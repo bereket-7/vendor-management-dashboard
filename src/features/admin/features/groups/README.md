@@ -56,7 +56,13 @@ pnpm test -- group
 
 ## API contract
 
-See [`docs/api-contracts/identity-groups.md`](../../../../docs/api-contracts/identity-groups.md).
+Live Django: `GET/POST/PATCH/DELETE /api/v1/identity-groups/` via `vendorCoreApi` / `groupApi` (JWT).  
+Mock: `NEXT_PUBLIC_USE_MOCK_GROUPS=true`.
+
+Deprecated Nest scaffold path `/api/admin/identity-groups/` — do not use.
+
+See monorepo [`docs/api/dashboard-endpoints.md`](../../../../../../docs/api/dashboard-endpoints.md).
+
 
 ## Offline (Dexie)
 

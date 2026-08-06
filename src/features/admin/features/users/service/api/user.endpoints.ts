@@ -1,3 +1,3 @@
 export const userEndpoints = {
-	list: () => "/api/admin/users/",
+	list: () => "/api/v1/users/",
 } as const;

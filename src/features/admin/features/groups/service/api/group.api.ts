@@ -1,18 +1,21 @@
-import { apiClient } from "@/lib/api/client";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
+import type { PaginatedResult } from "@/lib/vendor-core/types";
 
 import type {
-	ApiGroupListResponseDto,
 	ApiIdentityGroupDto,
 	GroupCreateDto,
 	GroupUpdateDto,
 } from "../../dto/group.dto";
 import type { GroupModel } from "../../types/group.types";
 import { toGroupModel, toGroupModelList } from "../mappers/group.mapper";
-import { groupEndpoints } from "./group.endpoints";
 import { MOCK_GROUPS } from "./group.mock";
 
 function isMockDataEnabled(): boolean {
 	return process.env.NEXT_PUBLIC_USE_MOCK_GROUPS === "true";
+}
+
+function unwrapList<T>(res: PaginatedResult<T> | T[]): T[] {
+	return Array.isArray(res) ? res : (res.results ?? []);
 }
 
 async function withMockFallback<T>(
@@ -27,9 +30,11 @@ export const groupApi = {
 	async list(): Promise<GroupModel[]> {
 		const dtos = await withMockFallback(
 			() =>
-				apiClient<ApiGroupListResponseDto | ApiIdentityGroupDto[]>(
-					groupEndpoints.list()
-				).then((res) => (Array.isArray(res) ? res : (res.results ?? []))),
+				vendorCoreApi
+					.listIdentityGroups()
+					.then((res) =>
+						unwrapList(res as PaginatedResult<ApiIdentityGroupDto> | ApiIdentityGroupDto[])
+					),
 			() => MOCK_GROUPS
 		);
 		return toGroupModelList(dtos);
@@ -37,7 +42,7 @@ export const groupApi = {
 
 	async getById(id: string): Promise<GroupModel | null> {
 		const dto = await withMockFallback(
-			() => apiClient<ApiIdentityGroupDto>(groupEndpoints.detail(id)),
+			() => vendorCoreApi.getIdentityGroup(id) as Promise<ApiIdentityGroupDto>,
 			() => MOCK_GROUPS.find((g) => String(g.id) === id) ?? null
 		);
 		if (!dto) return null;
@@ -47,10 +52,7 @@ export const groupApi = {
 	async create(payload: GroupCreateDto): Promise<GroupModel> {
 		const dto = await withMockFallback(
 			() =>
-				apiClient<ApiIdentityGroupDto>(groupEndpoints.create(), {
-					method: "POST",
-					body: JSON.stringify(payload),
-				}),
+				vendorCoreApi.createIdentityGroup(payload) as Promise<ApiIdentityGroupDto>,
 			() => ({
 				...payload,
 				id: `grp-${Date.now()}`,
@@ -67,10 +69,10 @@ export const groupApi = {
 	async update(id: string, payload: GroupUpdateDto): Promise<GroupModel> {
 		const dto = await withMockFallback(
 			() =>
-				apiClient<ApiIdentityGroupDto>(groupEndpoints.update(id), {
-					method: "PATCH",
-					body: JSON.stringify(payload),
-				}),
+				vendorCoreApi.updateIdentityGroup(
+					id,
+					payload
+				) as Promise<ApiIdentityGroupDto>,
 			() => {
 				const existing = MOCK_GROUPS.find((g) => String(g.id) === id);
 				return { ...existing, ...payload, id };
@@ -83,10 +85,7 @@ export const groupApi = {
 
 	async remove(id: string): Promise<void> {
 		await withMockFallback(
-			() =>
-				apiClient<void>(groupEndpoints.delete(id), {
-					method: "DELETE",
-				}),
+			() => vendorCoreApi.deleteIdentityGroup(id),
 			() => undefined
 		);
 	},

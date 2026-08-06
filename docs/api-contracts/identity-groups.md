@@ -2,9 +2,12 @@
 
 NestJS (or any REST backend) should implement these endpoints so the Next.js frontend can disable mocks (`NEXT_PUBLIC_USE_MOCK_GROUPS` unset).
 
-Base URL: `{NEXT_PUBLIC_API_URL}` (e.g. `http://localhost:3001`)
+**Implemented on Django:** `GET/POST/PATCH/DELETE /api/v1/identity-groups/` — dashboard `groupApi` uses `vendorCoreFetch` + JWT. Nest `/api/admin/identity-groups/` is deprecated.
 
-Auth: session cookie from Better Auth (`credentials: "include"` on fetch).
+Base URL: `{NEXT_PUBLIC_VENDOR_CORE_API_URL}` (e.g. `http://localhost:8010`) for live cutover.
+
+Auth: JWT Bearer from `POST /api/v1/authentication/token/` (session cookie Nest path is legacy).
+
 
 ## Endpoints
 
