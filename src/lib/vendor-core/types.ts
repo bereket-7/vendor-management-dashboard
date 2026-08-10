@@ -135,7 +135,7 @@ export type IntakeJobRunDto = {
 	job_id: string;
 };
 
-/** GET /api/v1/member-coverages/list/ — 834 coverage shells from intake. */
+/** GET /api/v1/member-coverages/ — 834 coverage shells from intake. */
 export type MemberCoverageDto = {
 	id: string;
 	reference_id?: string;
@@ -523,7 +523,7 @@ export type ProcessingEventDto = {
 	metadata?: Record<string, unknown> | null;
 };
 
-/** GET /api/v1/validation-results/list/ — row-level validation issue. */
+/** GET /api/v1/validation-results/ — row-level validation issue. */
 export type ValidationResultDto = {
 	id: string;
 	inbound_file_id?: string | null;

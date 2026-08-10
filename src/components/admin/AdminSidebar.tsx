@@ -193,7 +193,9 @@ export function AdminSidebar() {
 														<SidebarMenuButton
 															asChild
 															isActive={!isExternal && active}
-															tooltip={label}
+															tooltip={
+																item.prototype ? `${label} (prototype)` : label
+															}
 														>
 															{isExternal ? (
 																<a href={item.href}>
@@ -203,7 +205,12 @@ export function AdminSidebar() {
 															) : (
 																<Link href={item.href}>
 																	<Icon />
-																	<span>{label}</span>
+																	<span className="truncate">{label}</span>
+																	{item.prototype ? (
+																		<span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
+																			UI
+																		</span>
+																	) : null}
 																</Link>
 															)}
 														</SidebarMenuButton>

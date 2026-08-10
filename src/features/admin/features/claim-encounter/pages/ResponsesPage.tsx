@@ -46,8 +46,12 @@ import {
 	exportRowsAsCsv,
 	responsesForProgram,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { claimResponseDtosToResponses } from "@/features/admin/features/claim-encounter/live-claims";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { Link } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { useVendorCoreClaimResponses } from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -83,7 +87,18 @@ function timeOnly(value: string) {
 }
 
 export function ResponsesPage() {
+	if (isMockEnabled()) return <ResponsesPageInner />;
+	return (
+		<VendorCoreGate>
+			<ResponsesPageInner />
+		</VendorCoreGate>
+	);
+}
+
+function ResponsesPageInner() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const live = !isMockEnabled();
+	const liveResponses = useVendorCoreClaimResponses(live);
 	const [vendor, setVendor] = useState("all");
 	const [responseType, setResponseType] = useState("all");
 	const [status, setStatus] = useState("all");
@@ -93,10 +108,15 @@ export function ResponsesPage() {
 	const [page, setPage] = useState(1);
 	const pageSize = 8;
 
-	const baseRows = useMemo(
-		() => responsesForProgram(programFilter),
-		[programFilter]
-	);
+	const baseRows = useMemo(() => {
+		if (live) {
+			return claimResponseDtosToResponses(
+				(liveResponses.data ?? []) as Record<string, unknown>[],
+				programFilter
+			);
+		}
+		return responsesForProgram(programFilter);
+	}, [live, liveResponses.data, programFilter]);
 
 	const vendors = VENDOR_NAMES;
 

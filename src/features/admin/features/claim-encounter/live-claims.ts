@@ -1,4 +1,10 @@
-import type { ClaimLine, ProgramFileType } from "@/features/admin/features/claim-encounter/mock-data";
+import type {
+	ClaimException,
+	ClaimLine,
+	ClaimResponse,
+	ClaimVendorFile,
+	ProgramFileType,
+} from "@/features/admin/features/claim-encounter/mock-data";
 import type { ClaimLineDto } from "@/lib/vendor-core/types";
 
 const PROVIDERS = [
@@ -104,4 +110,147 @@ export function findClaimLineByClaimId(
 			row.claimId === decoded ||
 			row.claimId.toLowerCase() === decoded.toLowerCase()
 	);
+}
+
+function str(value: unknown, fallback = ""): string {
+	if (value == null) return fallback;
+	return String(value);
+}
+
+function num(value: unknown, fallback = 0): number {
+	const n = Number(value);
+	return Number.isFinite(n) ? n : fallback;
+}
+
+/** Map Django `/claim-vendor-files/` rows into claim workbench file cards. */
+export function claimVendorFileDtosToFiles(
+	rows: Record<string, unknown>[],
+	program: ProgramFileType = "DHCF"
+): ClaimVendorFile[] {
+	return rows.map((row, index) => {
+		const id = str(row.id);
+		const claimCount = num(row.claim_count);
+		const rejected = num(row.rejected_count);
+		const accepted = Math.max(claimCount - rejected, 0);
+		const statusRaw = str(row.status, "pending").toLowerCase();
+		const reviewStatus: ClaimVendorFile["reviewStatus"] =
+			statusRaw.includes("reject")
+				? "rejected"
+				: statusRaw.includes("accept") || statusRaw.includes("complete")
+					? "accepted"
+					: "pending";
+		const fileStatus: ClaimVendorFile["status"] =
+			reviewStatus === "rejected"
+				? "rejected"
+				: reviewStatus === "accepted"
+					? "accepted"
+					: "pending";
+		return {
+			id,
+			fileId: str(
+				row.transaction_set_control_number,
+				`CVF-${id.slice(0, 8).toUpperCase()}`
+			),
+			vendor: str(row.vendor_name ?? row.vendor, "Vendor"),
+			direction: "inbound",
+			program,
+			fileTypeLabel: "837 Professional",
+			transactionType: "837",
+			fileName: `${str(row.transaction_set_control_number, id)}.edi`,
+			receivedAt: str(row.created_at, new Date().toISOString()),
+			records: claimCount,
+			submitted: claimCount,
+			accepted,
+			rejected,
+			partial: 0,
+			paid: accepted,
+			denied: rejected,
+			status: fileStatus,
+			responseCode: null,
+			notes: null,
+			avgResponseMinutes: null,
+			reviewStatus,
+			rejectReasons: [],
+			reviewedAt: null,
+			reviewedBy: null,
+			sourceInboundFileId: row.source_inbound_file
+				? str(row.source_inbound_file)
+				: null,
+			outboundSendStatus: null,
+			ediFixture: "837I",
+		};
+	});
+}
+
+/** Map Django `/claim-responses/` rows. */
+export function claimResponseDtosToResponses(
+	rows: Record<string, unknown>[],
+	program: ProgramFileType = "DHCF"
+): ClaimResponse[] {
+	return rows.map((row, index) => {
+		const id = str(row.id);
+		const accepted = num(row.accepted_count);
+		const rejected = num(row.rejected_count);
+		const typeRaw = str(row.response_type, "835").toUpperCase();
+		const responseType: ClaimResponse["responseType"] =
+			typeRaw === "277CA" ||
+			typeRaw === "999" ||
+			typeRaw === "TA1" ||
+			typeRaw === "835"
+				? typeRaw
+				: "835";
+		return {
+			id,
+			responseId: `RESP-${id.slice(0, 8).toUpperCase()}`,
+			responseFile: `${responseType}_${id.slice(0, 8)}.edi`,
+			submissionBatch: str(row.batch, `BATCH-${index + 1}`),
+			relatedFileId: str(row.source_inbound_file, id),
+			vendor: str(row.vendor_name ?? row.vendor, "Vendor"),
+			program,
+			claimType: "Professional Claim",
+			responseType,
+			receivedAt: str(row.received_at ?? row.created_at, new Date().toISOString()),
+			totalSubmitted: accepted + rejected,
+			paid: accepted,
+			rejected,
+			partialPaid: 0,
+			pending: 0,
+			acceptedCount: accepted,
+			rejectedCount: rejected,
+			status: rejected > accepted ? "rejected" : "accepted",
+			summary: `${accepted} accepted / ${rejected} rejected`,
+			direction: "inbound",
+			ediFixture: responseType === "835" ? "835" : "837I",
+		};
+	});
+}
+
+/** Map Django `/claim-exceptions/` rows. */
+export function claimExceptionDtosToExceptions(
+	rows: Record<string, unknown>[],
+	program: ProgramFileType = "DHCF"
+): ClaimException[] {
+	return rows.map((row) => {
+		const id = str(row.id);
+		const severityRaw = str(row.severity, "error").toLowerCase();
+		const statusRaw = str(row.status, "open").toLowerCase();
+		return {
+			id,
+			exceptionId: `EX-${id.slice(0, 8).toUpperCase()}`,
+			fileId: str(row.batch ?? row.source_inbound_file, id),
+			vendor: str(row.vendor_name ?? row.vendor, "Vendor"),
+			program,
+			severity: severityRaw === "warning" ? "warning" : "error",
+			code: str(row.code, "EXC"),
+			message: str(row.message, "Exception"),
+			claimId: row.claim_line ? str(row.claim_line) : null,
+			status:
+				statusRaw === "resolved"
+					? "resolved"
+					: statusRaw.includes("progress")
+						? "in_progress"
+						: "open",
+			detectedAt: str(row.created_at, new Date().toISOString()),
+		};
+	});
 }

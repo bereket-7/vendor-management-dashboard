@@ -44,7 +44,11 @@ import {
 	REJECT_REASON_CATALOG,
 	exceptionsForProgram,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { claimExceptionDtosToExceptions } from "@/features/admin/features/claim-encounter/live-claims";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { useVendorCoreClaimExceptions } from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -54,7 +58,18 @@ function timeOnly(value: string) {
 }
 
 export function ExceptionsRejectionsPage() {
+	if (isMockEnabled()) return <ExceptionsRejectionsPageInner />;
+	return (
+		<VendorCoreGate>
+			<ExceptionsRejectionsPageInner />
+		</VendorCoreGate>
+	);
+}
+
+function ExceptionsRejectionsPageInner() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const live = !isMockEnabled();
+	const liveExceptions = useVendorCoreClaimExceptions(live);
 	const [vendor, setVendor] = useState("all");
 	const [severity, setSeverity] = useState("all");
 	const [status, setStatus] = useState("all");
@@ -64,10 +79,15 @@ export function ExceptionsRejectionsPage() {
 	const [page, setPage] = useState(1);
 	const pageSize = 8;
 
-	const baseRows = useMemo(
-		() => exceptionsForProgram(programFilter),
-		[programFilter]
-	);
+	const baseRows = useMemo(() => {
+		if (live) {
+			return claimExceptionDtosToExceptions(
+				(liveExceptions.data ?? []) as Record<string, unknown>[],
+				programFilter
+			);
+		}
+		return exceptionsForProgram(programFilter);
+	}, [live, liveExceptions.data, programFilter]);
 
 	const vendors = VENDOR_NAMES;
 

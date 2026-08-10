@@ -11,5 +11,10 @@ export interface SidebarNavItem {
 	section?: string;
 	/** Admin module this nav item belongs to */
 	module?: AdminModuleId;
+	/**
+	 * UI prototype — no Django `/api/v1` surface yet.
+	 * Shown in nav for demos; live mode still uses fixtures or empty states.
+	 */
+	prototype?: boolean;
 	items?: SidebarNavItem[];
 }

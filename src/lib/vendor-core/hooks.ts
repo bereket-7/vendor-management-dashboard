@@ -36,6 +36,10 @@ export const vendorCoreKeys = {
 	providers: () => [...vendorCoreKeys.all, "providers"] as const,
 	providerRosters: () => [...vendorCoreKeys.all, "provider-rosters"] as const,
 	claimLines: () => [...vendorCoreKeys.all, "claim-lines"] as const,
+	claimVendorFiles: () => [...vendorCoreKeys.all, "claim-vendor-files"] as const,
+	claimResponses: () => [...vendorCoreKeys.all, "claim-responses"] as const,
+	claimExceptions: () => [...vendorCoreKeys.all, "claim-exceptions"] as const,
+	notifications: () => [...vendorCoreKeys.all, "notifications"] as const,
 };
 
 function useAuthAwareQuery<T>(
@@ -243,6 +247,50 @@ export function useVendorCoreClaimLines(enabled = true) {
 		vendorCoreKeys.claimLines(),
 		async () => {
 			const page = await vendorCoreApi.listClaimLines();
+			return page.results ?? [];
+		},
+		enabled
+	);
+}
+
+export function useVendorCoreClaimVendorFiles(enabled = true) {
+	return useAuthAwareQuery(
+		vendorCoreKeys.claimVendorFiles(),
+		async () => {
+			const page = await vendorCoreApi.listClaimVendorFiles();
+			return page.results ?? [];
+		},
+		enabled
+	);
+}
+
+export function useVendorCoreClaimResponses(enabled = true) {
+	return useAuthAwareQuery(
+		vendorCoreKeys.claimResponses(),
+		async () => {
+			const page = await vendorCoreApi.listClaimResponses();
+			return page.results ?? [];
+		},
+		enabled
+	);
+}
+
+export function useVendorCoreClaimExceptions(enabled = true) {
+	return useAuthAwareQuery(
+		vendorCoreKeys.claimExceptions(),
+		async () => {
+			const page = await vendorCoreApi.listClaimExceptions();
+			return page.results ?? [];
+		},
+		enabled
+	);
+}
+
+export function useVendorCoreNotifications(enabled = true) {
+	return useAuthAwareQuery(
+		vendorCoreKeys.notifications(),
+		async () => {
+			const page = await vendorCoreApi.listNotifications();
 			return page.results ?? [];
 		},
 		enabled

@@ -1,4 +1,9 @@
-import { getStoredAccessToken, getVendorCoreBaseUrl, vendorCoreFetch } from "@/lib/vendor-core/client";
+import {
+	VendorCoreApiError,
+	getStoredAccessToken,
+	getVendorCoreBaseUrl,
+	vendorCoreFetch,
+} from "@/lib/vendor-core/client";
 import type {
 	AccountDto,
 	AuditRecordDto,
@@ -6,8 +11,6 @@ import type {
 	CoreUserDto,
 	CredentialDto,
 	ErrorRecordDto,
-	IdentityGroupCreateDto,
-	IdentityGroupDto,
 	InboundFileDto,
 	IntakeJobDto,
 	IntakeJobRunDto,
@@ -15,7 +18,6 @@ import type {
 	MemberCoverageDto,
 	MonitoringDashboardDto,
 	PaginatedResult,
-	ProcessingEventDto,
 	ProviderDto,
 	ProviderRosterDto,
 	ClaimLineDto,
@@ -40,70 +42,115 @@ import {
 } from "@/lib/vendor-core/types";
 
 /**
- * Live vendor-core paths (api.vm.tillahealth.com):
- * - Most resources: GET …/list/ + POST …/create/
- * - Intake jobs, inbound files, uploads, monitoring: REST-style roots
+ * Live Django vendor-core paths (`/api/v1/*`).
+ * Collection resources use REST list/create on the same URL;
+ * detail uses GET/PATCH on `/resource/{id}/`.
  */
 export const vendorCoreEndpoints = {
-	vendorsList: "/api/v1/vendors/list/",
-	vendorsCreate: "/api/v1/vendors/create/",
+	vendors: "/api/v1/vendors/",
+	vendorsInvite: "/api/v1/vendors/invite/",
 	vendor: (id: string) => `/api/v1/vendors/${id}/`,
-	accountsList: "/api/v1/accounts/list/",
-	accountsCreate: "/api/v1/accounts/create/",
-	credentialsList: "/api/v1/credentials/list/",
-	credentialsCreate: "/api/v1/credentials/create/",
-	connectionsList: "/api/v1/connections/list/",
-	connectionsCreate: "/api/v1/connections/create/",
+	categories: "/api/v1/categories/",
+	vendorMe: "/api/v1/vendor/me/",
+	vendorTeam: "/api/v1/vendor/team/",
+	accounts: "/api/v1/accounts/",
+	account: (id: string) => `/api/v1/accounts/${id}/`,
+	credentials: "/api/v1/credentials/",
+	credential: (id: string) => `/api/v1/credentials/${id}/`,
+	connections: "/api/v1/connections/",
 	connection: (id: string) => `/api/v1/connections/${id}/`,
 	connectionTest: (id: string) => `/api/v1/connections/${id}/test/`,
 	intakeJobs: "/api/v1/intake-jobs/",
 	intakeJob: (id: string) => `/api/v1/intake-jobs/${id}/`,
 	intakeJobRun: (id: string) => `/api/v1/intake-jobs/${id}/run/`,
-	intakeJobRunsList: "/api/v1/intake-job-runs/list/",
-	memberCoveragesList: "/api/v1/member-coverages/list/",
-	memberCoveragesCreate: "/api/v1/member-coverages/create/",
-	memberCoveragesSeed: "/api/v1/member-coverages/seed/",
-	providersList: "/api/v1/providers/list/",
-	providersSeed: "/api/v1/providers/seed/",
-	providerRostersList: "/api/v1/provider-rosters/list/",
-	claimLinesList: "/api/v1/claim-lines/list/",
-	claimLinesCreate: "/api/v1/claim-lines/create/",
-	claimLinesSeed: "/api/v1/claim-lines/seed/",
-	claimLine: (id: string) => `/api/v1/claim-lines/${id}/`,
-	claimLineUpdate: (id: string) => `/api/v1/claim-lines/${id}/update/`,
-	claimLineDelete: (id: string) => `/api/v1/claim-lines/${id}/delete/`,
-	claimLineHardDelete: (id: string) => `/api/v1/claim-lines/${id}/hard-delete/`,
-	claimLineRestore: (id: string) => `/api/v1/claim-lines/${id}/restore/`,
-	eligibilityFilesList: "/api/v1/eligibility-files/list/",
-	eligibilityFilesCreate: "/api/v1/eligibility-files/create/",
+	intakeJobRuns: "/api/v1/intake-job-runs/",
+	memberCoverages: "/api/v1/member-coverages/",
+	providers: "/api/v1/providers/",
+	providerRosters: "/api/v1/provider-rosters/",
+	claimLines: "/api/v1/claim-lines/",
+	claimVendorFiles: "/api/v1/claim-vendor-files/",
+	claimVendorFile: (id: string) => `/api/v1/claim-vendor-files/${id}/`,
+	claimResponses: "/api/v1/claim-responses/",
+	claimExceptions: "/api/v1/claim-exceptions/",
+	submissionBatches: "/api/v1/submission-batches/",
+	eligibilityFiles: "/api/v1/eligibility-files/",
 	inboundFiles: "/api/v1/inbound-files/",
 	inboundFile: (id: string) => `/api/v1/inbound-files/${id}/`,
 	inboundFileEvents: (id: string) => `/api/v1/inbound-files/${id}/events/`,
 	inboundFileReprocess: (id: string) =>
 		`/api/v1/inbound-files/${id}/reprocess/`,
-	inboundFilesSeed: "/api/v1/inbound-files/seed/",
-	validationResultsList: "/api/v1/validation-results/list/",
+	validationResults: "/api/v1/validation-results/",
 	uploads: "/api/v1/intake/uploads/",
 	monitoring: "/api/v1/monitoring/",
-	errorsList: "/api/v1/errors/list/",
+	errors: "/api/v1/errors/",
 	error: (id: string) => `/api/v1/errors/${id}/`,
 	errorRetry: (id: string) => `/api/v1/errors/${id}/retry/`,
 	errorResolve: (id: string) => `/api/v1/errors/${id}/resolve/`,
-	routingRulesList: "/api/v1/routing-rules/list/",
-	routingRulesCreate: "/api/v1/routing-rules/create/",
-	auditList: "/api/v1/audit/list/",
+	routingRules: "/api/v1/routing-rules/",
+	routingRule: (id: string) => `/api/v1/routing-rules/${id}/`,
+	audit: "/api/v1/audit/",
 	users: "/api/v1/users/",
 	userUpdate: (id: string) => `/api/v1/users/${id}/update/`,
 	userPassword: (id: string) => `/api/v1/users/${id}/password/`,
 	userLoginEvents: (id: string) => `/api/v1/users/${id}/login-events/`,
 	loginEvents: "/api/v1/users/login-events/",
 	myLoginEvents: "/api/v1/users/me/login-events/",
-	vendorUpdate: (id: string) => `/api/v1/vendors/${id}/update/`,
-	vendorDelete: (id: string) => `/api/v1/vendors/${id}/delete/`,
-	vendorHardDelete: (id: string) => `/api/v1/vendors/${id}/hard-delete/`,
-	vendorRestore: (id: string) => `/api/v1/vendors/${id}/restore/`,
+	identityGroups: "/api/v1/identity-groups/",
+	identityGroup: (id: string) => `/api/v1/identity-groups/${id}/`,
+	roles: "/api/v1/roles/",
+	settings: "/api/v1/settings/",
+	onboarding: "/api/v1/onboarding/",
+	onboardingDetail: (id: string) => `/api/v1/onboarding/${id}/`,
+	documents: "/api/v1/documents/",
+	document: (id: string) => `/api/v1/documents/${id}/`,
+	contracts: "/api/v1/contracts/",
+	contract: (id: string) => `/api/v1/contracts/${id}/`,
+	rfx: "/api/v1/rfx/",
+	rfxDetail: (id: string) => `/api/v1/rfx/${id}/`,
+	rfxBids: (id: string) => `/api/v1/rfx/${id}/bids/`,
+	purchaseOrders: "/api/v1/purchase-orders/",
+	purchaseOrder: (id: string) => `/api/v1/purchase-orders/${id}/`,
+	invoices: "/api/v1/invoices/",
+	invoice: (id: string) => `/api/v1/invoices/${id}/`,
+	approvals: "/api/v1/approvals/",
+	approval: (id: string) => `/api/v1/approvals/${id}/`,
+	scorecards: "/api/v1/scorecards/",
+	certificates: "/api/v1/certificates/",
+	notifications: "/api/v1/notifications/",
+	notification: (id: string) => `/api/v1/notifications/${id}/`,
 	health: "/health/",
 } as const;
+
+/** @deprecated Use vendorCoreEndpoints.vendors — kept for call-site clarity aliases */
+export const vendorCoreEndpointAliases = {
+	vendorsList: vendorCoreEndpoints.vendors,
+	vendorsCreate: vendorCoreEndpoints.vendors,
+	accountsList: vendorCoreEndpoints.accounts,
+	accountsCreate: vendorCoreEndpoints.accounts,
+	credentialsList: vendorCoreEndpoints.credentials,
+	credentialsCreate: vendorCoreEndpoints.credentials,
+	connectionsList: vendorCoreEndpoints.connections,
+	connectionsCreate: vendorCoreEndpoints.connections,
+	intakeJobRunsList: vendorCoreEndpoints.intakeJobRuns,
+	memberCoveragesList: vendorCoreEndpoints.memberCoverages,
+	providersList: vendorCoreEndpoints.providers,
+	providerRostersList: vendorCoreEndpoints.providerRosters,
+	claimLinesList: vendorCoreEndpoints.claimLines,
+	eligibilityFilesList: vendorCoreEndpoints.eligibilityFiles,
+	validationResultsList: vendorCoreEndpoints.validationResults,
+	errorsList: vendorCoreEndpoints.errors,
+	routingRulesList: vendorCoreEndpoints.routingRules,
+	routingRulesCreate: vendorCoreEndpoints.routingRules,
+	auditList: vendorCoreEndpoints.audit,
+	vendorUpdate: vendorCoreEndpoints.vendor,
+} as const;
+
+function unsupported(operation: string): never {
+	throw new VendorCoreApiError(
+		`${operation} is not exposed by Django vendor-core yet`,
+		501
+	);
+}
 
 function pageParams(extra?: Record<string, string | number | undefined | null>) {
 	// Django list endpoints reject limit > 100 ("One or more fields are invalid.")
@@ -146,6 +193,28 @@ function mapPage<T, R>(
 	};
 }
 
+async function listResourcePages<T>(
+	path: string,
+	params?: Record<string, string | number | undefined | null>,
+	pageSize = 100
+): Promise<PaginatedResult<T>> {
+	const results = await listAllPages(
+		({ limit, offset }) =>
+			vendorCoreFetch<PaginatedResult<T>>(path, {
+				params: pageParams({ ...params, limit, offset }),
+			}),
+		pageSize
+	);
+	return {
+		limit: results.length,
+		offset: 0,
+		count: results.length,
+		next: null,
+		previous: null,
+		results,
+	};
+}
+
 export const vendorCoreApi = {
 	createVendor: (body: {
 		vendor_code: string;
@@ -157,7 +226,17 @@ export const vendorCoreApi = {
 		tier?: string;
 		metadata?: Record<string, unknown>;
 	}) =>
-		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendorsCreate, {
+		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendors, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}).then((v) => normalizeVendor(v as unknown as Record<string, unknown>)),
+
+	inviteVendor: (body: {
+		legal_name: string;
+		email: string;
+		categories?: string[];
+	}) =>
+		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendorsInvite, {
 			method: "POST",
 			body: JSON.stringify(body),
 		}).then((v) => normalizeVendor(v as unknown as Record<string, unknown>)),
@@ -170,7 +249,7 @@ export const vendorCoreApi = {
 		active?: boolean;
 		metadata?: Record<string, unknown>;
 	}) =>
-		vendorCoreFetch<AccountDto>(vendorCoreEndpoints.accountsCreate, {
+		vendorCoreFetch<AccountDto>(vendorCoreEndpoints.accounts, {
 			method: "POST",
 			body: JSON.stringify(body),
 		}).then((a) => normalizeAccount(a as unknown as Record<string, unknown>)),
@@ -181,13 +260,13 @@ export const vendorCoreApi = {
 		secret_ref: string;
 		metadata?: Record<string, unknown>;
 	}) =>
-		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credentialsCreate, {
+		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credentials, {
 			method: "POST",
 			body: JSON.stringify(body),
 		}),
 
 	createConnection: (body: Record<string, unknown>) =>
-		vendorCoreFetch<ConnectionDto>(vendorCoreEndpoints.connectionsCreate, {
+		vendorCoreFetch<ConnectionDto>(vendorCoreEndpoints.connections, {
 			method: "POST",
 			body: JSON.stringify(body),
 		}).then((c) =>
@@ -201,7 +280,7 @@ export const vendorCoreApi = {
 		}).then((j) => normalizeJob(j as unknown as Record<string, unknown>)),
 
 	createRoutingRule: (body: Record<string, unknown>) =>
-		vendorCoreFetch<RoutingRuleDto>(vendorCoreEndpoints.routingRulesCreate, {
+		vendorCoreFetch<RoutingRuleDto>(vendorCoreEndpoints.routingRules, {
 			method: "POST",
 			body: JSON.stringify(body),
 		}),
@@ -210,7 +289,7 @@ export const vendorCoreApi = {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
-			>(vendorCoreEndpoints.vendorsList, {
+			>(vendorCoreEndpoints.vendors, {
 				params: pageParams({ ...params, limit, offset }),
 			});
 			return mapPage(page, normalizeVendor);
@@ -236,7 +315,7 @@ export const vendorCoreApi = {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
-			>(vendorCoreEndpoints.accountsList, {
+			>(vendorCoreEndpoints.accounts, {
 				params: pageParams({ ...params, limit, offset }),
 			});
 			return mapPage(page, normalizeAccount);
@@ -253,7 +332,7 @@ export const vendorCoreApi = {
 
 	listCredentials: () =>
 		vendorCoreFetch<PaginatedResult<CredentialDto>>(
-			vendorCoreEndpoints.credentialsList,
+			vendorCoreEndpoints.credentials,
 			{ params: pageParams() }
 		),
 
@@ -265,7 +344,7 @@ export const vendorCoreApi = {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
-			>(vendorCoreEndpoints.connectionsList, {
+			>(vendorCoreEndpoints.connections, {
 				params: pageParams({ ...params, limit, offset }),
 			});
 			return mapPage(page, normalizeConnection);
@@ -287,7 +366,6 @@ export const vendorCoreApi = {
 		),
 
 	listIntakeJobs: async (params?: { status?: string; vendor_id?: string }) => {
-		// Intake jobs clamp page size (~50); page through until exhausted.
 		const results = await listAllPages(
 			async ({ limit, offset }) => {
 				const page = await vendorCoreFetch<
@@ -334,10 +412,9 @@ export const vendorCoreApi = {
 		limit?: number;
 		offset?: number;
 	}) => {
-		// Runs grow quickly; return one page (UI can filter / refresh).
 		const page = await vendorCoreFetch<
 			PaginatedResult<Record<string, unknown>>
-		>(vendorCoreEndpoints.intakeJobRunsList, {
+		>(vendorCoreEndpoints.intakeJobRuns, {
 			params: pageParams({
 				job_id: params?.job_id,
 				stage: params?.stage,
@@ -352,7 +429,7 @@ export const vendorCoreApi = {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
-			>(vendorCoreEndpoints.memberCoveragesList, {
+			>(vendorCoreEndpoints.memberCoverages, {
 				params: pageParams({ ...params, limit, offset }),
 			});
 			return mapPage(page, normalizeMemberCoverage);
@@ -367,18 +444,14 @@ export const vendorCoreApi = {
 		} satisfies PaginatedResult<MemberCoverageDto>;
 	},
 
-	createEligibilityFile: (body: {
+	createEligibilityFile: (_body: {
 		vendor_id?: string;
 		original_filename?: string;
 		received_at?: string;
 		member_count?: number;
-	}) =>
-		vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.eligibilityFilesCreate,
-			{ method: "POST", body: JSON.stringify(body) }
-		),
+	}) => unsupported("POST /eligibility-files/"),
 
-	createMemberCoverage: (body: {
+	createMemberCoverage: (_body: {
 		eligibility_file_id: string;
 		subscriber_id: string;
 		group_or_policy_number?: string;
@@ -386,24 +459,10 @@ export const vendorCoreApi = {
 		member_last_name?: string;
 		maintenance_type_code?: string;
 		raw_object_id?: string;
-	}) =>
-		vendorCoreFetch<MemberCoverageDto>(
-			vendorCoreEndpoints.memberCoveragesCreate,
-			{ method: "POST", body: JSON.stringify(body) }
-		).then((row) =>
-			normalizeMemberCoverage(row as unknown as Record<string, unknown>)
-		),
+	}) => unsupported("POST /member-coverages/"),
 
-	seedMemberCoverages: (body?: { vendor_id?: string; count?: number }) =>
-		vendorCoreFetch<{
-			created: number;
-			skipped?: boolean;
-			existing?: number;
-			eligibility_file_id?: string | null;
-		}>(vendorCoreEndpoints.memberCoveragesSeed, {
-			method: "POST",
-			body: JSON.stringify(body ?? {}),
-		}),
+	seedMemberCoverages: (_body?: { vendor_id?: string; count?: number }) =>
+		unsupported("POST /member-coverages/seed/"),
 
 	listInboundFiles: async (params?: {
 		stage?: string;
@@ -441,16 +500,8 @@ export const vendorCoreApi = {
 			{ method: "POST" }
 		),
 
-	seedInboundProcessing: (body?: { vendor_id?: string; force?: boolean }) =>
-		vendorCoreFetch<{
-			created: number;
-			skipped?: boolean;
-			existing_inbound_files?: number;
-			inbound_file_ids?: string[];
-		}>(vendorCoreEndpoints.inboundFilesSeed, {
-			method: "POST",
-			body: JSON.stringify(body ?? {}),
-		}),
+	seedInboundProcessing: (_body?: { vendor_id?: string; force?: boolean }) =>
+		unsupported("POST /inbound-files/seed/"),
 
 	listInboundFileEvents: async (inboundFileId: string) => {
 		const data = await vendorCoreFetch<
@@ -471,7 +522,7 @@ export const vendorCoreApi = {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
-			>(vendorCoreEndpoints.validationResultsList, {
+			>(vendorCoreEndpoints.validationResults, {
 				params: pageParams({ ...params, limit, offset }),
 			});
 			return mapPage(page, normalizeValidationResult);
@@ -506,25 +557,7 @@ export const vendorCoreApi = {
 		return normalizeInboundFile(raw);
 	},
 
-	getInboundFile: (id: string) =>
-		vendorCoreFetch<InboundFileDto>(vendorCoreEndpoints.inboundFileDetail(id)),
-
-	reprocessInboundFile: (id: string) =>
-		vendorCoreFetch<InboundFileDto>(
-			vendorCoreEndpoints.inboundFileReprocess(id),
-			{ method: "POST" }
-		),
-
-	listInboundFileEvents: (id: string) =>
-		vendorCoreFetch<
-			PaginatedResult<{
-				id: string;
-				stage: string;
-				message: string;
-				created_at?: string;
-			}>
-		>(vendorCoreEndpoints.inboundFileEvents(id)),
-
+	/** Alias used by older call sites */
 	uploadIntake: async (input: {
 		file: File;
 		connection_id?: string;
@@ -536,7 +569,7 @@ export const vendorCoreApi = {
 		if (input.job_id) form.append("job_id", input.job_id);
 		const token = getStoredAccessToken();
 		const response = await fetch(
-			`${getVendorCoreBaseUrl()}${vendorCoreEndpoints.intakeUploads}`,
+			`${getVendorCoreBaseUrl()}${vendorCoreEndpoints.uploads}`,
 			{
 				method: "POST",
 				headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -559,7 +592,7 @@ export const vendorCoreApi = {
 	listErrors: async (params?: { status?: string; category?: string }) => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-				vendorCoreEndpoints.errorsList,
+				vendorCoreEndpoints.errors,
 				{ params: pageParams({ ...params, limit, offset }) }
 			);
 			return mapPage(page, normalizeErrorRecord);
@@ -596,7 +629,7 @@ export const vendorCoreApi = {
 	listProviders: async () => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-				vendorCoreEndpoints.providersList,
+				vendorCoreEndpoints.providers,
 				{ params: pageParams({ limit, offset }) }
 			);
 			return mapPage(page, normalizeProvider);
@@ -614,7 +647,7 @@ export const vendorCoreApi = {
 	listProviderRosters: async () => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-				vendorCoreEndpoints.providerRostersList,
+				vendorCoreEndpoints.providerRosters,
 				{ params: pageParams({ limit, offset }) }
 			);
 			return mapPage(page, normalizeProviderRoster);
@@ -629,22 +662,16 @@ export const vendorCoreApi = {
 		} satisfies PaginatedResult<ProviderRosterDto>;
 	},
 
-	seedProviders: (body?: { vendor_id?: string; count?: number; force?: boolean }) =>
-		vendorCoreFetch<{
-			created: number;
-			skipped?: boolean;
-			existing_providers?: number;
-			roster_file_id?: string | null;
-			provider_ids?: string[];
-		}>(vendorCoreEndpoints.providersSeed, {
-			method: "POST",
-			body: JSON.stringify(body ?? {}),
-		}),
+	seedProviders: (_body?: {
+		vendor_id?: string;
+		count?: number;
+		force?: boolean;
+	}) => unsupported("POST /providers/seed/"),
 
 	listClaimLines: async () => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-				vendorCoreEndpoints.claimLinesList,
+				vendorCoreEndpoints.claimLines,
 				{ params: pageParams({ limit, offset }) }
 			);
 			return mapPage(page, normalizeClaimLine);
@@ -659,85 +686,82 @@ export const vendorCoreApi = {
 		} satisfies PaginatedResult<ClaimLineDto>;
 	},
 
-	getClaimLine: (id: string) =>
-		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.claimLine(id)).then(
-			(row) => normalizeClaimLine(row)
+	getClaimLine: (_id: string) => unsupported("GET /claim-lines/{id}/"),
+
+	createClaimLine: (_body: Record<string, unknown>) =>
+		unsupported("POST /claim-lines/"),
+
+	updateClaimLine: (_id: string, _body: Record<string, unknown>) =>
+		unsupported("PATCH /claim-lines/{id}/"),
+
+	deleteClaimLine: (_id: string) => unsupported("DELETE /claim-lines/{id}/"),
+
+	hardDeleteClaimLine: (_id: string) =>
+		unsupported("DELETE /claim-lines/{id}/hard-delete/"),
+
+	restoreClaimLine: (_id: string) =>
+		unsupported("POST /claim-lines/{id}/restore/"),
+
+	seedClaimLines: (_body?: { vendor_id?: string; force?: boolean }) =>
+		unsupported("POST /claim-lines/seed/"),
+
+	listClaimVendorFiles: () =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.claimVendorFiles
 		),
 
-	createClaimLine: (body: Record<string, unknown>) =>
-		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.claimLinesCreate, {
-			method: "POST",
-			body: JSON.stringify(body),
-		}).then((row) => normalizeClaimLine(row)),
-
-	updateClaimLine: (id: string, body: Record<string, unknown>) =>
+	getClaimVendorFile: (id: string) =>
 		vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.claimLineUpdate(id),
-			{
-				method: "PATCH",
-				body: JSON.stringify(body),
-			}
-		).then((row) => normalizeClaimLine(row)),
+			vendorCoreEndpoints.claimVendorFile(id)
+		),
 
-	deleteClaimLine: (id: string) =>
-		vendorCoreFetch<{ id: string }>(vendorCoreEndpoints.claimLineDelete(id), {
-			method: "DELETE",
-		}),
+	listClaimResponses: () =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.claimResponses
+		),
 
-	hardDeleteClaimLine: (id: string) =>
-		vendorCoreFetch<{ id: string }>(vendorCoreEndpoints.claimLineHardDelete(id), {
-			method: "DELETE",
-		}),
+	listClaimExceptions: () =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.claimExceptions
+		),
 
-	restoreClaimLine: (id: string) =>
-		vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.claimLineRestore(id),
-			{ method: "POST" }
-		).then((row) => normalizeClaimLine(row)),
-
-	seedClaimLines: (body?: { vendor_id?: string; force?: boolean }) =>
-		vendorCoreFetch<{
-			created: number;
-			skipped?: boolean;
-			existing_claim_lines?: number;
-			batch_id?: string | null;
-			claim_line_ids?: string[];
-		}>(vendorCoreEndpoints.claimLinesSeed, {
-			method: "POST",
-			body: JSON.stringify(body ?? {}),
-		}),
+	listSubmissionBatches: () =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.submissionBatches
+		),
 
 	listRoutingRules: () =>
 		vendorCoreFetch<PaginatedResult<RoutingRuleDto>>(
-			vendorCoreEndpoints.routingRulesList,
+			vendorCoreEndpoints.routingRules,
 			{ params: pageParams() }
 		),
 
 	listAudit: (params?: { resource_type?: string; action?: string }) =>
-		vendorCoreFetch<PaginatedResult<AuditRecordDto>>(
-			vendorCoreEndpoints.auditList,
-			{ params: pageParams(params) }
-		),
+		vendorCoreFetch<PaginatedResult<AuditRecordDto>>(vendorCoreEndpoints.audit, {
+			params: pageParams(params),
+		}),
 
 	updateVendor: (id: string, body: Record<string, unknown>) =>
-		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendorUpdate(id), {
+		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendor(id), {
 			method: "PATCH",
 			body: JSON.stringify(body),
 		}).then((v) => normalizeVendor(v as unknown as Record<string, unknown>)),
 
+	/** Soft-delete: set status to terminated (no dedicated DELETE route). */
 	deleteVendor: (id: string) =>
-		vendorCoreFetch<unknown>(vendorCoreEndpoints.vendorDelete(id), {
-			method: "DELETE",
-		}),
+		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendor(id), {
+			method: "PATCH",
+			body: JSON.stringify({ status: "terminated" }),
+		}).then((v) => normalizeVendor(v as unknown as Record<string, unknown>)),
 
-	hardDeleteVendor: (id: string) =>
-		vendorCoreFetch<unknown>(vendorCoreEndpoints.vendorHardDelete(id), {
-			method: "DELETE",
-		}),
+	hardDeleteVendor: (_id: string) =>
+		unsupported("DELETE /vendors/{id}/hard-delete/"),
 
+	/** Restore: move terminated/offboarded vendors back to prospect. */
 	restoreVendor: (id: string) =>
-		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendorRestore(id), {
-			method: "POST",
+		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendor(id), {
+			method: "PATCH",
+			body: JSON.stringify({ status: "prospect" }),
 		}).then((v) => normalizeVendor(v as unknown as Record<string, unknown>)),
 
 	listUsers: async (params?: { search?: string }) => {
@@ -812,4 +836,208 @@ export const vendorCoreApi = {
 			results,
 		} satisfies PaginatedResult<LoginEventDto>;
 	},
+
+	listCategories: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.categories),
+
+	listIdentityGroups: () =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.identityGroups
+		),
+
+	getIdentityGroup: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.identityGroup(id)
+		),
+
+	createIdentityGroup: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.identityGroups,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateIdentityGroup: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.identityGroup(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	deleteIdentityGroup: (id: string) =>
+		vendorCoreFetch<unknown>(vendorCoreEndpoints.identityGroup(id), {
+			method: "DELETE",
+		}),
+
+	listRoles: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.roles),
+
+	listSettings: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.settings),
+
+	listOnboarding: (params?: { status?: string; vendor_id?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.onboarding,
+			params
+		),
+
+	getOnboarding: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingDetail(id)
+		),
+
+	updateOnboarding: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingDetail(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	listDocuments: (params?: { vendor_id?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.documents,
+			params
+		),
+
+	getDocument: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.document(id)),
+
+	createDocument: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.documents, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	updateDocument: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.document(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	listContracts: (params?: { vendor_id?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.contracts,
+			params
+		),
+
+	getContract: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.contract(id)),
+
+	createContract: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.contracts, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	updateContract: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.contract(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	listRfx: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.rfx),
+
+	getRfx: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.rfxDetail(id)),
+
+	createRfx: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.rfx, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	updateRfx: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.rfxDetail(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	listRfxBids: (rfxId: string) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.rfxBids(rfxId)
+		),
+
+	createRfxBid: (rfxId: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.rfxBids(rfxId),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	listPurchaseOrders: (params?: { vendor_id?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrders,
+			params
+		),
+
+	getPurchaseOrder: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrder(id)
+		),
+
+	createPurchaseOrder: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrders,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updatePurchaseOrder: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrder(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	listInvoices: (params?: { vendor_id?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.invoices,
+			params
+		),
+
+	getInvoice: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.invoice(id)),
+
+	createInvoice: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.invoices, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	updateInvoice: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.invoice(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	listApprovals: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.approvals),
+
+	updateApproval: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.approval(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	listScorecards: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.scorecards),
+
+	listCertificates: (params?: { vendor_id?: string; status?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.certificates,
+			params
+		),
+
+	listNotifications: (params?: { status?: string }) =>
+		listResourcePages<Record<string, unknown>>(
+			vendorCoreEndpoints.notifications,
+			params
+		),
+
+	markNotificationRead: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.notification(id),
+			{ method: "PATCH", body: JSON.stringify({}) }
+		),
+
+	getVendorMe: () =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.vendorMe),
+
+	listVendorTeam: () =>
+		listResourcePages<Record<string, unknown>>(vendorCoreEndpoints.vendorTeam),
 };

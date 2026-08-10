@@ -32,9 +32,12 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { FILE_RUNS } from "@/features/admin/features/file-management/mock-data";
 import { VENDOR_ALERTS } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { useVendorCoreNotifications } from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -62,37 +65,73 @@ function severityTone(severity: NotificationRow["severity"]) {
 	return "bg-sky-500/10 text-sky-700";
 }
 
-export function NotificationsPage() {
+function channelLabel(channel: string): NotificationRow["channel"] {
+	if (channel === "email") return "Email";
+	if (channel === "webhook" || channel === "sms") return "Ops Queue";
+	return "In-app";
+}
+
+function mapLiveNotification(row: Record<string, unknown>): NotificationRow {
+	const statusRaw = String(row.status ?? "pending");
+	const status: NotificationRow["status"] =
+		statusRaw === "read"
+			? "Acknowledged"
+			: statusRaw === "failed"
+				? "Escalated"
+				: "New";
+	return {
+		id: String(row.id),
+		title: String(row.subject ?? "Notification"),
+		vendorName: String(row.related_entity_type ?? "System"),
+		severity:
+			statusRaw === "failed"
+				? "error"
+				: statusRaw === "pending"
+					? "warning"
+					: "info",
+		when: String(row.created_at ?? new Date().toISOString()),
+		channel: channelLabel(String(row.channel ?? "in_app")),
+		status,
+		audience: "Operations",
+	};
+}
+
+function NotificationsPageInner() {
 	const [search, setSearch] = useState("");
 	const [severity, setSeverity] = useState("all");
 	const [channel, setChannel] = useState("all");
+	const live = !isMockEnabled();
+	const liveQuery = useVendorCoreNotifications(live);
 
-	const notifications = useMemo<NotificationRow[]>(
-		() =>
-			VENDOR_ALERTS.map((alert, index) => ({
-				id: alert.id,
-				title: alert.title,
-				vendorName: alert.vendorName,
-				severity: alert.severity,
-				when: alert.when,
-				runId: alert.runId,
-				channel:
-					index % 3 === 0 ? "In-app" : index % 3 === 1 ? "Email" : "Ops Queue",
-				status:
-					index % 3 === 0
-						? "New"
-						: index % 3 === 1
-							? "Acknowledged"
-							: "Escalated",
-				audience:
-					alert.severity === "error"
-						? "Ops + Vendor Manager"
-						: alert.severity === "warning"
-							? "Operations"
-							: "Treasury / AP",
-			})),
-		[]
-	);
+	const notifications = useMemo<NotificationRow[]>(() => {
+		if (live) {
+			return (liveQuery.data ?? []).map((row) =>
+				mapLiveNotification(row as Record<string, unknown>)
+			);
+		}
+		return VENDOR_ALERTS.map((alert, index) => ({
+			id: alert.id,
+			title: alert.title,
+			vendorName: alert.vendorName,
+			severity: alert.severity,
+			when: alert.when,
+			runId: alert.runId,
+			channel:
+				index % 3 === 0 ? "In-app" : index % 3 === 1 ? "Email" : "Ops Queue",
+			status:
+				index % 3 === 0
+					? "New"
+					: index % 3 === 1
+						? "Acknowledged"
+						: "Escalated",
+			audience:
+				alert.severity === "error"
+					? "Ops + Vendor Manager"
+					: alert.severity === "warning"
+						? "Operations"
+						: "Treasury / AP",
+		}));
+	}, [live, liveQuery.data]);
 
 	const filteredNotifications = useMemo(() => {
 		const query = search.trim().toLowerCase();
@@ -151,7 +190,14 @@ export function NotificationsPage() {
 					<Button asChild size="sm" className="h-9">
 						<Link href="/admin/error-management">Open Error Management</Link>
 					</Button>
-					<Button variant="outline" size="sm" className="h-9">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9"
+						onClick={() => {
+							if (live) void liveQuery.refetch();
+						}}
+					>
 						<RefreshCw className="mr-1.5 size-3.5" />
 						Refresh
 					</Button>
@@ -449,5 +495,14 @@ export function NotificationsPage() {
 				</CardContent>
 			</Card>
 		</div>
+	);
+}
+
+export function NotificationsPage() {
+	if (isMockEnabled()) return <NotificationsPageInner />;
+	return (
+		<VendorCoreGate>
+			<NotificationsPageInner />
+		</VendorCoreGate>
 	);
 }

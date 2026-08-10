@@ -111,9 +111,9 @@ async function listAll(token, path) {
 
 async function uploadFallback(token) {
 	console.log("Seed API unavailable — uploading sample inbound files only…");
-	const vendors = await listAll(token, "/api/v1/vendors/list/");
+	const vendors = await listAll(token, "/api/v1/vendors/");
 	const byCode = new Map(vendors.map((v) => [v.vendor_code || v.code, v]));
-	const connections = await listAll(token, "/api/v1/connections/list/");
+	const connections = await listAll(token, "/api/v1/connections/");
 	let uploads = 0;
 	for (const file of SAMPLE_FILES) {
 		const vendor = byCode.get(file.vendorCode);
@@ -166,7 +166,7 @@ async function main() {
 	}
 	console.log("✓ authenticated");
 
-	const vendors = await request("GET", "/api/v1/vendors/list/?limit=1", {
+	const vendors = await request("GET", "/api/v1/vendors/?limit=1", {
 		token,
 	});
 	const vendorCount = vendors?.count ?? vendors?.results?.length ?? 0;
@@ -223,7 +223,7 @@ async function main() {
 
 	const validation = await request(
 		"GET",
-		"/api/v1/validation-results/list/?limit=5",
+		"/api/v1/validation-results/?limit=5",
 		{ token }
 	);
 	const validationCount = validation?.count ?? validation?.results?.length ?? 0;
@@ -241,7 +241,7 @@ async function main() {
 		}
 	}
 
-	const errors = await request("GET", "/api/v1/errors/list/?limit=5", { token });
+	const errors = await request("GET", "/api/v1/errors/?limit=5", { token });
 	const errorCount = errors?.count ?? errors?.results?.length ?? 0;
 	console.log(`Error records: ${errorCount}`);
 

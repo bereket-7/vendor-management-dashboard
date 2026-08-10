@@ -66,8 +66,12 @@ import {
 	filesForProgram,
 	formatCount,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { claimVendorFileDtosToFiles } from "@/features/admin/features/claim-encounter/live-claims";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { Link } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { useVendorCoreClaimVendorFiles } from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -76,7 +80,18 @@ type SortKey = "receivedAt" | "records" | "vendor" | "wait";
 const SLA_HOURS = 48;
 
 export function InboundVendorFilePage() {
+	if (isMockEnabled()) return <InboundVendorFilePageInner />;
+	return (
+		<VendorCoreGate>
+			<InboundVendorFilePageInner />
+		</VendorCoreGate>
+	);
+}
+
+function InboundVendorFilePageInner() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const live = !isMockEnabled();
+	const liveFiles = useVendorCoreClaimVendorFiles(live);
 	const [vendor, setVendor] = useState("all");
 	const [fileType, setFileType] = useState("all");
 	const [statusFilter, setStatusFilter] = useState<
@@ -91,10 +106,15 @@ export function InboundVendorFilePage() {
 	const [refreshing, setRefreshing] = useState(false);
 
 	/** Inbound = pending review + MFC-rejected (held for vendor correction). */
-	const inboundQueue = useMemo(
-		() => filesForProgram(programFilter, "inbound"),
-		[programFilter]
-	);
+	const inboundQueue = useMemo(() => {
+		if (live) {
+			return claimVendorFileDtosToFiles(
+				(liveFiles.data ?? []) as Record<string, unknown>[],
+				programFilter
+			);
+		}
+		return filesForProgram(programFilter, "inbound");
+	}, [live, liveFiles.data, programFilter]);
 	const allOutbound = useMemo(
 		() => filesForProgram(programFilter, "outbound"),
 		[programFilter]

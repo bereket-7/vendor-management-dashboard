@@ -1,8 +1,35 @@
 # Backend cutover checklist
 
-When your NestJS (and optional Django vendor-core) APIs are ready, switch the frontend from mocks to live data with **one env var**. Fixture source files are **not deleted** — they become inactive when the toggle is off.
+When Django vendor-core (and optional NestJS) APIs are ready, switch the frontend from mocks to live data with **one env var**. Fixture source files are **not deleted** — they become inactive when the toggle is off.
+
+## Source of truth
+
+**Live contract:** Django [`services/vendor-management-core`](../../../services/vendor-management-core) under `/api/v1/*` (JWT SimpleJWT).
+
+NestJS (`/api/auth/*`, `/api/admin/*`) remains **optional** (`NEXT_PUBLIC_USE_NEST=true`). It is **not** on [`https://api.vm.tillahealth.com`](https://api.vm.tillahealth.com). Prefer Django paths via the vendor-core client for procurement, identity groups, notifications, certificates, and claims lists.
+
+REST shape (collection + detail):
+
+| Action | Path |
+|--------|------|
+| List / create | `GET` / `POST` `/api/v1/<resource>/` |
+| Retrieve / update | `GET` / `PATCH` `/api/v1/<resource>/{id}/` |
+| Special actions | e.g. `/connections/{id}/test/`, `/errors/{id}/retry/` |
+
+Do **not** use legacy `/list/` or `/create/` suffixes — those are not registered on Django.
 
 ## 1. Environment
+
+### Django vendor-core live (recommended)
+
+```env
+NEXT_PUBLIC_USE_MOCK=false
+NEXT_PUBLIC_USE_NEST=false
+NEXT_PUBLIC_VENDOR_CORE_API_URL=https://api.vm.tillahealth.com
+# or http://localhost:8010 for local Django
+```
+
+Browser calls go through the same-origin proxy at `/api/vendor-core/*` when the upstream host is remote (avoids CORS). Live screens prompt for a Django JWT user.
 
 ### NestJS + vendor-core both live
 
@@ -11,29 +38,15 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com
 NEXT_PUBLIC_APP_URL=https://app.your-domain.com
 NEXT_PUBLIC_URL=https://app.your-domain.com
 NEXT_PUBLIC_VENDOR_CORE_API_URL=https://vendor-core.your-domain.com
-
-# Single switch — turns off all mocks (auth, VMS, identity, feature APIs)
+NEXT_PUBLIC_USE_NEST=true
 NEXT_PUBLIC_USE_MOCK=false
 ```
 
-### Vendor-core only (current staging)
-
-[`https://api.vm.tillahealth.com`](https://api.vm.tillahealth.com) is **Django vendor-core** (JWT + `/api/v1/*`).  
-Django admin UI: [`/admin/`](https://api.vm.tillahealth.com/admin/) — do **not** put `/admin/` in the API base URL.  
-NestJS (`/api/auth/*`, `/api/admin/*`) is **not** on this host.
+### Fixtures only (default)
 
 ```env
 NEXT_PUBLIC_USE_MOCK=true
-NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_VENDOR_CORE_API_URL=https://api.vm.tillahealth.com
 ```
-
-A remote `NEXT_PUBLIC_VENDOR_CORE_API_URL` enables Integration Intake **and** the
-integration nav screens (Vendors, File monitoring/history, Processing status,
-Schedules, Errors, Audit) against Django while Nest/VMS stay mocked.
-
-Live screens prompt for a Django JWT user (same credentials as Django admin).
-Browser calls go through the same-origin proxy at `/api/vendor-core/*` (avoids CORS).
 
 Smoke test:
 
@@ -42,20 +55,21 @@ pnpm test:vendor-core
 VENDOR_CORE_USER=… VENDOR_CORE_PASSWORD=… pnpm test:vendor-core
 ```
 
-Seed Phase‑1 demo data from frontend mocks (vendors/accounts/connections/jobs/sample files) into the API DB — **no backend deploy**:
+Seed Phase‑1 demo data (vendors/accounts/connections/jobs) when create APIs exist:
 
 ```bash
 VENDOR_CORE_USER=… VENDOR_CORE_PASSWORD=… pnpm seed:vendor-core
 ```
 
+Note: `/seed/` endpoints and claim-line writes are **not** on current Django — seed scripts that call them will report 501 / not deployed.
+
 ## 2. Verify contracts
 
-- [Identity groups](./api-contracts/identity-groups.md) — required for admin Groups CRUD
-- [VMS domain](./api-contracts/vms.md) — vendors, onboarding, RFX, contracts, POs, invoices
-- Users: `GET /api/admin/users/`
-- Roles: `GET /api/admin/roles/`
-- Settings: `GET /api/admin/settings/`
-- Feature modules: `GET /api/admin/<module>/` (members, providers, file-management, claim-encounter, …)
+- Django OpenAPI: `{VENDOR_CORE}/docs/` (admin session)
+- Postman: `services/vendor-management-core/postman/vendor_management_core_all_apis.postman_collection.json`
+- Frontend client: [`src/lib/vendor-core/api.ts`](../src/lib/vendor-core/api.ts)
+- Identity groups: Django `/api/v1/identity-groups/` (see [identity-groups.md](./api-contracts/identity-groups.md))
+- VMS procurement: Django `/api/v1/{onboarding,documents,contracts,rfx,…}/` (see [vms.md](./api-contracts/vms.md))
 
 ## 3. Smoke tests
 
@@ -63,16 +77,26 @@ VENDOR_CORE_USER=… VENDOR_CORE_PASSWORD=… pnpm seed:vendor-core
 | ------------ | ------------------------------------------------------- |
 | Login        | `/{locale}/auth/login`                                  |
 | Groups list  | `/{locale}/admin/groups`                                |
-| Create group | `/{locale}/admin/groups/create`                         |
-| Edit group   | `/{locale}/admin/groups/{id}/edit`                      |
-| Delete group | From groups table                                       |
 | Integration  | `/{locale}/admin/integration` (vendor-core JWT)         |
-| Offline sync | Create while offline → reconnect → pending badge clears |
+| Vendors      | `/{locale}/admin/vendors`                               |
+| Notifications| `/{locale}/admin/notifications`                         |
+| Claims list  | `/{locale}/admin/claim-encounter/claims`                |
 
-## 4. CORS and auth
+## 4. UI prototypes (no Django HTTP yet)
 
-See [api-contracts/README.md](./api-contracts/README.md) for CORS and Better Auth trusted origins.
+Nav items marked `prototype: true` (sidebar shows a **UI** badge) still use fixtures or empty live states:
 
-## 5. Rollback
+- Command Center, Automations, SLA Monitoring, Vendor Comparison
+- Reports, Edge Server Data, Master Data Entry, Error Correction
+- Claims regulatory / program-monitoring pages
+- Outbound vendor files, Acceptance Analytics (claims)
+
+Backend models may exist (e.g. ops `activity_event`, `automation_rule`) without routes.
+
+## 5. Soft-delete note
+
+Vendor “delete” in live mode maps to `PATCH /vendors/{id}/` with `status=terminated`. Hard-delete is not exposed. Restore maps to `status=prospect`.
+
+## 6. Rollback
 
 Set `NEXT_PUBLIC_USE_MOCK=true` and restart to isolate frontend issues without changing code.

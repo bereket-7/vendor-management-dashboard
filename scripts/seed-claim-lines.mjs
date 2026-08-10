@@ -104,7 +104,7 @@ async function main() {
 	}
 	console.log("✓ authenticated");
 
-	const vendors = await request("GET", "/api/v1/vendors/list/?limit=1", { token });
+	const vendors = await request("GET", "/api/v1/vendors/?limit=1", { token });
 	const vendorCount = vendors?.count ?? vendors?.results?.length ?? 0;
 	if (!vendorCount) {
 		console.error(
@@ -131,7 +131,7 @@ async function main() {
 		throw err;
 	}
 
-	const lines = await request("GET", "/api/v1/claim-lines/list/?limit=5", {
+	const lines = await request("GET", "/api/v1/claim-lines/?limit=5", {
 		token,
 	});
 	const lineCount = lines?.count ?? lines?.results?.length ?? 0;

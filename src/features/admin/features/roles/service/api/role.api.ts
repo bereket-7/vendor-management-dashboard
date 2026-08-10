@@ -1,20 +1,30 @@
 import { apiClient } from "@/lib/api/client";
-import { withMockOrRemote } from "@/lib/mock-mode";
+import {
+	isLiveIntegrationEnabled,
+	isMockEnabled,
+	isNestApiEnabled,
+} from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 
-import type { ApiRoleDto } from "../../dto/role.dto";
+import type { ApiRoleDto, ApiRoleListResponseDto } from "../../dto/role.dto";
 import type { RoleModel } from "../../types/role.types";
 import { toRoleModelList } from "../mappers/role.mapper";
 import { MOCK_ROLES } from "./role.mock";
+import { roleEndpoints } from "./role.endpoints";
 
 export const roleApi = {
 	async list(): Promise<RoleModel[]> {
-		const dtos = await withMockOrRemote(
-			() => MOCK_ROLES,
-			() =>
-				apiClient<ApiRoleListResponseDto | ApiRoleDto[]>(
-					roleEndpoints.list()
-				).then((res) => (Array.isArray(res) ? res : (res.results ?? [])))
-		);
-		return toRoleModelList(dtos);
+		if (isMockEnabled()) return toRoleModelList(MOCK_ROLES);
+		if (isLiveIntegrationEnabled()) {
+			const page = await vendorCoreApi.listRoles();
+			return toRoleModelList((page.results ?? []) as ApiRoleDto[]);
+		}
+		if (isNestApiEnabled()) {
+			const res = await apiClient<ApiRoleListResponseDto | ApiRoleDto[]>(
+				roleEndpoints.list()
+			);
+			return toRoleModelList(Array.isArray(res) ? res : (res.results ?? []));
+		}
+		return [];
 	},
 };

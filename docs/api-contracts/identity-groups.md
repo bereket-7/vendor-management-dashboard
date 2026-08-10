@@ -1,25 +1,23 @@
 # Identity Groups API contract
 
-NestJS (or any REST backend) should implement these endpoints so the Next.js frontend can disable mocks (`NEXT_PUBLIC_USE_MOCK` unset).
-
-**Implemented on Django:** `GET/POST/PATCH/DELETE /api/v1/identity-groups/` — dashboard `groupApi` uses `vendorCoreFetch` + JWT. Nest `/api/admin/identity-groups/` is deprecated.
+**Live source of truth:** Django `/api/v1/identity-groups/` (JWT).  
+Dashboard `groupApi` calls vendor-core when `NEXT_PUBLIC_USE_MOCK=false`. Nest `/api/admin/identity-groups/` is optional legacy.
 
 Base URL: `{NEXT_PUBLIC_VENDOR_CORE_API_URL}` (e.g. `http://localhost:8010`) for live cutover.
 
-Auth: JWT Bearer from `POST /api/v1/authentication/token/` (session cookie Nest path is legacy).
-
+Auth: JWT Bearer from `POST /api/v1/authentication/token/`.
 
 ## Endpoints
 
 | Method   | Path                               | Frontend usage |
 | -------- | ---------------------------------- | -------------- |
-| `GET`    | `/api/admin/identity-groups/`      | List groups    |
-| `GET`    | `/api/admin/identity-groups/{id}/` | Group detail   |
-| `POST`   | `/api/admin/identity-groups/`      | Create group   |
-| `PATCH`  | `/api/admin/identity-groups/{id}/` | Update group   |
-| `DELETE` | `/api/admin/identity-groups/{id}/` | Delete group   |
+| `GET`    | `/api/v1/identity-groups/`         | List groups    |
+| `GET`    | `/api/v1/identity-groups/{id}/`    | Group detail   |
+| `POST`   | `/api/v1/identity-groups/`         | Create group   |
+| `PATCH`  | `/api/v1/identity-groups/{id}/`    | Update group   |
+| `DELETE` | `/api/v1/identity-groups/{id}/`    | Delete group   |
 
-Source: [`src/features/admin/features/groups/service/api/group.endpoints.ts`](../../src/features/admin/features/groups/service/api/group.endpoints.ts)
+Source: [`src/features/admin/features/groups/service/api/group.endpoints.ts`](../../src/features/admin/features/groups/service/api/group.endpoints.ts) + [`vendorCoreApi`](../../src/lib/vendor-core/api.ts)
 
 ## List response
 
@@ -90,7 +88,7 @@ Return standard HTTP status codes. JSON error body should be parseable by the fr
 
 ## Frontend cutover
 
-1. Implement endpoints on NestJS matching this contract.
-2. Set `NEXT_PUBLIC_API_URL` to the backend.
-3. Remove or comment out `NEXT_PUBLIC_USE_MOCK` in `.env`.
+1. Point `NEXT_PUBLIC_VENDOR_CORE_API_URL` at Django vendor-core.
+2. Set `NEXT_PUBLIC_USE_MOCK=false`.
+3. Authenticate via `VendorCoreGate` (Django JWT).
 4. Run admin Groups smoke: list → create → edit → delete.
