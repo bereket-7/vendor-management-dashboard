@@ -13,7 +13,7 @@ global.TextDecoder = TextDecoder as typeof global.TextDecoder;
 if (typeof globalThis.fetch === "undefined") {
 	globalThis.fetch = jest.fn(async () => {
 		throw new Error(
-			"fetch is not available in this test environment. Set NEXT_PUBLIC_USE_MOCK_*=true in jest.env.ts or mock the API."
+			"fetch is not available in this test environment. Set NEXT_PUBLIC_USE_MOCK=true in jest.env.ts or mock the API."
 		);
 	}) as typeof fetch;
 }

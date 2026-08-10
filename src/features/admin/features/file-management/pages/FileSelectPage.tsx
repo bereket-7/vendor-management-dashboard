@@ -95,13 +95,13 @@ function StatusPill({ status }: { status: FileRun["status"] }) {
 	}
 	if (bucket === "in_progress") {
 		return (
-			<span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800">
+			<span className="inline-flex items-center rounded-md border border-transparent bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800">
 				In Progress
 			</span>
 		);
 	}
 	return (
-		<span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
+		<span className="inline-flex items-center rounded-md border border-transparent bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
 			{displayRunStatus(status)}
 		</span>
 	);
@@ -240,12 +240,12 @@ export function FileSelectPage() {
 	];
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<div>
-				<h1 className="text-lg font-medium tracking-tight sm:text-xl">
+				<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
 					Select Vendor, File, or Failed Run
 				</h1>
-				<p className="mt-0.5 text-xs text-muted-foreground">
+				<p className="text-sm leading-relaxed text-muted-foreground">
 					Choose a vendor or file context, then open a recent run for details.
 				</p>
 			</div>

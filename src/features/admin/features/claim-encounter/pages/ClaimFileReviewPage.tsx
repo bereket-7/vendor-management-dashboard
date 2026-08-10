@@ -72,7 +72,7 @@ export function ClaimFileReviewPage() {
 
 	if (!file) {
 		return (
-			<div className="space-y-3">
+			<div className="space-y-4">
 				<Link
 					href="/admin/claim-encounter/inbound"
 					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"
@@ -347,7 +347,7 @@ export function ClaimFileReviewPage() {
 					<DialogHeader>
 						<DialogTitle>Reject claims — reason required</DialogTitle>
 					</DialogHeader>
-					<div className="space-y-3">
+					<div className="space-y-4">
 						<p className="text-xs text-muted-foreground">
 							Select one or more reason codes for {selected.size} claim(s).
 							These are returned to the vendor.

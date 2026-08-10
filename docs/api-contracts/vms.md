@@ -1,6 +1,6 @@
 # VMS API contracts (NestJS cutover stubs)
 
-Frontend currently uses `NEXT_PUBLIC_USE_MOCK_VMS` + [`src/features/shared/vms/mock-store.ts`](../../src/features/shared/vms/mock-store.ts). Replace `vmsApi` remote paths when NestJS is ready.
+Frontend currently uses `NEXT_PUBLIC_USE_MOCK` + [`src/features/shared/vms/mock-store.ts`](../../src/features/shared/vms/mock-store.ts). Replace `vmsApi` remote paths when NestJS is ready.
 
 ## Resources
 

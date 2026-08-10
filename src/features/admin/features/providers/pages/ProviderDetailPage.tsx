@@ -14,12 +14,19 @@ import {
 	ClipboardList,
 	Download,
 	FileWarning,
+	Globe,
+	GraduationCap,
 	IdCard,
+	Languages,
+	Mail,
 	MapPin,
 	Network,
+	Phone,
 	Printer,
 	Receipt,
+	Stethoscope,
 	TrendingDown,
+	UserRound,
 	Users,
 } from "lucide-react";
 import {
@@ -56,6 +63,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import {
+	type ClaimActivityStatus,
 	type CredentialStatus,
 	type ExceptionStatus,
 	type FeedStatus,
@@ -67,6 +75,7 @@ import {
 	formatDate,
 	getProvider,
 	initials,
+	providerAge,
 } from "@/features/admin/features/providers/mock-data";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -90,7 +99,7 @@ function StatusPill({ status }: { status: ProviderStatus }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+				"inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
 				status === "active" && "bg-emerald-100 text-emerald-800",
 				status === "pending" && "bg-amber-100 text-amber-900",
 				status === "inactive" && "bg-slate-100 text-slate-700",
@@ -106,7 +115,7 @@ function NetworkPill({ status }: { status: NetworkStatus }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium",
+				"inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
 				status === "in_network" && "bg-emerald-100 text-emerald-800",
 				status === "out_of_network" && "bg-red-100 text-red-800",
 				status === "pending" && "bg-amber-100 text-amber-900"
@@ -125,7 +134,7 @@ function FeedPill({ status }: { status: FeedStatus }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+				"inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
 				status === "active" && "bg-emerald-100 text-emerald-800",
 				status === "warning" && "bg-amber-100 text-amber-900",
 				status === "inactive" && "bg-slate-100 text-slate-700"
@@ -140,7 +149,7 @@ function ExceptionPill({ status }: { status: ExceptionStatus }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+				"inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
 				status === "open" && "bg-amber-100 text-amber-900",
 				status === "in_progress" && "bg-sky-100 text-sky-900",
 				status === "resolved" && "bg-emerald-100 text-emerald-800"
@@ -151,29 +160,55 @@ function ExceptionPill({ status }: { status: ExceptionStatus }) {
 	);
 }
 
+function ClaimStatusPill({ status }: { status: ClaimActivityStatus }) {
+	return (
+		<span
+			className={cn(
+				"inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
+				status === "paid" && "bg-emerald-100 text-emerald-800",
+				status === "accepted" && "bg-emerald-100 text-emerald-800",
+				status === "denied" && "bg-red-100 text-red-800",
+				status === "rejected" && "bg-red-100 text-red-800",
+				status === "pending" && "bg-amber-100 text-amber-900"
+			)}
+		>
+			{status}
+		</span>
+	);
+}
+
 function Panel({
 	title,
 	action,
 	children,
 	className,
+	dense,
 }: {
 	title: string;
 	action?: ReactNode;
 	children: ReactNode;
 	className?: string;
+	dense?: boolean;
 }) {
 	return (
 		<section
 			className={cn(
-				"flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card",
+				"flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm",
 				className
 			)}
 		>
-			<div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
-				<h3 className="text-sm font-medium">{title}</h3>
+			<div
+				className={cn(
+					"flex items-center justify-between gap-3 border-b border-border/30",
+					dense ? "px-4 py-2.5" : "px-5 py-3.5"
+				)}
+			>
+				<h3 className="text-sm font-semibold tracking-tight">{title}</h3>
 				{action}
 			</div>
-			<div className="min-h-0 flex-1 p-3">{children}</div>
+			<div className={cn("min-h-0 flex-1", dense ? "p-4" : "p-5")}>
+				{children}
+			</div>
 		</section>
 	);
 }
@@ -183,10 +218,83 @@ function ViewLink({ label, onClick }: { label: string; onClick: () => void }) {
 		<button
 			type="button"
 			onClick={onClick}
-			className="mt-2 text-xs font-medium text-primary hover:underline"
+			className="mt-3 text-sm font-medium text-primary hover:underline"
 		>
 			{label} →
 		</button>
+	);
+}
+
+function MetaField({ label, value }: { label: string; value: ReactNode }) {
+	return (
+		<div className="min-w-0 space-y-1">
+			<p className="text-xs font-medium text-muted-foreground">{label}</p>
+			<div className="text-sm font-medium text-foreground break-words">
+				{value ?? "—"}
+			</div>
+		</div>
+	);
+}
+
+function MetricStrip({
+	title,
+	items,
+	compact,
+	className,
+}: {
+	title?: string;
+	items: Array<{
+		label: string;
+		value: ReactNode;
+		accent?: boolean;
+		mono?: boolean;
+	}>;
+	compact?: boolean;
+	className?: string;
+}) {
+	return (
+		<section
+			className={cn(
+				"overflow-hidden rounded-xl border border-border bg-card shadow-sm",
+				className
+			)}
+		>
+			{title ? (
+				<div className="border-b border-border/30 px-3 py-1.5 sm:px-4">
+					<p className="text-[11px] font-semibold tracking-tight text-muted-foreground uppercase">
+						{title}
+					</p>
+				</div>
+			) : null}
+			<div className="flex w-full flex-wrap lg:flex-nowrap">
+				{items.map((item, index) => (
+					<div
+						key={item.label}
+						className={cn(
+							"min-w-0 flex-1",
+							compact
+								? "min-w-[5.5rem] basis-[5.5rem] px-2.5 py-2.5 sm:px-3"
+								: "min-w-[8.5rem] basis-[8.5rem] px-3 py-3 sm:px-4",
+							index > 0 && "border-l border-border/30"
+						)}
+					>
+						<p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+							{item.label}
+						</p>
+						<div
+							className={cn(
+								"mt-1 truncate text-sm font-semibold",
+								item.mono &&
+									"font-mono text-[13px] tabular-nums tracking-tight",
+								item.accent ? "text-emerald-700" : "text-foreground"
+							)}
+						>
+							{item.value ?? "—"}
+						</div>
+					</div>
+				))}
+			</div>
+		</section>
 	);
 }
 
@@ -196,7 +304,7 @@ function Trend({ value }: { value: number }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums",
+				"inline-flex items-center gap-0.5 text-xs font-medium tabular-nums",
 				up ? "text-emerald-700" : "text-red-700"
 			)}
 		>
@@ -237,7 +345,7 @@ export function ProviderDetailPage({
 
 	if (!provider) {
 		return (
-			<div className="space-y-3">
+			<div className="space-y-5">
 				<p className="text-sm text-destructive">Provider not found.</p>
 				<Button asChild variant="outline" size="sm">
 					<Link href="/admin/providers">Back to providers</Link>
@@ -304,17 +412,17 @@ export function ProviderDetailPage({
 	];
 
 	return (
-		<div className="space-y-3">
-			<div className="flex flex-wrap items-center justify-between gap-2">
-				<p className="text-xs text-muted-foreground">
-					<span className="text-foreground/70">Providers</span>
-					<span className="mx-1.5">›</span>
+		<div className="space-y-5">
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<p className="text-sm text-muted-foreground">
+					<span className="text-foreground/80">Providers</span>
+					<span className="mx-1.5 text-border">/</span>
 					Provider Profile
 				</p>
-				<div className="flex flex-wrap gap-1.5">
+				<div className="flex flex-wrap gap-2">
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="outline" size="sm" className="h-8 text-xs">
+							<Button variant="outline" size="sm" className="h-9">
 								Provider Summary
 								<ChevronDown className="ml-1 size-3.5" />
 							</Button>
@@ -334,7 +442,7 @@ export function ProviderDetailPage({
 					</DropdownMenu>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="outline" size="sm" className="h-8 text-xs">
+							<Button variant="outline" size="sm" className="h-9">
 								<Printer className="mr-1.5 size-3.5" />
 								Print
 								<ChevronDown className="ml-1 size-3.5" />
@@ -353,7 +461,7 @@ export function ProviderDetailPage({
 					</DropdownMenu>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button size="sm" className="h-8 text-xs">
+							<Button size="sm" className="h-9">
 								<Download className="mr-1.5 size-3.5" />
 								Export
 								<ChevronDown className="ml-1 size-3.5" />
@@ -371,108 +479,112 @@ export function ProviderDetailPage({
 				</div>
 			</div>
 
-			{/* Hero */}
-			<section className="rounded-lg border border-border/50 bg-card p-4">
-				<div className="grid gap-4 xl:grid-cols-[1.4fr_1fr_1fr_0.9fr]">
-					<div className="flex gap-3">
+			{/* Identity header */}
+			<section className="rounded-xl border border-border/40 bg-card p-5 shadow-sm">
+				<div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+					<div className="flex min-w-0 gap-4">
 						<div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
 							{initials(provider.name)}
 						</div>
-						<div className="min-w-0">
-							<div className="flex flex-wrap items-center gap-2">
-								<h1 className="text-xl font-semibold tracking-tight">{name}</h1>
+						<div className="min-w-0 space-y-2">
+							<div className="flex flex-wrap items-center gap-2.5">
+								<h1 className="text-2xl font-semibold tracking-tight">
+									{name}
+								</h1>
 								<StatusPill status={provider.status} />
 							</div>
-							<p className="mt-1 text-xs text-muted-foreground">
-								Specialty:{" "}
+							<p className="text-sm text-muted-foreground">
 								<span className="font-medium text-foreground">
 									{provider.specialty}
 								</span>
-								{" · "}
-								Subspecialty:{" "}
-								<span className="font-medium text-foreground">
-									{provider.subspecialty}
-								</span>
+								<span className="mx-1.5 text-border">·</span>
+								{provider.subspecialty}
 							</p>
-							<div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-								<p>
-									<span className="text-muted-foreground">NPI:</span>{" "}
-									<span className="font-mono font-medium">{provider.npi}</span>
-								</p>
-								<p>
-									<span className="text-muted-foreground">Tax ID:</span>{" "}
-									<span className="font-mono font-medium">
+							<div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
+								<span>
+									NPI{" "}
+									<span className="font-mono font-medium text-foreground">
+										{provider.npi}
+									</span>
+								</span>
+								<span>
+									Tax ID{" "}
+									<span className="font-mono font-medium text-foreground">
 										{provider.taxId}
 									</span>
-								</p>
-								<p>
-									<span className="text-muted-foreground">UPIN:</span>{" "}
-									<span className="font-mono font-medium">{provider.upin}</span>
-								</p>
-								<p>
-									<span className="text-muted-foreground">Medicaid ID:</span>{" "}
-									<span className="font-mono font-medium">
+								</span>
+								<span>
+									UPIN{" "}
+									<span className="font-mono font-medium text-foreground">
+										{provider.upin}
+									</span>
+								</span>
+								<span>
+									Medicaid{" "}
+									<span className="font-mono font-medium text-foreground">
 										{provider.medicaidId}
 									</span>
-								</p>
+								</span>
+							</div>
+							<div className="flex flex-col gap-1.5 pt-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-5">
+								<span className="inline-flex items-start gap-2">
+									<Building2 className="mt-0.5 size-3.5 shrink-0" />
+									<span>
+										<span className="font-medium text-foreground">
+											{provider.practiceName}
+										</span>
+										<span className="mx-1.5">·</span>
+										{provider.practiceAddress}
+									</span>
+								</span>
+								<span className="inline-flex items-center gap-2">
+									<MapPin className="size-3.5 shrink-0" />
+									{provider.practicePhone}
+								</span>
 							</div>
 						</div>
 					</div>
 
-					<div className="space-y-1 text-xs">
-						<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-							Primary practice
-						</p>
-						<p className="font-medium">{provider.practiceName}</p>
-						<p className="text-muted-foreground">{provider.practiceAddress}</p>
-						<p className="text-muted-foreground">{provider.practicePhone}</p>
-					</div>
-
-					<div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-2">
-						{[
-							["Provider type", provider.providerType],
-							["Gender", provider.gender],
-							["Date of birth", formatDate(provider.dob)],
-							["Years in practice", `${provider.yearsInPractice} years`],
-						].map(([k, v]) => (
-							<div key={k}>
-								<p className="text-[10px] uppercase text-muted-foreground">
-									{k}
+					<div className="grid shrink-0 gap-4 rounded-lg bg-muted/30 p-4 sm:grid-cols-2 lg:w-[380px]">
+						<MetaField label="Provider type" value={provider.providerType} />
+						<MetaField label="Gender" value={provider.gender} />
+						<MetaField label="Date of birth" value={formatDate(provider.dob)} />
+						<MetaField
+							label="Years in practice"
+							value={`${provider.yearsInPractice} years`}
+						/>
+						<div className="col-span-full flex items-center gap-3 border-t border-border/40 pt-4">
+							<span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+								<CheckCircle2 className="size-5" />
+							</span>
+							<div className="min-w-0">
+								<p className="text-xs font-medium text-muted-foreground">
+									Enrollment
 								</p>
-								<p className="font-medium">{v}</p>
+								<p className="text-sm font-semibold capitalize text-emerald-800">
+									{provider.enrollmentStatus === "enrolled"
+										? "Enrolled"
+										: provider.enrollmentStatus}
+									<span className="ml-2 font-normal text-muted-foreground">
+										· Effective {formatDate(provider.enrollmentEffective)}
+									</span>
+								</p>
+								<button
+									type="button"
+									className="mt-0.5 text-xs font-medium text-primary hover:underline"
+									onClick={() => setTab("Enrollment")}
+								>
+									View enrollment details →
+								</button>
 							</div>
-						))}
-					</div>
-
-					<div className="rounded-lg border border-border/50 bg-background/60 p-3 text-center">
-						<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-							Enrollment status
-						</p>
-						<span className="mx-auto mt-2 flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-							<CheckCircle2 className="size-7" />
-						</span>
-						<p className="mt-1.5 text-sm font-semibold capitalize text-emerald-800">
-							{provider.enrollmentStatus === "enrolled"
-								? "Enrolled"
-								: provider.enrollmentStatus}
-						</p>
-						<p className="mt-1 text-[11px] text-muted-foreground">
-							Effective {formatDate(provider.enrollmentEffective)}
-						</p>
-						<button
-							type="button"
-							className="mt-2 text-[11px] font-medium text-primary hover:underline"
-							onClick={() => setTab("Enrollment")}
-						>
-							View enrollment details →
-						</button>
+						</div>
 					</div>
 				</div>
 			</section>
 
 			{/* Tabs */}
-			<nav className="overflow-x-auto border-b border-border/50">
-				<div className="flex min-w-max gap-0">
+			<nav className="overflow-x-auto border-b border-border/40">
+				<div className="flex min-w-max gap-1">
 					{TABS.map((item) => {
 						const Icon = item.icon;
 						return (
@@ -481,7 +593,7 @@ export function ProviderDetailPage({
 								type="button"
 								onClick={() => setTab(item.id)}
 								className={cn(
-									"inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+									"inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
 									tab === item.id
 										? "border-primary text-primary"
 										: "border-transparent text-muted-foreground hover:text-foreground"
@@ -496,29 +608,29 @@ export function ProviderDetailPage({
 			</nav>
 
 			{tab === "Overview" ? (
-				<div className="space-y-3">
+				<div className="space-y-5">
 					{/* KPIs */}
-					<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 						{kpis.map((k) => {
 							const Icon = k.icon;
 							return (
 								<div
 									key={k.label}
-									className="rounded-lg border border-border/50 bg-card p-2.5"
+									className="rounded-xl border border-border/40 bg-card p-4 shadow-sm"
 								>
 									<div className="flex items-start justify-between gap-2">
 										<div className="min-w-0">
-											<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+											<p className="text-xs font-medium text-muted-foreground">
 												{k.label}
 											</p>
-											<p className="mt-1 truncate text-base font-semibold tabular-nums tracking-tight">
+											<p className="mt-1.5 truncate text-lg font-semibold tabular-nums tracking-tight">
 												{k.value}
 											</p>
-											<div className="mt-1">
+											<div className="mt-1.5">
 												<Trend value={k.trend} />
 											</div>
 										</div>
-										<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+										<span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
 											<Icon className="size-4" />
 										</span>
 									</div>
@@ -528,35 +640,33 @@ export function ProviderDetailPage({
 					</div>
 
 					{/* Row 1 */}
-					<div className="grid gap-3 lg:grid-cols-3">
+					<div className="grid gap-4 lg:grid-cols-2">
 						<Panel title="Provider Locations">
-							<div className="-mx-1 overflow-x-auto">
+							<div className="overflow-x-auto">
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
-											<TableHead className="h-8 text-[10px]">
-												Location
-											</TableHead>
-											<TableHead className="h-8 text-[10px]">Status</TableHead>
-											<TableHead className="h-8 text-[10px]">Primary</TableHead>
+											<TableHead className="h-9 text-xs">Location</TableHead>
+											<TableHead className="h-9 text-xs">Status</TableHead>
+											<TableHead className="h-9 text-xs">Primary</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
 										{provider.locations.map((loc) => (
 											<TableRow key={loc.id}>
-												<TableCell className="py-1.5">
-													<p className="text-[11px] font-medium">{loc.name}</p>
-													<p className="text-[10px] text-muted-foreground">
+												<TableCell className="py-2.5">
+													<p className="text-sm font-medium">{loc.name}</p>
+													<p className="text-sm leading-relaxed text-muted-foreground">
 														{loc.address}
 													</p>
-													<p className="text-[10px] text-muted-foreground">
+													<p className="text-sm leading-relaxed text-muted-foreground">
 														{loc.phone}
 													</p>
 												</TableCell>
-												<TableCell className="py-1.5">
+												<TableCell className="py-2.5">
 													<StatusPill status={loc.status} />
 												</TableCell>
-												<TableCell className="py-1.5 text-[11px]">
+												<TableCell className="py-2.5 text-sm">
 													{loc.isPrimary ? "Yes" : "No"}
 												</TableCell>
 											</TableRow>
@@ -571,32 +681,28 @@ export function ProviderDetailPage({
 						</Panel>
 
 						<Panel title="Network Participation">
-							<div className="-mx-1 overflow-x-auto">
+							<div className="overflow-x-auto">
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
-											<TableHead className="h-8 text-[10px]">Network</TableHead>
-											<TableHead className="h-8 text-[10px]">Status</TableHead>
-											<TableHead className="h-8 text-[10px]">
-												Effective
-											</TableHead>
+											<TableHead className="h-9 text-xs">Network</TableHead>
+											<TableHead className="h-9 text-xs">Status</TableHead>
+											<TableHead className="h-9 text-xs">Effective</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
 										{provider.networks.slice(0, 5).map((n) => (
 											<TableRow key={n.id}>
-												<TableCell className="py-1.5">
-													<p className="text-[11px] font-medium">
-														{n.networkPlan}
-													</p>
-													<p className="text-[10px] text-muted-foreground">
+												<TableCell className="py-2.5">
+													<p className="text-sm font-medium">{n.networkPlan}</p>
+													<p className="text-sm leading-relaxed text-muted-foreground">
 														{n.payer}
 													</p>
 												</TableCell>
-												<TableCell className="py-1.5">
+												<TableCell className="py-2.5">
 													<NetworkPill status={n.status} />
 												</TableCell>
-												<TableCell className="py-1.5 text-[11px] tabular-nums">
+												<TableCell className="py-2.5 text-sm tabular-nums">
 													{formatDate(n.effectiveDate)}
 												</TableCell>
 											</TableRow>
@@ -609,28 +715,26 @@ export function ProviderDetailPage({
 								onClick={() => setTab("Network Participation")}
 							/>
 						</Panel>
-
-						<Panel title="Identifiers">
-							<ul className="space-y-2">
-								{provider.identifiers.map((id) => (
-									<li
-										key={id.id}
-										className="flex items-center justify-between gap-2 rounded-md border border-border/40 px-2.5 py-1.5 text-xs"
-									>
-										<span className="text-muted-foreground">{id.label}</span>
-										<span className="font-mono font-medium">{id.value}</span>
-									</li>
-								))}
-							</ul>
-							<ViewLink
-								label="View all identifiers"
-								onClick={() => setTab("Identifiers")}
-							/>
-						</Panel>
 					</div>
 
+					<Panel title="Identifiers">
+						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							{provider.identifiers.map((id) => (
+								<MetaField
+									key={id.id}
+									label={id.label}
+									value={<span className="font-mono text-sm">{id.value}</span>}
+								/>
+							))}
+						</div>
+						<ViewLink
+							label="View all identifiers"
+							onClick={() => setTab("Identifiers")}
+						/>
+					</Panel>
+
 					{/* Row 2 — charts */}
-					<div className="grid gap-3 lg:grid-cols-3">
+					<div className="grid gap-4 lg:grid-cols-2">
 						<Panel title="Claims & Encounters Volume">
 							<div className="h-[220px]">
 								<ResponsiveContainer width="100%" height="100%">
@@ -703,70 +807,68 @@ export function ProviderDetailPage({
 								onClick={() => setTab("Rejection Trends")}
 							/>
 						</Panel>
-
-						<Panel title="Top Rejection Reasons">
-							<div className="-mx-1 overflow-x-auto">
-								<Table>
-									<TableHeader>
-										<TableRow className="hover:bg-transparent">
-											<TableHead className="h-8 text-[10px]">Reason</TableHead>
-											<TableHead className="h-8 text-right text-[10px]">
-												Count
-											</TableHead>
-											<TableHead className="h-8 text-right text-[10px]">
-												%
-											</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{provider.rejectionReasons.map((r) => (
-											<TableRow key={r.id}>
-												<TableCell className="py-1.5 text-[11px]">
-													{r.reason}
-												</TableCell>
-												<TableCell className="py-1.5 text-right text-[11px] tabular-nums">
-													{r.count}
-												</TableCell>
-												<TableCell className="py-1.5 text-right text-[11px] tabular-nums">
-													{r.pct}%
-												</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
-							</div>
-							<ViewLink
-								label="View all rejection reasons"
-								onClick={() => setTab("Rejection Trends")}
-							/>
-						</Panel>
 					</div>
 
+					<Panel title="Top Rejection Reasons">
+						<div className="overflow-x-auto">
+							<Table>
+								<TableHeader>
+									<TableRow className="hover:bg-transparent">
+										<TableHead className="h-9 text-xs">Reason</TableHead>
+										<TableHead className="h-9 text-right text-xs">
+											Count
+										</TableHead>
+										<TableHead className="h-9 text-right text-xs">%</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{provider.rejectionReasons.map((r) => (
+										<TableRow key={r.id}>
+											<TableCell className="py-2.5 text-sm">
+												{r.reason}
+											</TableCell>
+											<TableCell className="py-2.5 text-right text-sm tabular-nums">
+												{r.count}
+											</TableCell>
+											<TableCell className="py-2.5 text-right text-sm tabular-nums">
+												{r.pct}%
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+						<ViewLink
+							label="View all rejection reasons"
+							onClick={() => setTab("Rejection Trends")}
+						/>
+					</Panel>
+
 					{/* Row 3 */}
-					<div className="grid gap-3 lg:grid-cols-3">
+					<div className="grid gap-4 lg:grid-cols-2">
 						<Panel title="Vendors / Source Associations">
-							<div className="-mx-1 overflow-x-auto">
+							<div className="overflow-x-auto">
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
-											<TableHead className="h-8 text-[10px]">Vendor</TableHead>
-											<TableHead className="h-8 text-[10px]">Feed</TableHead>
-											<TableHead className="h-8 text-[10px]">Status</TableHead>
+											<TableHead className="h-9 text-xs">Vendor</TableHead>
+											<TableHead className="h-9 text-xs">Feed</TableHead>
+											<TableHead className="h-9 text-xs">Status</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
 										{provider.vendors.map((v) => (
 											<TableRow key={v.id}>
-												<TableCell className="py-1.5">
-													<p className="text-[11px] font-medium">{v.vendor}</p>
-													<p className="text-[10px] text-muted-foreground">
+												<TableCell className="py-2.5">
+													<p className="text-sm font-medium">{v.vendor}</p>
+													<p className="text-sm leading-relaxed text-muted-foreground">
 														{v.frequency} · {v.lastReceived}
 													</p>
 												</TableCell>
-												<TableCell className="py-1.5 text-[11px]">
+												<TableCell className="py-2.5 text-sm">
 													{v.fileType}
 												</TableCell>
-												<TableCell className="py-1.5">
+												<TableCell className="py-2.5">
 													<FeedPill status={v.status} />
 												</TableCell>
 											</TableRow>
@@ -803,12 +905,10 @@ export function ProviderDetailPage({
 										<p className="text-lg font-semibold tabular-nums">
 											{credPct}%
 										</p>
-										<p className="text-[10px] text-muted-foreground">
-											Complete
-										</p>
+										<p className="text-xs text-muted-foreground">Complete</p>
 									</div>
 								</div>
-								<ul className="w-full space-y-1.5 text-xs">
+								<ul className="w-full space-y-2 text-sm">
 									{[
 										{
 											label: "Complete",
@@ -837,7 +937,7 @@ export function ProviderDetailPage({
 										>
 											<span className="flex items-center gap-2">
 												<span
-													className={cn("size-2 rounded-full", row.color)}
+													className={cn("size-2.5 rounded-full", row.color)}
 												/>
 												{row.label}
 											</span>
@@ -853,55 +953,53 @@ export function ProviderDetailPage({
 								onClick={() => setTab("Credentialing & Exceptions")}
 							/>
 						</Panel>
-
-						<Panel title="Credentialing & Enrollment Exceptions">
-							{provider.exceptions.length === 0 ? (
-								<p className="text-xs text-muted-foreground">
-									No open exceptions.
-								</p>
-							) : (
-								<div className="-mx-1 overflow-x-auto">
-									<Table>
-										<TableHeader>
-											<TableRow className="hover:bg-transparent">
-												<TableHead className="h-8 text-[10px]">Type</TableHead>
-												<TableHead className="h-8 text-[10px]">
-													Status
-												</TableHead>
-												<TableHead className="h-8 text-[10px]">Date</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{provider.exceptions.map((ex) => (
-												<TableRow key={ex.id}>
-													<TableCell className="py-1.5">
-														<p className="text-[11px] font-medium text-amber-800">
-															{ex.exceptionType}
-														</p>
-														<p className="text-[10px] text-muted-foreground">
-															{ex.description}
-														</p>
-													</TableCell>
-													<TableCell className="py-1.5">
-														<ExceptionPill status={ex.status} />
-													</TableCell>
-													<TableCell className="py-1.5 text-[11px] tabular-nums">
-														{formatDate(ex.dateIdentified)}
-													</TableCell>
-												</TableRow>
-											))}
-										</TableBody>
-									</Table>
-								</div>
-							)}
-							<ViewLink
-								label="View all exceptions"
-								onClick={() => setTab("Credentialing & Exceptions")}
-							/>
-						</Panel>
 					</div>
 
-					<footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2 text-[11px] text-muted-foreground">
+					<Panel title="Credentialing & Enrollment Exceptions">
+						{provider.exceptions.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								No open exceptions.
+							</p>
+						) : (
+							<div className="overflow-x-auto">
+								<Table>
+									<TableHeader>
+										<TableRow className="hover:bg-transparent">
+											<TableHead className="h-9 text-xs">Type</TableHead>
+											<TableHead className="h-9 text-xs">Status</TableHead>
+											<TableHead className="h-9 text-xs">Date</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{provider.exceptions.map((ex) => (
+											<TableRow key={ex.id}>
+												<TableCell className="py-2.5">
+													<p className="text-sm font-medium text-amber-800">
+														{ex.exceptionType}
+													</p>
+													<p className="text-sm leading-relaxed text-muted-foreground">
+														{ex.description}
+													</p>
+												</TableCell>
+												<TableCell className="py-2.5">
+													<ExceptionPill status={ex.status} />
+												</TableCell>
+												<TableCell className="py-2.5 text-sm tabular-nums">
+													{formatDate(ex.dateIdentified)}
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						)}
+						<ViewLink
+							label="View all exceptions"
+							onClick={() => setTab("Credentialing & Exceptions")}
+						/>
+					</Panel>
+
+					<footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3 text-xs text-muted-foreground">
 						<p>All dates and times are displayed in Eastern Time (ET).</p>
 						<p>Data as of {provider.dataAsOf}</p>
 					</footer>
@@ -909,6 +1007,530 @@ export function ProviderDetailPage({
 			) : (
 				<TabBody tab={tab} provider={provider} />
 			)}
+		</div>
+	);
+}
+
+function ClaimsEncountersTab({
+	provider,
+}: {
+	provider: NonNullable<ReturnType<typeof getProvider>>;
+}) {
+	const [pane, setPane] = useState<"claims" | "encounters">("claims");
+	const rows =
+		pane === "claims" ? provider.recentClaims : provider.recentEncounters;
+
+	const totals = provider.monthlyVolume.reduce(
+		(acc, m) => {
+			acc.claims += m.claims;
+			acc.encounters += m.encounters;
+			acc.rejections += m.rejectionCount;
+			return acc;
+		},
+		{ claims: 0, encounters: 0, rejections: 0 }
+	);
+	const avgRejection =
+		Math.round(
+			(provider.monthlyVolume.reduce((s, m) => s + m.rejectionRate, 0) /
+				provider.monthlyVolume.length) *
+				100
+		) / 100;
+
+	return (
+		<div className="space-y-4">
+			<MetricStrip
+				title="12-month performance"
+				items={[
+					{
+						label: "Claims",
+						value: formatCompact(provider.claims12m),
+					},
+					{
+						label: "Encounters",
+						value: formatCompact(provider.encounters12m),
+					},
+					{
+						label: "Billed",
+						value: formatCurrency(provider.billed12m),
+					},
+					{
+						label: "Paid",
+						value: formatCurrency(provider.paid12m),
+					},
+					{
+						label: "Net payment",
+						value: formatCurrency(provider.netPayment12m),
+					},
+					{
+						label: "Rejection rate",
+						value: `${provider.rejectionRate}%`,
+						accent: provider.rejectionRate < 7,
+					},
+				]}
+			/>
+
+			<div className="grid gap-3 lg:grid-cols-5">
+				<Panel
+					dense
+					title="Volume trend"
+					className="lg:col-span-3"
+					action={
+						<span className="text-[11px] text-muted-foreground">
+							Claims vs encounters
+						</span>
+					}
+				>
+					<div className="h-[260px]">
+						<ResponsiveContainer width="100%" height="100%">
+							<ComposedChart data={provider.monthlyVolume}>
+								<CartesianGrid strokeDasharray="3 3" vertical={false} />
+								<XAxis dataKey="month" tick={{ fontSize: 10 }} />
+								<YAxis tick={{ fontSize: 10 }} width={40} />
+								<Tooltip />
+								<Legend wrapperStyle={{ fontSize: 11 }} />
+								<Bar
+									dataKey="claims"
+									name="Claims"
+									fill="#13446c"
+									radius={[3, 3, 0, 0]}
+								/>
+								<Line
+									type="monotone"
+									dataKey="encounters"
+									name="Encounters"
+									stroke="#059669"
+									strokeWidth={2}
+									dot={{ r: 2.5 }}
+								/>
+							</ComposedChart>
+						</ResponsiveContainer>
+					</div>
+				</Panel>
+
+				<Panel
+					dense
+					title="Period summary"
+					className="lg:col-span-2"
+					action={
+						<span className="text-[11px] text-muted-foreground">
+							Trailing 12 months
+						</span>
+					}
+				>
+					<div className="space-y-4">
+						<div className="grid grid-cols-2 gap-2.5">
+							{[
+								{
+									label: "Total claims",
+									value: formatCompact(totals.claims),
+									trend: provider.claimsTrendPct,
+								},
+								{
+									label: "Total encounters",
+									value: formatCompact(totals.encounters),
+									trend: provider.encountersTrendPct,
+								},
+								{
+									label: "Rejections",
+									value: formatCompact(totals.rejections),
+									trend: provider.rejectionTrendPct,
+								},
+								{
+									label: "Avg rejection",
+									value: `${avgRejection}%`,
+									trend: provider.rejectionTrendPct,
+								},
+							].map((item) => (
+								<div
+									key={item.label}
+									className="rounded-lg border border-border/30 bg-muted/15 px-3 py-2.5"
+								>
+									<p className="text-[11px] text-muted-foreground">
+										{item.label}
+									</p>
+									<p className="mt-1 text-sm font-semibold tabular-nums">
+										{item.value}
+									</p>
+									<div className="mt-1">
+										<Trend value={item.trend} />
+									</div>
+								</div>
+							))}
+						</div>
+						<div className="overflow-x-auto rounded-lg border border-border/30">
+							<Table>
+								<TableHeader>
+									<TableRow className="hover:bg-transparent">
+										<TableHead className="h-8 text-[11px]">Month</TableHead>
+										<TableHead className="h-8 text-right text-[11px]">
+											Claims
+										</TableHead>
+										<TableHead className="h-8 text-right text-[11px]">
+											Enc.
+										</TableHead>
+										<TableHead className="h-8 text-right text-[11px]">
+											Rej %
+										</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{provider.monthlyVolume.slice(-4).map((m) => (
+										<TableRow key={m.month}>
+											<TableCell className="py-1.5 text-xs font-medium">
+												{m.month}
+											</TableCell>
+											<TableCell className="py-1.5 text-right text-xs tabular-nums">
+												{m.claims}
+											</TableCell>
+											<TableCell className="py-1.5 text-right text-xs tabular-nums">
+												{m.encounters}
+											</TableCell>
+											<TableCell className="py-1.5 text-right text-xs tabular-nums">
+												{m.rejectionRate}%
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+					</div>
+				</Panel>
+			</div>
+
+			<Panel
+				dense
+				title="Recent activity"
+				action={
+					<div className="flex items-center gap-1 rounded-lg bg-muted/40 p-0.5">
+						{(
+							[
+								{
+									id: "claims" as const,
+									label: `Claims (${provider.recentClaims.length})`,
+								},
+								{
+									id: "encounters" as const,
+									label: `Encounters (${provider.recentEncounters.length})`,
+								},
+							] as const
+						).map((p) => (
+							<button
+								key={p.id}
+								type="button"
+								onClick={() => setPane(p.id)}
+								className={cn(
+									"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+									pane === p.id
+										? "bg-primary text-primary-foreground shadow-sm"
+										: "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+								)}
+							>
+								{p.label}
+							</button>
+						))}
+					</div>
+				}
+			>
+				<div className="overflow-x-auto">
+					<Table>
+						<TableHeader>
+							<TableRow className="hover:bg-transparent">
+								<TableHead className="h-9 text-xs">DOS</TableHead>
+								<TableHead className="h-9 text-xs">Claim #</TableHead>
+								<TableHead className="h-9 text-xs">Member</TableHead>
+								<TableHead className="h-9 text-xs">Type</TableHead>
+								<TableHead className="h-9 text-xs">Code</TableHead>
+								<TableHead className="h-9 text-xs">Vendor</TableHead>
+								<TableHead className="h-9 text-right text-xs">Billed</TableHead>
+								<TableHead className="h-9 text-right text-xs">Paid</TableHead>
+								<TableHead className="h-9 text-xs">Status</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{rows.map((r) => (
+								<TableRow key={r.id}>
+									<TableCell className="py-2.5 text-sm tabular-nums">
+										{formatDate(r.dos)}
+									</TableCell>
+									<TableCell className="py-2.5 font-mono text-xs">
+										{r.claimNumber}
+									</TableCell>
+									<TableCell className="py-2.5">
+										<p className="text-sm font-medium">{r.memberName}</p>
+										<p className="font-mono text-[11px] text-muted-foreground">
+											{r.memberId}
+										</p>
+									</TableCell>
+									<TableCell className="py-2.5 text-sm">{r.type}</TableCell>
+									<TableCell className="py-2.5 font-mono text-xs">
+										{r.procedureCode}
+									</TableCell>
+									<TableCell className="py-2.5 text-sm">{r.vendor}</TableCell>
+									<TableCell className="py-2.5 text-right text-sm tabular-nums">
+										{formatCurrency(r.billed)}
+									</TableCell>
+									<TableCell className="py-2.5 text-right text-sm tabular-nums">
+										{formatCurrency(r.paid)}
+									</TableCell>
+									<TableCell className="py-2.5">
+										<ClaimStatusPill status={r.status} />
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</div>
+				<p className="mt-3 text-[11px] text-muted-foreground">
+					Showing recent {pane} for this provider · Data as of{" "}
+					{provider.dataAsOf}
+				</p>
+			</Panel>
+		</div>
+	);
+}
+
+function CredStatusPill({ status }: { status: CredentialStatus }) {
+	return (
+		<span
+			className={cn(
+				"inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
+				status === "complete" && "bg-emerald-100 text-emerald-800",
+				status === "expiring" && "bg-amber-100 text-amber-900",
+				status === "expired" && "bg-red-100 text-red-800",
+				status === "pending" && "bg-slate-100 text-slate-700"
+			)}
+		>
+			{status}
+		</span>
+	);
+}
+
+function CredentialingTab({
+	provider,
+}: {
+	provider: NonNullable<ReturnType<typeof getProvider>>;
+}) {
+	const counts = {
+		complete: 0,
+		expiring: 0,
+		expired: 0,
+		pending: 0,
+	} as Record<CredentialStatus, number>;
+	for (const c of provider.credentialing) counts[c.status] += 1;
+	const total =
+		counts.complete + counts.expiring + counts.expired + counts.pending;
+	const completePct = total ? Math.round((counts.complete / total) * 100) : 0;
+	const openExceptions = provider.exceptions.filter(
+		(e) => e.status === "open" || e.status === "in_progress"
+	).length;
+	const actionNeeded = provider.credentialing.filter(
+		(c) =>
+			c.status === "expiring" ||
+			c.status === "expired" ||
+			c.status === "pending"
+	);
+
+	return (
+		<div className="space-y-4">
+			<MetricStrip
+				title="Credentialing health"
+				items={[
+					{
+						label: "Complete",
+						value: `${counts.complete}`,
+						accent: true,
+					},
+					{ label: "Expiring", value: `${counts.expiring}` },
+					{ label: "Expired", value: `${counts.expired}` },
+					{ label: "Pending", value: `${counts.pending}` },
+					{
+						label: "Completion",
+						value: `${completePct}%`,
+						accent: completePct >= 85,
+					},
+					{
+						label: "Open exceptions",
+						value: `${openExceptions}`,
+					},
+				]}
+			/>
+
+			<div className="grid gap-3 lg:grid-cols-5">
+				<Panel
+					dense
+					title="Credentialing checklist"
+					className="lg:col-span-3"
+					action={
+						<span className="text-[11px] text-muted-foreground">
+							{total} items tracked
+						</span>
+					}
+				>
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader>
+								<TableRow className="hover:bg-transparent">
+									<TableHead className="h-9 text-xs">Requirement</TableHead>
+									<TableHead className="h-9 text-xs">Issuer</TableHead>
+									<TableHead className="h-9 text-xs">Verified</TableHead>
+									<TableHead className="h-9 text-xs">Expires</TableHead>
+									<TableHead className="h-9 text-xs">Status</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{provider.credentialing.map((c) => (
+									<TableRow key={c.id}>
+										<TableCell className="py-2.5 text-sm font-medium">
+											{c.label}
+										</TableCell>
+										<TableCell className="py-2.5 text-sm text-muted-foreground">
+											{c.issuer}
+										</TableCell>
+										<TableCell className="py-2.5 text-sm tabular-nums">
+											{formatDate(c.verifiedDate)}
+										</TableCell>
+										<TableCell className="py-2.5 text-sm tabular-nums">
+											{formatDate(c.expirationDate)}
+										</TableCell>
+										<TableCell className="py-2.5">
+											<CredStatusPill status={c.status} />
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
+				</Panel>
+
+				<div className="space-y-3 lg:col-span-2">
+					<Panel dense title="Action required">
+						{actionNeeded.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								No expiring, expired, or pending credentials.
+							</p>
+						) : (
+							<ul className="space-y-2.5">
+								{actionNeeded.map((c) => (
+									<li
+										key={c.id}
+										className="flex items-start justify-between gap-3 rounded-lg border border-border/30 bg-muted/15 px-3 py-2.5"
+									>
+										<div className="min-w-0">
+											<p className="text-sm font-medium">{c.label}</p>
+											<p className="text-sm leading-relaxed text-muted-foreground">
+												{c.issuer}
+												{c.expirationDate
+													? ` · Exp ${formatDate(c.expirationDate)}`
+													: ""}
+											</p>
+										</div>
+										<CredStatusPill status={c.status} />
+									</li>
+								))}
+							</ul>
+						)}
+					</Panel>
+
+					<Panel dense title="Status mix">
+						<ul className="space-y-2.5 text-sm">
+							{(
+								[
+									{
+										label: "Complete",
+										value: counts.complete,
+										color: "bg-emerald-500",
+									},
+									{
+										label: "Expiring",
+										value: counts.expiring,
+										color: "bg-amber-500",
+									},
+									{
+										label: "Expired",
+										value: counts.expired,
+										color: "bg-red-500",
+									},
+									{
+										label: "Pending",
+										value: counts.pending,
+										color: "bg-slate-400",
+									},
+								] as const
+							).map((row) => (
+								<li
+									key={row.label}
+									className="flex items-center justify-between gap-2"
+								>
+									<span className="flex items-center gap-2">
+										<span className={cn("size-2.5 rounded-full", row.color)} />
+										{row.label}
+									</span>
+									<span className="font-medium tabular-nums">{row.value}</span>
+								</li>
+							))}
+						</ul>
+						<div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+							<div
+								className="h-full rounded-full bg-emerald-500"
+								style={{ width: `${completePct}%` }}
+							/>
+						</div>
+						<p className="mt-1.5 text-[11px] text-muted-foreground">
+							{completePct}% of requirements complete
+						</p>
+					</Panel>
+				</div>
+			</div>
+
+			<Panel
+				dense
+				title="Credentialing & enrollment exceptions"
+				action={
+					<span className="text-[11px] text-muted-foreground">
+						{provider.exceptions.length} total
+					</span>
+				}
+			>
+				{provider.exceptions.length === 0 ? (
+					<p className="text-sm text-muted-foreground">
+						No exceptions on file.
+					</p>
+				) : (
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader>
+								<TableRow className="hover:bg-transparent">
+									<TableHead className="h-9 text-xs">Type</TableHead>
+									<TableHead className="h-9 text-xs">Description</TableHead>
+									<TableHead className="h-9 text-xs">Status</TableHead>
+									<TableHead className="h-9 text-xs">Identified</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{provider.exceptions.map((ex) => (
+									<TableRow key={ex.id}>
+										<TableCell className="py-2.5 text-sm font-medium text-amber-800">
+											{ex.exceptionType}
+										</TableCell>
+										<TableCell className="py-2.5 text-sm leading-relaxed">
+											{ex.description}
+										</TableCell>
+										<TableCell className="py-2.5">
+											<ExceptionPill status={ex.status} />
+										</TableCell>
+										<TableCell className="py-2.5 text-sm tabular-nums">
+											{formatDate(ex.dateIdentified)}
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
+				)}
+				<p className="mt-3 text-[11px] text-muted-foreground">
+					Data as of {provider.dataAsOf}
+				</p>
+			</Panel>
 		</div>
 	);
 }
@@ -921,82 +1543,344 @@ function TabBody({
 	provider: NonNullable<ReturnType<typeof getProvider>>;
 }) {
 	if (tab === "Demographics") {
+		const age = providerAge(provider.dob);
+		const legalName = [
+			provider.firstName,
+			provider.middleName,
+			provider.lastName,
+			provider.suffix,
+		]
+			.filter(Boolean)
+			.join(" ");
+
 		return (
-			<Panel title="Demographics">
-				<dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-					{[
-						["Name", displayProviderName(provider)],
-						["Provider type", provider.providerType],
-						["Gender", provider.gender],
-						["Date of birth", formatDate(provider.dob)],
-						["Years in practice", String(provider.yearsInPractice)],
-						["Specialty", provider.specialty],
-						["Subspecialty", provider.subspecialty],
-						["Program", provider.program],
-						["Status", provider.status],
-						["Practice", provider.practiceName],
-						["Address", provider.practiceAddress],
-						["Phone", provider.practicePhone],
-					].map(([k, v]) => (
-						<div
-							key={k}
-							className="rounded-md border border-border/40 px-3 py-2"
-						>
-							<dt className="text-[10px] uppercase text-muted-foreground">
-								{k}
-							</dt>
-							<dd className="mt-0.5 text-sm font-medium">{v}</dd>
+			<div className="space-y-4">
+				<div className="grid gap-3 xl:grid-cols-2">
+					<MetricStrip
+						compact
+						title="Snapshot"
+						items={[
+							{
+								label: "Status",
+								value: <StatusPill status={provider.status} />,
+							},
+							{ label: "Type", value: provider.providerType },
+							{ label: "Gender", value: provider.gender },
+							{
+								label: "Age",
+								value: age != null ? `${age} yrs` : "—",
+							},
+							{
+								label: "Practice",
+								value: `${provider.yearsInPractice} yrs`,
+							},
+							{ label: "Program", value: provider.program },
+							{
+								label: "Patients",
+								value: provider.acceptingNewPatients ? "Accepting" : "Closed",
+								accent: provider.acceptingNewPatients,
+							},
+						]}
+					/>
+
+					<MetricStrip
+						compact
+						title="Identifiers"
+						items={provider.identifiers.map((id) => ({
+							label: id.label,
+							value: id.value,
+							mono: true,
+						}))}
+					/>
+				</div>
+
+				{/* Three equal columns — fills width, stays short */}
+				<div className="grid gap-3 lg:grid-cols-3">
+					<Panel
+						dense
+						title="Personal identity"
+						action={<UserRound className="size-3.5 text-muted-foreground" />}
+					>
+						<div className="grid grid-cols-2 gap-x-4 gap-y-3">
+							<MetaField label="Legal name" value={legalName} />
+							<MetaField
+								label="Display name"
+								value={displayProviderName(provider)}
+							/>
+							<MetaField
+								label="Preferred name"
+								value={provider.preferredName ?? "—"}
+							/>
+							<MetaField label="Credentials" value={provider.credentials} />
+							<MetaField
+								label="Date of birth"
+								value={
+									<span className="tabular-nums">
+										{formatDate(provider.dob)}
+										{age != null ? (
+											<span className="ml-1.5 font-normal text-muted-foreground">
+												({age})
+											</span>
+										) : null}
+									</span>
+								}
+							/>
+							<MetaField label="Gender" value={provider.gender} />
+							<MetaField label="Race" value={provider.race} />
+							<MetaField label="Ethnicity" value={provider.ethnicity} />
+							<div className="col-span-2">
+								<MetaField
+									label="Preferred language"
+									value={
+										<span className="inline-flex items-center gap-1.5">
+											<Languages className="size-3.5 text-muted-foreground" />
+											{provider.preferredLanguage}
+										</span>
+									}
+								/>
+							</div>
 						</div>
-					))}
-				</dl>
-			</Panel>
+					</Panel>
+
+					<Panel
+						dense
+						title="Professional profile"
+						action={<Stethoscope className="size-3.5 text-muted-foreground" />}
+					>
+						<div className="grid grid-cols-2 gap-x-4 gap-y-3">
+							<MetaField label="Provider type" value={provider.providerType} />
+							<MetaField
+								label="Years in practice"
+								value={`${provider.yearsInPractice} years`}
+							/>
+							<MetaField label="Specialty" value={provider.specialty} />
+							<MetaField label="Subspecialty" value={provider.subspecialty} />
+							<div className="col-span-2">
+								<MetaField
+									label="Taxonomy"
+									value={
+										<span>
+											<span className="font-mono">{provider.taxonomyCode}</span>
+											<span className="ml-1.5 font-normal text-muted-foreground">
+												· {provider.taxonomyDescription}
+											</span>
+										</span>
+									}
+								/>
+							</div>
+							<div className="col-span-2">
+								<MetaField
+									label="Board certification"
+									value={provider.boardCertification}
+								/>
+							</div>
+							<div className="col-span-2">
+								<MetaField
+									label="Medical school"
+									value={
+										<span className="inline-flex items-start gap-1.5">
+											<GraduationCap className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+											<span>
+												{provider.medicalSchool}
+												<span className="text-muted-foreground">
+													{" "}
+													· Class of {provider.graduationYear}
+												</span>
+											</span>
+										</span>
+									}
+								/>
+							</div>
+							<MetaField
+								label="Accepting patients"
+								value={
+									<span
+										className={cn(
+											"inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+											provider.acceptingNewPatients
+												? "bg-emerald-100 text-emerald-800"
+												: "bg-slate-100 text-slate-700"
+										)}
+									>
+										{provider.acceptingNewPatients
+											? "Accepting"
+											: "Not accepting"}
+									</span>
+								}
+							/>
+						</div>
+					</Panel>
+
+					<Panel
+						dense
+						title="Program & status"
+						action={<BadgeCheck className="size-3.5 text-muted-foreground" />}
+					>
+						<div className="grid grid-cols-2 gap-x-4 gap-y-3">
+							<MetaField label="Program" value={provider.program} />
+							<MetaField
+								label="Provider status"
+								value={<StatusPill status={provider.status} />}
+							/>
+							<MetaField
+								label="Enrollment"
+								value={
+									<span
+										className={cn(
+											"inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+											provider.enrollmentStatus === "enrolled" &&
+												"bg-emerald-100 text-emerald-800",
+											provider.enrollmentStatus === "pending" &&
+												"bg-amber-100 text-amber-900",
+											provider.enrollmentStatus === "terminated" &&
+												"bg-red-100 text-red-800"
+										)}
+									>
+										{provider.enrollmentStatus}
+									</span>
+								}
+							/>
+							<MetaField
+								label="Effective"
+								value={
+									<span className="tabular-nums">
+										{formatDate(provider.enrollmentEffective)}
+									</span>
+								}
+							/>
+							<div className="col-span-2 border-t border-border/30 pt-3">
+								<p className="text-[11px] leading-relaxed text-muted-foreground">
+									Locations and networks are maintained on their dedicated tabs.
+									<span className="mt-1 block">
+										Data as of {provider.dataAsOf}
+									</span>
+								</p>
+							</div>
+						</div>
+					</Panel>
+				</div>
+
+				{/* Practice & contact — one wide, compact row */}
+				<Panel
+					dense
+					title="Primary practice & contact"
+					action={<Building2 className="size-3.5 text-muted-foreground" />}
+				>
+					<div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+						<MetaField
+							label="Practice / organization"
+							value={provider.practiceName}
+						/>
+						<MetaField
+							label="Service address"
+							value={
+								<span className="inline-flex items-start gap-1.5">
+									<MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+									<span>
+										{provider.practiceAddress}
+										<span className="block font-normal text-muted-foreground">
+											{provider.practiceCity}, {provider.practiceState}{" "}
+											{provider.practiceZip}
+										</span>
+									</span>
+								</span>
+							}
+						/>
+						<MetaField
+							label="Mailing address"
+							value={provider.mailingAddress}
+						/>
+						<div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:col-span-2 xl:col-span-1 xl:grid-cols-1">
+							<MetaField
+								label="Phone"
+								value={
+									<span className="inline-flex items-center gap-1.5 tabular-nums">
+										<Phone className="size-3.5 text-muted-foreground" />
+										{provider.practicePhone}
+									</span>
+								}
+							/>
+							<MetaField
+								label="Fax"
+								value={<span className="tabular-nums">{provider.fax}</span>}
+							/>
+							<MetaField
+								label="Email"
+								value={
+									<span className="inline-flex items-center gap-1.5 truncate">
+										<Mail className="size-3.5 shrink-0 text-muted-foreground" />
+										<span className="truncate">{provider.email}</span>
+									</span>
+								}
+							/>
+							{provider.website ? (
+								<MetaField
+									label="Website"
+									value={
+										<a
+											href={provider.website}
+											target="_blank"
+											rel="noreferrer"
+											className="inline-flex items-center gap-1.5 text-primary hover:underline"
+										>
+											<Globe className="size-3.5 shrink-0" />
+											{provider.website.replace(/^https?:\/\//, "")}
+										</a>
+									}
+								/>
+							) : null}
+						</div>
+					</div>
+				</Panel>
+			</div>
 		);
 	}
 
 	if (tab === "Identifiers") {
 		return (
-			<Panel title="Identifiers">
-				<ul className="grid gap-2 sm:grid-cols-2">
-					{provider.identifiers.map((id) => (
-						<li
-							key={id.id}
-							className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2 text-sm"
-						>
-							<span className="text-muted-foreground">{id.label}</span>
-							<span className="font-mono font-medium">{id.value}</span>
-						</li>
-					))}
-				</ul>
-			</Panel>
+			<div className="space-y-4">
+				<MetricStrip
+					title="Core identifiers"
+					items={provider.identifiers.map((id) => ({
+						label: id.label,
+						value: id.value,
+						mono: true,
+					}))}
+				/>
+				<Panel dense title="Identifier details">
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{provider.identifiers.map((id) => (
+							<MetaField
+								key={id.id}
+								label={id.label}
+								value={
+									<span className="font-mono text-sm tabular-nums tracking-tight">
+										{id.value}
+									</span>
+								}
+							/>
+						))}
+					</div>
+				</Panel>
+			</div>
 		);
 	}
 
 	if (tab === "Enrollment") {
 		return (
 			<Panel title="Enrollment">
-				<div className="grid gap-3 sm:grid-cols-3">
-					<div className="rounded-md border border-border/40 p-3">
-						<p className="text-[10px] uppercase text-muted-foreground">
-							Status
-						</p>
-						<p className="mt-1 text-sm font-semibold capitalize">
-							{provider.enrollmentStatus}
-						</p>
-					</div>
-					<div className="rounded-md border border-border/40 p-3">
-						<p className="text-[10px] uppercase text-muted-foreground">
-							Effective date
-						</p>
-						<p className="mt-1 text-sm font-semibold tabular-nums">
-							{formatDate(provider.enrollmentEffective)}
-						</p>
-					</div>
-					<div className="rounded-md border border-border/40 p-3">
-						<p className="text-[10px] uppercase text-muted-foreground">
-							Program
-						</p>
-						<p className="mt-1 text-sm font-semibold">{provider.program}</p>
-					</div>
+				<div className="grid gap-5 sm:grid-cols-3">
+					<MetaField
+						label="Status"
+						value={
+							<span className="capitalize">{provider.enrollmentStatus}</span>
+						}
+					/>
+					<MetaField
+						label="Effective date"
+						value={formatDate(provider.enrollmentEffective)}
+					/>
+					<MetaField label="Program" value={provider.program} />
 				</div>
 			</Panel>
 		);
@@ -1079,39 +1963,12 @@ function TabBody({
 	}
 
 	if (tab === "Claims & Encounters") {
-		return (
-			<Panel title="Claims & Encounters Volume (12 months)">
-				<div className="h-[320px]">
-					<ResponsiveContainer width="100%" height="100%">
-						<ComposedChart data={provider.monthlyVolume}>
-							<CartesianGrid strokeDasharray="3 3" vertical={false} />
-							<XAxis dataKey="month" tick={{ fontSize: 11 }} />
-							<YAxis tick={{ fontSize: 11 }} width={40} />
-							<Tooltip />
-							<Legend />
-							<Bar
-								dataKey="claims"
-								name="Claims"
-								fill="#13446c"
-								radius={[4, 4, 0, 0]}
-							/>
-							<Line
-								type="monotone"
-								dataKey="encounters"
-								name="Encounters"
-								stroke="#059669"
-								strokeWidth={2}
-							/>
-						</ComposedChart>
-					</ResponsiveContainer>
-				</div>
-			</Panel>
-		);
+		return <ClaimsEncountersTab provider={provider} />;
 	}
 
 	if (tab === "Rejection Trends") {
 		return (
-			<div className="grid gap-3 lg:grid-cols-2">
+			<div className="grid gap-4 lg:grid-cols-2">
 				<Panel title="Rejection Trends">
 					<div className="h-[280px]">
 						<ResponsiveContainer width="100%" height="100%">
@@ -1199,65 +2056,5 @@ function TabBody({
 		);
 	}
 
-	return (
-		<div className="grid gap-3 lg:grid-cols-2">
-			<Panel title="Credentialing checklist">
-				<ul className="space-y-1.5">
-					{provider.credentialing.map((c) => (
-						<li
-							key={c.id}
-							className="flex items-center justify-between rounded-md border border-border/40 px-2.5 py-1.5 text-xs"
-						>
-							<span>{c.label}</span>
-							<span
-								className={cn(
-									"rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-									c.status === "complete" && "bg-emerald-100 text-emerald-800",
-									c.status === "expiring" && "bg-amber-100 text-amber-900",
-									c.status === "expired" && "bg-red-100 text-red-800",
-									c.status === "pending" && "bg-slate-100 text-slate-700"
-								)}
-							>
-								{c.status}
-							</span>
-						</li>
-					))}
-				</ul>
-			</Panel>
-			<Panel title="Exceptions">
-				{provider.exceptions.length === 0 ? (
-					<p className="text-xs text-muted-foreground">No exceptions.</p>
-				) : (
-					<div className="overflow-x-auto">
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Type</TableHead>
-									<TableHead>Description</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Identified</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{provider.exceptions.map((ex) => (
-									<TableRow key={ex.id}>
-										<TableCell className="text-sm font-medium text-amber-800">
-											{ex.exceptionType}
-										</TableCell>
-										<TableCell className="text-sm">{ex.description}</TableCell>
-										<TableCell>
-											<ExceptionPill status={ex.status} />
-										</TableCell>
-										<TableCell className="tabular-nums text-sm">
-											{formatDate(ex.dateIdentified)}
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					</div>
-				)}
-			</Panel>
-		</div>
-	);
+	return <CredentialingTab provider={provider} />;
 }

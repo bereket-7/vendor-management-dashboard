@@ -580,7 +580,7 @@ export function EdiViewer({
 	return (
 		<div
 			className={cn(
-				"flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/50 bg-card/70",
+				"flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm",
 				className
 			)}
 		>

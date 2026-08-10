@@ -66,9 +66,9 @@ For local dev without Nest roles, set `NEXT_PUBLIC_DEV_ADMIN=true` to treat the 
 
 [`src/lib/api/client.ts`](../src/lib/api/client.ts) targets `NEXT_PUBLIC_API_URL` with `credentials: "include"`. Errors throw [`ApiError`](../src/lib/api/errors.ts) with status, message, and optional field errors.
 
-### Mock groups
+### Mock mode
 
-Set `NEXT_PUBLIC_USE_MOCK_GROUPS=true` to use in-memory group data. When unset, API failures surface as errors (no silent dev fallback).
+Set `NEXT_PUBLIC_USE_MOCK=true` (default) for in-memory data and mock auth. Set `NEXT_PUBLIC_USE_MOCK=false` to use NestJS REST + Better Auth and the Django vendor-core intake API. See [`src/lib/mock-mode.ts`](../src/lib/mock-mode.ts).
 
 ## Permissions (client ABAC)
 
@@ -110,7 +110,8 @@ Local Docker under [`infra/`](../infra/README.md): host `pnpm build:docker` (Tur
 
 - Set `NEXT_PUBLIC_API_URL` to your NestJS production domain
 - Set `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_URL` to your Next.js frontend domain
-- Unset all `NEXT_PUBLIC_USE_MOCK_*` flags
+- Set `NEXT_PUBLIC_USE_MOCK=false`
+- Set `NEXT_PUBLIC_VENDOR_CORE_API_URL` when using intake / monitoring
 - Set `NEXT_PUBLIC_SENTRY_DSN` and verify [`sentry.client.config.ts`](../sentry.client.config.ts) loads in production
 - Optional analytics: `NEXT_PUBLIC_GA_ID`, `NEXT_PUBLIC_CLARITY_ID`
 - Run `pnpm test-all` before deploy

@@ -54,7 +54,7 @@ export function SettingsPage() {
 
 	if (isInitialLoading) {
 		return (
-			<div className="space-y-6">
+			<div className="space-y-4">
 				<Skeleton className="h-10 w-48" />
 				<Skeleton className="h-64 w-full" />
 			</div>
@@ -70,7 +70,7 @@ export function SettingsPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">

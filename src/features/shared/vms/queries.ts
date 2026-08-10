@@ -2,6 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { useVendorCoreSessionOptional } from "@/components/vendor-core/VendorCoreGate";
+import { useInvalidateVendorCore } from "@/lib/vendor-core/hooks";
+
 import { vmsApi } from "./api";
 import type {
 	ContractModel,
@@ -46,27 +49,39 @@ export const vmsKeys = {
 };
 
 export function useVendorsList() {
+	const vc = useVendorCoreSessionOptional();
+	const liveNeedsAuth = Boolean(vc?.live);
+	const ready =
+		!liveNeedsAuth || (!vc?.bootstrapping && Boolean(vc?.authed));
+
 	const q = useQuery({
-		queryKey: vmsKeys.vendors(),
+		queryKey: [...vmsKeys.vendors(), vc?.authed ? "authed" : "anon"],
 		queryFn: () => vmsApi.listVendors(),
+		enabled: ready,
 	});
 	return {
 		vendors: q.data ?? [],
-		isLoading: q.isLoading,
+		isLoading: !ready || q.isLoading,
 		error: q.error,
 		refetch: q.refetch,
 	};
 }
 
 export function useVendor(id: string | undefined) {
+	const vc = useVendorCoreSessionOptional();
+	const liveNeedsAuth = Boolean(vc?.live);
+	const ready =
+		!!id &&
+		(!liveNeedsAuth || (!vc?.bootstrapping && Boolean(vc?.authed)));
+
 	const q = useQuery({
-		queryKey: vmsKeys.vendor(id ?? ""),
+		queryKey: [...vmsKeys.vendor(id ?? ""), vc?.authed ? "authed" : "anon"],
 		queryFn: () => vmsApi.getVendor(id!),
-		enabled: !!id,
+		enabled: ready,
 	});
 	return {
 		vendor: q.data ?? null,
-		isLoading: q.isLoading,
+		isLoading: !ready || q.isLoading,
 		error: q.error,
 	};
 }
@@ -298,19 +313,63 @@ export function useInviteVendorMutation() {
 
 export function useCreateVendorMutation() {
 	const invalidate = useInvalidateVms();
+	const invalidateVendorCore = useInvalidateVendorCore();
 	return useMutation({
 		mutationFn: (data: Parameters<typeof vmsApi.createVendor>[0]) =>
 			vmsApi.createVendor(data),
-		onSuccess: invalidate,
+		onSuccess: async () => {
+			invalidate();
+			await invalidateVendorCore();
+		},
 	});
 }
 
 export function useUpdateVendorMutation() {
 	const invalidate = useInvalidateVms();
+	const invalidateVendorCore = useInvalidateVendorCore();
 	return useMutation({
 		mutationFn: ({ id, patch }: { id: string; patch: Partial<VendorModel> }) =>
 			vmsApi.updateVendor(id, patch),
-		onSuccess: invalidate,
+		onSuccess: async () => {
+			invalidate();
+			await invalidateVendorCore();
+		},
+	});
+}
+
+export function useDeleteVendorMutation() {
+	const invalidate = useInvalidateVms();
+	const invalidateVendorCore = useInvalidateVendorCore();
+	return useMutation({
+		mutationFn: (id: string) => vmsApi.deleteVendor(id),
+		onSuccess: async () => {
+			invalidate();
+			await invalidateVendorCore();
+		},
+	});
+}
+
+export function useHardDeleteVendorMutation() {
+	const invalidate = useInvalidateVms();
+	const invalidateVendorCore = useInvalidateVendorCore();
+	return useMutation({
+		mutationFn: (id: string) => vmsApi.hardDeleteVendor(id),
+		onSuccess: async () => {
+			invalidate();
+			await invalidateVendorCore();
+		},
+	});
+}
+
+export function useRestoreVendorMutation() {
+	const invalidate = useInvalidateVms();
+	const invalidateVendorCore = useInvalidateVendorCore();
+	return useMutation({
+		mutationFn: (id: string) => vmsApi.restoreVendor(id),
+		onSuccess: async () => {
+			invalidate();
+			await invalidateVendorCore();
+		},
 	});
 }
 

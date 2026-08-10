@@ -2,16 +2,10 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 
-import {
-	AlertTriangle,
-	CheckCircle2,
-	Download,
-	RefreshCw,
-	Search,
-	XCircle,
-} from "lucide-react";
+import { Download, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,19 +28,25 @@ import {
 	type FileRun,
 	type ValidationIssue,
 } from "@/features/admin/features/file-management/mock-data";
-import { vendorIdForRun } from "@/features/admin/features/vendors/vendor-integration-mock";
+import {
+	type ErrorQueueRow,
+	errorRecordsToRows,
+	validationResultsToErrorRows,
+} from "@/features/admin/features/error-management/live-errors";
 import { Link } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core";
+import {
+	useInvalidateVendorCore,
+	useVendorCoreErrors,
+	useVendorCoreInboundFiles,
+	useVendorCoreValidationResults,
+	useVendorCoreVendors,
+} from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
-type ErrorRow = ValidationIssue & {
-	rowId: string;
-	runId: string;
-	vendor: string;
-	fileType: string;
-	timestamp: string;
-	statusLabel: string;
-};
+type ErrorRow = ErrorQueueRow;
 
 function severityTone(severity: ValidationIssue["severity"]) {
 	if (severity === "error") return "bg-red-600 text-white border-red-600";
@@ -101,17 +101,62 @@ function buildErrors(runs: FileRun[]) {
 }
 
 export function ErrorManagementPage() {
+	if (!isMockEnabled()) {
+		return (
+			<VendorCoreGate title="Error management">
+				<ErrorManagementBody useLive />
+			</VendorCoreGate>
+		);
+	}
+	return <ErrorManagementBody useLive={false} />;
+}
+
+function ErrorManagementBody({ useLive }: { useLive: boolean }) {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const invalidate = useInvalidateVendorCore();
+	const errorsQ = useVendorCoreErrors("all", useLive);
+	const validationQ = useVendorCoreValidationResults(useLive ? {} : undefined);
+	const filesQ = useVendorCoreInboundFiles();
+	const vendorsQ = useVendorCoreVendors();
 	const [severity, setSeverity] = useState("all");
 	const [query, setQuery] = useState("");
 	const [page, setPage] = useState(1);
 	const [refreshing, setRefreshing] = useState(false);
+	const [busyId, setBusyId] = useState<string | null>(null);
 	const pageSize = 12;
 
-	const rows = useMemo(
-		() => buildErrors(FILE_RUNS.filter((run) => run.program === programFilter)),
-		[programFilter]
+	const nameById = useMemo(
+		() => new Map((vendorsQ.data ?? []).map((v) => [v.id, v.name])),
+		[vendorsQ.data]
 	);
+	const fileById = useMemo(
+		() => new Map((filesQ.data ?? []).map((file) => [file.id, file])),
+		[filesQ.data]
+	);
+
+	const rows = useMemo(() => {
+		if (!useLive) {
+			return buildErrors(
+				FILE_RUNS.filter((run) => run.program === programFilter)
+			);
+		}
+		const errorRows = errorRecordsToRows(errorsQ.data ?? [], {
+			nameById,
+			fileById,
+		});
+		if (errorRows.length > 0) return errorRows;
+		return validationResultsToErrorRows(validationQ.data ?? [], {
+			nameById,
+			fileById,
+		});
+	}, [
+		useLive,
+		errorsQ.data,
+		validationQ.data,
+		nameById,
+		fileById,
+		programFilter,
+	]);
 
 	const filtered = useMemo(() => {
 		const q = query.trim().toLowerCase();
@@ -126,6 +171,7 @@ export function ErrorManagementPage() {
 				row.message,
 				row.field,
 				row.timestamp,
+				row.statusLabel,
 			]
 				.join(" ")
 				.toLowerCase()
@@ -154,9 +200,42 @@ export function ErrorManagementPage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		await new Promise((resolve) => setTimeout(resolve, 400));
-		setRefreshing(false);
-		toast.success("Error queue refreshed");
+		try {
+			if (useLive) {
+				await invalidate();
+			} else {
+				await new Promise((resolve) => setTimeout(resolve, 400));
+			}
+			toast.success("Error queue refreshed");
+		} finally {
+			setRefreshing(false);
+		}
+	}
+
+	async function onRetry(id: string) {
+		setBusyId(id);
+		try {
+			await vendorCoreApi.retryError(id);
+			toast.success("Retry queued");
+			await invalidate();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Retry failed");
+		} finally {
+			setBusyId(null);
+		}
+	}
+
+	async function onResolve(id: string) {
+		setBusyId(id);
+		try {
+			await vendorCoreApi.resolveError(id, "Resolved from error management");
+			toast.success("Marked resolved");
+			await invalidate();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Resolve failed");
+		} finally {
+			setBusyId(null);
+		}
 	}
 
 	return (
@@ -184,6 +263,28 @@ export function ErrorManagementPage() {
 					</Link>
 				</Button>
 			</div>
+
+			{useLive && (errorsQ.error ?? validationQ.error) ? (
+				<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+					Could not load errors:{" "}
+					{(errorsQ.error ?? validationQ.error)?.message}
+				</div>
+			) : null}
+
+			{useLive &&
+			!errorsQ.isLoading &&
+			!validationQ.isLoading &&
+			(errorsQ.data?.length ?? 0) === 0 &&
+			(validationQ.data?.length ?? 0) > 0 ? (
+				<div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+					No error records returned yet. Showing validation results from the
+					API. Run{" "}
+					<code className="rounded bg-muted px-1 py-0.5 text-xs">
+						pnpm seed:errors
+					</code>{" "}
+					after vendor-core seed endpoints are deployed.
+				</div>
+			) : null}
 
 			<div className="grid gap-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.06] via-card to-sky-50/80 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 				<MetaItem
@@ -313,14 +414,16 @@ export function ErrorManagementPage() {
 					<Button
 						size="sm"
 						className="h-9"
-						onClick={handleRefresh}
-						disabled={refreshing}
+						onClick={() => void handleRefresh()}
+						disabled={refreshing || (useLive && errorsQ.isLoading && validationQ.isLoading)}
 					>
 						<span className="inline-flex items-center gap-1.5">
 							<RefreshCw
 								className={cn(
 									"size-3.5 shrink-0",
-									refreshing && "animate-spin"
+									(refreshing ||
+										(useLive && errorsQ.isLoading && validationQ.isLoading)) &&
+										"animate-spin"
 								)}
 							/>
 							<span>Refresh</span>
@@ -329,7 +432,7 @@ export function ErrorManagementPage() {
 				</div>
 			</div>
 
-			<div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
+			<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 				<div className="overflow-x-auto">
 					<Table>
 						<TableHeader>
@@ -359,8 +462,17 @@ export function ErrorManagementPage() {
 						</TableHeader>
 						<TableBody>
 							{pageRows.map((row) => {
-								const run = FILE_RUNS.find((item) => item.runId === row.runId);
-								const vendorId = run ? vendorIdForRun(run) : null;
+								const run = useLive
+									? undefined
+									: FILE_RUNS.find((item) => item.runId === row.runId);
+								const openHref = useLive
+									? row.inboundFileId
+										? `/admin/file-monitoring/${row.inboundFileId}`
+										: "/admin/file-monitoring"
+									: run
+										? `/admin/file-monitoring/${run.id}/investigate/${row.id}`
+										: "/admin/file-monitoring";
+
 								return (
 									<TableRow key={row.rowId} className={rowTone(row.severity)}>
 										<TableCell className="pl-4 font-mono text-xs tabular-nums text-muted-foreground sm:pl-6">
@@ -390,22 +502,37 @@ export function ErrorManagementPage() {
 												row.field ? `Field ${row.field}` : null,
 												row.line ? `Line ${row.line}` : null,
 												row.status ? `Status ${row.status}` : null,
+												row.statusLabel ? `Run ${row.statusLabel}` : null,
 											]
 												.filter(Boolean)
 												.join(" · ") || "Pending review"}
 										</TableCell>
 										<TableCell className="pr-4 text-right sm:pr-6">
-											<Button variant="ghost" size="sm" asChild>
-												<Link
-													href={
-														run
-															? `/admin/file-monitoring/${run.id}/investigate/${row.id}`
-															: "/admin/file-monitoring"
-													}
-												>
-													Open
-												</Link>
-											</Button>
+											<div className="inline-flex flex-wrap items-center justify-end gap-1">
+												<Button variant="ghost" size="sm" asChild>
+													<Link href={openHref}>Open</Link>
+												</Button>
+												{useLive && row.retryEligible ? (
+													<Button
+														variant="ghost"
+														size="sm"
+														disabled={busyId === row.id}
+														onClick={() => void onRetry(row.id)}
+													>
+														Retry
+													</Button>
+												) : null}
+												{useLive && row.recordStatus === "open" ? (
+													<Button
+														variant="ghost"
+														size="sm"
+														disabled={busyId === row.id}
+														onClick={() => void onResolve(row.id)}
+													>
+														Resolve
+													</Button>
+												) : null}
+											</div>
 										</TableCell>
 									</TableRow>
 								);
@@ -416,7 +543,12 @@ export function ErrorManagementPage() {
 										colSpan={7}
 										className="h-24 text-center text-muted-foreground"
 									>
-										No errors match the current filters.
+										{useLive &&
+										errorsQ.isLoading &&
+										validationQ.isLoading &&
+										rows.length === 0
+											? "Loading errors from vendor-core…"
+											: "No errors match the current filters."}
 									</TableCell>
 								</TableRow>
 							)}

@@ -1,3 +1,6 @@
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { fixtureRecord, isMockEnabled } from "@/lib/mock-mode";
+
 export type ProviderStatus = "active" | "inactive" | "pending" | "termed";
 export type NetworkStatus = "in_network" | "out_of_network" | "pending";
 export type CredentialStatus = "complete" | "expiring" | "expired" | "pending";
@@ -86,6 +89,9 @@ export type CredentialItem = {
 	id: string;
 	label: string;
 	status: CredentialStatus;
+	issuer: string;
+	verifiedDate: string | null;
+	expirationDate: string | null;
 };
 
 export type ProviderException = {
@@ -96,25 +102,74 @@ export type ProviderException = {
 	dateIdentified: string;
 };
 
-export type ProviderDetail = ProviderSummary & {
-	stateLicense: string;
-	deaNumber: string;
-	locations: ProviderLocation[];
-	networks: NetworkParticipation[];
-	identifiers: ProviderIdentifier[];
-	monthlyVolume: MonthlyVolume[];
-	rejectionReasons: RejectionReason[];
-	vendors: VendorAssociation[];
-	credentialing: CredentialItem[];
-	exceptions: ProviderException[];
-	claimsTrendPct: number;
-	encountersTrendPct: number;
-	billedTrendPct: number;
-	paidTrendPct: number;
-	rejectionTrendPct: number;
-	netPaymentTrendPct: number;
-	dataAsOf: string;
+export type ClaimActivityStatus =
+	| "paid"
+	| "denied"
+	| "pending"
+	| "rejected"
+	| "accepted";
+
+export type ProviderClaimRow = {
+	id: string;
+	dos: string;
+	receivedDate: string;
+	claimNumber: string;
+	memberId: string;
+	memberName: string;
+	type: "Professional" | "Institutional" | "Encounter";
+	procedureCode: string;
+	billed: number;
+	paid: number;
+	status: ClaimActivityStatus;
+	vendor: string;
 };
+
+export type ProviderDemographics = {
+	firstName: string;
+	middleName: string | null;
+	lastName: string;
+	preferredName: string | null;
+	suffix: string | null;
+	email: string;
+	fax: string;
+	preferredLanguage: string;
+	race: string;
+	ethnicity: string;
+	taxonomyCode: string;
+	taxonomyDescription: string;
+	boardCertification: string;
+	medicalSchool: string;
+	graduationYear: number;
+	acceptingNewPatients: boolean;
+	mailingAddress: string;
+	practiceCity: string;
+	practiceState: string;
+	practiceZip: string;
+	website: string | null;
+};
+
+export type ProviderDetail = ProviderSummary &
+	ProviderDemographics & {
+		stateLicense: string;
+		deaNumber: string;
+		locations: ProviderLocation[];
+		networks: NetworkParticipation[];
+		identifiers: ProviderIdentifier[];
+		monthlyVolume: MonthlyVolume[];
+		rejectionReasons: RejectionReason[];
+		recentClaims: ProviderClaimRow[];
+		recentEncounters: ProviderClaimRow[];
+		vendors: VendorAssociation[];
+		credentialing: CredentialItem[];
+		exceptions: ProviderException[];
+		claimsTrendPct: number;
+		encountersTrendPct: number;
+		billedTrendPct: number;
+		paidTrendPct: number;
+		rejectionTrendPct: number;
+		netPaymentTrendPct: number;
+		dataAsOf: string;
+	};
 
 const SPECIALTIES = [
 	["Internal Medicine", "Primary Care"],
@@ -181,6 +236,51 @@ const MONTHS = [
 	"Jul",
 ];
 
+const TAXONOMIES = [
+	["207R00000X", "Internal Medicine"],
+	["207Q00000X", "Family Medicine"],
+	["207RC0000X", "Cardiovascular Disease"],
+	["208000000X", "Pediatrics"],
+	["207X00000X", "Orthopaedic Surgery"],
+	["2084P0800X", "Psychiatry"],
+	["207V00000X", "Obstetrics & Gynecology"],
+	["207N00000X", "Dermatology"],
+	["2084N0400X", "Neurology"],
+	["207P00000X", "Emergency Medicine"],
+] as const;
+
+const SCHOOLS = [
+	"George Washington University School of Medicine",
+	"Georgetown University School of Medicine",
+	"Howard University College of Medicine",
+	"Johns Hopkins University School of Medicine",
+	"University of Maryland School of Medicine",
+	"Virginia Commonwealth University School of Medicine",
+];
+
+const LANGUAGES = [
+	"English",
+	"Spanish",
+	"Amharic",
+	"French",
+	"Mandarin",
+	"Vietnamese",
+];
+const RACES = [
+	"White",
+	"Black or African American",
+	"Asian",
+	"American Indian or Alaska Native",
+	"Native Hawaiian or Other Pacific Islander",
+	"Two or More Races",
+	"Decline to Answer",
+];
+const ETHNICITIES = [
+	"Not Hispanic or Latino",
+	"Hispanic or Latino",
+	"Decline to Answer",
+];
+
 function buildSummaries(): ProviderSummary[] {
 	return NAMES.map(([first, last, cred], i) => {
 		const [specialty, subspecialty] = SPECIALTIES[i % SPECIALTIES.length]!;
@@ -202,7 +302,7 @@ function buildSummaries(): ProviderSummary[] {
 			id: `prov-${i + 1}`,
 			npi: String(1000000000 + i * 1117 + 234567890).slice(0, 10),
 			name: `${first} ${last}`,
-			credentials: cred,
+			credentials: cred ?? "",
 			specialty,
 			subspecialty,
 			taxId: `${12 + (i % 80)}-${1000000 + i * 137}`.slice(0, 10),
@@ -234,11 +334,13 @@ function buildSummaries(): ProviderSummary[] {
 	});
 }
 
-export const PROVIDER_SUMMARIES: ProviderSummary[] = buildSummaries();
+const _PROVIDER_SUMMARIES: ProviderSummary[] = isMockEnabled()
+	? buildSummaries()
+	: [];
 
 // Match mockup hero provider
-(() => {
-	const john = PROVIDER_SUMMARIES[0]!;
+if (isMockEnabled() && _PROVIDER_SUMMARIES[0]) {
+	const john = _PROVIDER_SUMMARIES[0]!;
 	john.name = "John Smith";
 	john.credentials = "MD";
 	john.specialty = "Internal Medicine";
@@ -264,7 +366,9 @@ export const PROVIDER_SUMMARIES: ProviderSummary[] = buildSummaries();
 	john.paid12m = 3204551.32;
 	john.rejectionRate = 6.72;
 	john.netPayment12m = 2856422.18;
-})();
+}
+
+export const PROVIDER_SUMMARIES: ProviderSummary[] = _PROVIDER_SUMMARIES;
 
 function detailFor(summary: ProviderSummary): ProviderDetail {
 	const isJohn = summary.id === "prov-1";
@@ -312,8 +416,129 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 		{ id: "rr5", reason: "Timely filing", count: isJohn ? 76 : 18, pct: 9.2 },
 	];
 
+	const nameParts = summary.name.trim().split(/\s+/);
+	const firstName = nameParts[0] ?? summary.name;
+	const lastName = nameParts.slice(1).join(" ") || summary.name;
+	const idx = Number(summary.id.replace(/\D/g, "")) || 1;
+	const [taxonomyCode, taxonomyDescription] =
+		TAXONOMIES[(idx - 1) % TAXONOMIES.length]!;
+	const zipMatch = summary.practiceAddress.match(/DC\s+(\d{5})/);
+	const practiceZip = zipMatch?.[1] ?? `200${10 + (idx % 40)}`;
+
+	const memberNames = [
+		"Doe, John",
+		"Garcia, Maria",
+		"Williams, James",
+		"Hassan, Aisha",
+		"Johnson, Robert",
+		"Martinez, Sofia",
+		"Brown, Daniel",
+		"Ali, Fatima",
+		"Davis, Michael",
+		"Nguyen, Elena",
+	];
+	const claimStatuses: ClaimActivityStatus[] = [
+		"paid",
+		"paid",
+		"paid",
+		"pending",
+		"denied",
+		"rejected",
+		"accepted",
+		"paid",
+	];
+	const cptCodes = [
+		"99213",
+		"99214",
+		"99215",
+		"93000",
+		"80053",
+		"90471",
+		"G0438",
+		"99203",
+	];
+	const buildActivity = (
+		kind: "claim" | "encounter",
+		count: number
+	): ProviderClaimRow[] =>
+		Array.from({ length: count }, (_, i) => {
+			const billed = 120 + ((idx * 17 + i * 41) % 880);
+			const status = claimStatuses[(idx + i) % claimStatuses.length]!;
+			const paid =
+				status === "paid" || status === "accepted"
+					? Math.round(billed * (0.62 + ((i * 3) % 20) / 100))
+					: status === "pending"
+						? 0
+						: Math.round(billed * 0.15);
+			const day = String(1 + ((i * 3 + idx) % 27)).padStart(2, "0");
+			const month = String(1 + ((i + idx) % 7)).padStart(2, "0");
+			return {
+				id: `${kind}-${summary.id}-${i + 1}`,
+				dos: `2026-${month}-${day}`,
+				receivedDate: `2026-${month}-${String(Math.min(28, Number(day) + 2)).padStart(2, "0")}`,
+				claimNumber:
+					kind === "claim"
+						? `CLM-2026-${String(84000 + idx * 100 + i).padStart(6, "0")}`
+						: `ENC-2026-${String(22000 + idx * 80 + i).padStart(6, "0")}`,
+				memberId: `MFC-${String(100000 + idx * 37 + i).padStart(6, "0")}`,
+				memberName: memberNames[(idx + i) % memberNames.length]!,
+				type:
+					kind === "encounter"
+						? "Encounter"
+						: i % 5 === 0
+							? "Institutional"
+							: "Professional",
+				procedureCode: cptCodes[(idx + i) % cptCodes.length]!,
+				billed,
+				paid,
+				status: kind === "encounter" && status === "paid" ? "accepted" : status,
+				vendor: VENDOR_NAMES[(idx + i) % Math.min(4, VENDOR_NAMES.length)]!,
+			};
+		});
+
 	return {
 		...summary,
+		firstName: isJohn ? "John" : firstName,
+		middleName: isJohn ? "Michael" : idx % 3 === 0 ? "A." : null,
+		lastName: isJohn ? "Smith" : lastName,
+		preferredName: isJohn ? "Dr. Smith" : null,
+		suffix:
+			summary.credentials === "MD" || summary.credentials === "DO"
+				? null
+				: null,
+		email: isJohn
+			? "john.smith@smithmedical.com"
+			: `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, "")}@${summary.practiceName
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, "")
+					.slice(0, 18)}.com`,
+		fax: isJohn
+			? "(202) 555-0199"
+			: `(202) ${555 + (idx % 40)}-${3000 + ((idx * 11) % 6000)}`,
+		preferredLanguage: isJohn ? "English" : LANGUAGES[idx % LANGUAGES.length]!,
+		race: isJohn ? "White" : RACES[idx % RACES.length]!,
+		ethnicity: isJohn
+			? "Not Hispanic or Latino"
+			: ETHNICITIES[idx % ETHNICITIES.length]!,
+		taxonomyCode: isJohn ? "207R00000X" : taxonomyCode,
+		taxonomyDescription: isJohn ? "Internal Medicine" : taxonomyDescription,
+		boardCertification: isJohn
+			? "American Board of Internal Medicine"
+			: `American Board of ${summary.specialty.split(" ")[0]}`,
+		medicalSchool: isJohn
+			? "George Washington University School of Medicine"
+			: SCHOOLS[idx % SCHOOLS.length]!,
+		graduationYear: isJohn ? 2004 : 1995 + (idx % 20),
+		acceptingNewPatients: isJohn
+			? true
+			: summary.status === "active" && idx % 5 !== 0,
+		mailingAddress: isJohn
+			? "1842 K Street NW, Suite 400, Washington, DC 20006"
+			: summary.practiceAddress,
+		practiceCity: "Washington",
+		practiceState: "DC",
+		practiceZip: isJohn ? "20006" : practiceZip,
+		website: isJohn ? "https://www.smithmedical.com" : null,
 		stateLicense: `MD${34000 + Number(summary.id.replace(/\D/g, ""))}`,
 		deaNumber: `BS${2000000 + Number(summary.id.replace(/\D/g, "")) * 17}`,
 		claimsTrendPct: isJohn ? 12.4 : 8.1,
@@ -417,10 +642,12 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 		],
 		monthlyVolume,
 		rejectionReasons,
+		recentClaims: buildActivity("claim", isJohn ? 12 : 8),
+		recentEncounters: buildActivity("encounter", isJohn ? 10 : 6),
 		vendors: [
 			{
 				id: "v1",
-				vendor: "UST",
+				vendor: VENDOR_NAMES[0]!,
 				fileType: "837 Professional",
 				dataSent: "Claims",
 				frequency: "Daily",
@@ -429,7 +656,7 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 			},
 			{
 				id: "v2",
-				vendor: "Beacon Health",
+				vendor: VENDOR_NAMES[6]!,
 				fileType: "837 Institutional",
 				dataSent: "Claims",
 				frequency: "Daily",
@@ -438,7 +665,7 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 			},
 			{
 				id: "v3",
-				vendor: "Cascade Net",
+				vendor: VENDOR_NAMES[2]!,
 				fileType: "837 Encounter",
 				dataSent: "Encounters",
 				frequency: "Weekly",
@@ -447,7 +674,7 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 			},
 			{
 				id: "v4",
-				vendor: "CVS",
+				vendor: VENDOR_NAMES[1]!,
 				fileType: "NCPDP",
 				dataSent: "Pharmacy",
 				frequency: "Daily",
@@ -456,22 +683,134 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 			},
 		],
 		credentialing: [
-			{ id: "c1", label: "Medical License", status: "complete" },
-			{ id: "c2", label: "DEA Registration", status: "complete" },
-			{ id: "c3", label: "Board Certification", status: "complete" },
-			{ id: "c4", label: "Malpractice Insurance", status: "expiring" },
-			{ id: "c5", label: "Hospital Privileges", status: "complete" },
-			{ id: "c6", label: "CAQH Profile", status: "complete" },
-			{ id: "c7", label: "Background Check", status: "complete" },
-			{ id: "c8", label: "OIG Exclusion", status: "complete" },
-			{ id: "c9", label: "NPI Verification", status: "complete" },
-			{ id: "c10", label: "Education Verification", status: "complete" },
-			{ id: "c11", label: "Work History", status: "complete" },
-			{ id: "c12", label: "Peer References", status: "complete" },
-			{ id: "c13", label: "CMS Opt-Out", status: "complete" },
-			{ id: "c14", label: "CLIA Certificate", status: "complete" },
-			{ id: "c15", label: "CPR Certification", status: "expiring" },
-			{ id: "c16", label: "Immunization Record", status: "complete" },
+			{
+				id: "c1",
+				label: "Medical License",
+				status: "complete",
+				issuer: "DC Board of Medicine",
+				verifiedDate: "2025-11-12",
+				expirationDate: "2027-06-30",
+			},
+			{
+				id: "c2",
+				label: "DEA Registration",
+				status: "complete",
+				issuer: "DEA",
+				verifiedDate: "2025-09-03",
+				expirationDate: "2028-03-31",
+			},
+			{
+				id: "c3",
+				label: "Board Certification",
+				status: "complete",
+				issuer: "ABIM",
+				verifiedDate: "2024-04-18",
+				expirationDate: "2030-12-31",
+			},
+			{
+				id: "c4",
+				label: "Malpractice Insurance",
+				status: "expiring",
+				issuer: "MedPro Group",
+				verifiedDate: "2025-09-01",
+				expirationDate: "2026-09-01",
+			},
+			{
+				id: "c5",
+				label: "Hospital Privileges",
+				status: "complete",
+				issuer: "MedStar Washington Hospital Center",
+				verifiedDate: "2025-01-20",
+				expirationDate: "2027-01-20",
+			},
+			{
+				id: "c6",
+				label: "CAQH Profile",
+				status: "complete",
+				issuer: "CAQH",
+				verifiedDate: "2026-06-15",
+				expirationDate: null,
+			},
+			{
+				id: "c7",
+				label: "Background Check",
+				status: "complete",
+				issuer: "Sterling",
+				verifiedDate: "2025-08-10",
+				expirationDate: "2028-08-10",
+			},
+			{
+				id: "c8",
+				label: "OIG Exclusion",
+				status: "complete",
+				issuer: "HHS OIG",
+				verifiedDate: "2026-07-01",
+				expirationDate: null,
+			},
+			{
+				id: "c9",
+				label: "NPI Verification",
+				status: "complete",
+				issuer: "NPPES",
+				verifiedDate: "2026-07-01",
+				expirationDate: null,
+			},
+			{
+				id: "c10",
+				label: "Education Verification",
+				status: "complete",
+				issuer: "Primary Source",
+				verifiedDate: "2022-01-10",
+				expirationDate: null,
+			},
+			{
+				id: "c11",
+				label: "Work History",
+				status: "complete",
+				issuer: "Credentialing Ops",
+				verifiedDate: "2022-01-10",
+				expirationDate: null,
+			},
+			{
+				id: "c12",
+				label: "Peer References",
+				status: "complete",
+				issuer: "Credentialing Ops",
+				verifiedDate: "2022-02-01",
+				expirationDate: null,
+			},
+			{
+				id: "c13",
+				label: "CMS Opt-Out",
+				status: "complete",
+				issuer: "CMS",
+				verifiedDate: "2026-01-05",
+				expirationDate: null,
+			},
+			{
+				id: "c14",
+				label: "CLIA Certificate",
+				status: "complete",
+				issuer: "CMS / CLIA",
+				verifiedDate: "2025-03-12",
+				expirationDate: "2027-03-12",
+			},
+			{
+				id: "c15",
+				label: "CPR Certification",
+				status: "expiring",
+				issuer: "AHA",
+				verifiedDate: "2024-10-01",
+				expirationDate: "2026-10-01",
+			},
+			{
+				id: "c16",
+				label: "Immunization Record",
+				status: isJohn ? "complete" : idx % 7 === 0 ? "pending" : "complete",
+				issuer: "Occupational Health",
+				verifiedDate: "2025-05-20",
+				expirationDate: null,
+			},
 		],
 		exceptions: isJohn
 			? [
@@ -512,8 +851,9 @@ function detailFor(summary: ProviderSummary): ProviderDetail {
 	};
 }
 
-export const PROVIDER_DETAILS: Record<string, ProviderDetail> =
-	Object.fromEntries(PROVIDER_SUMMARIES.map((s) => [s.id, detailFor(s)]));
+export const PROVIDER_DETAILS: Record<string, ProviderDetail> = fixtureRecord(
+	Object.fromEntries(PROVIDER_SUMMARIES.map((s) => [s.id, detailFor(s)]))
+);
 
 export function displayProviderName(
 	p: Pick<ProviderSummary, "name" | "credentials">
@@ -522,6 +862,7 @@ export function displayProviderName(
 }
 
 export function getProvider(idOrNpi: string): ProviderDetail | undefined {
+	if (!isMockEnabled()) return undefined;
 	const decoded = decodeURIComponent(idOrNpi);
 	const byId = PROVIDER_DETAILS[decoded];
 	if (byId) return byId;
@@ -549,6 +890,15 @@ export function formatDate(iso: string | null | undefined) {
 
 export function formatCompact(value: number) {
 	return value.toLocaleString("en-US");
+}
+
+export function providerAge(dob: string, asOf = "2026-08-04") {
+	const [y, m, d] = dob.split("-").map(Number);
+	const [ay, am, ad] = asOf.split("-").map(Number);
+	if (!y || !m || !d || !ay || !am || !ad) return null;
+	let age = ay - y;
+	if (am < m || (am === m && ad < d)) age -= 1;
+	return age;
 }
 
 export function initials(name: string) {

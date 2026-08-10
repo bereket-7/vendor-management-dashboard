@@ -11,7 +11,7 @@ const mockApiClient = jest.mocked(apiClient);
 describe("roleApi.list", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
-		process.env.NEXT_PUBLIC_USE_MOCK_ROLES = "true";
+		process.env.NEXT_PUBLIC_USE_MOCK = "true";
 	});
 
 	it("returns mock roles when mock flag is set", async () => {

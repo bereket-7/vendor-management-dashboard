@@ -63,6 +63,7 @@ import {
 	filesForProgram,
 	formatCount,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -109,10 +110,7 @@ export function AcceptanceAnalyticsPage() {
 		[programFilter]
 	);
 
-	const vendors = useMemo(
-		() => Array.from(new Set(baseRows.map((r) => r.vendor))).sort(),
-		[baseRows]
-	);
+	const vendors = VENDOR_NAMES;
 	const claimTypes = useMemo(
 		() => Array.from(new Set(baseRows.map((r) => r.fileTypeLabel))).sort(),
 		[baseRows]
@@ -463,7 +461,7 @@ export function AcceptanceAnalyticsPage() {
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<ClaimPageHeader
 				title="Acceptance Analytics"
 				description={`Deep acceptance, rejection, and payment analysis across claim & encounter files · ${programFilter}`}

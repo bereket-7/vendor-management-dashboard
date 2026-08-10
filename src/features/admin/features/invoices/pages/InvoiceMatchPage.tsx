@@ -46,7 +46,7 @@ export function InvoiceMatchPage() {
 					{queue.map((invoice) => (
 						<article
 							key={invoice.id}
-							className="flex flex-wrap items-center justify-between gap-5 rounded-lg border bg-card p-5"
+							className="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-border bg-card shadow-sm p-5"
 						>
 							<div className="min-w-52">
 								<div className="flex items-center gap-2">

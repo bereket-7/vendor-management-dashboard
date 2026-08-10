@@ -130,7 +130,7 @@ export function DocumentDetailPage() {
 
 	if (isLoading) {
 		return (
-			<div className="space-y-6">
+			<div className="space-y-4">
 				<Skeleton className="h-6 w-40" />
 				<Skeleton className="h-32 w-full rounded-xl" />
 				<Skeleton className="h-96 w-full rounded-xl" />
@@ -164,7 +164,7 @@ export function DocumentDetailPage() {
 	const canReview = document.status === "pending";
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<Link
 				href="/admin/documents"
 				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -448,7 +448,7 @@ export function DocumentDetailPage() {
 									Time remaining until document expiry
 								</CardDescription>
 							</CardHeader>
-							<CardContent className="space-y-3">
+							<CardContent className="space-y-4">
 								<div className="flex items-center justify-between text-sm">
 									<span className="text-muted-foreground">Expires</span>
 									<span className="font-medium tabular-nums">

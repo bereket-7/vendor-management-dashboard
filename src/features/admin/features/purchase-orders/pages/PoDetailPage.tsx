@@ -94,7 +94,7 @@ export function PoDetailPage() {
 					)}
 				</div>
 			</div>
-			<div className="grid gap-4 rounded-lg border bg-card p-5 sm:grid-cols-4">
+			<div className="grid gap-4 rounded-xl border border-border bg-card shadow-sm p-5 sm:grid-cols-4">
 				<div>
 					<p className="text-xs uppercase text-muted-foreground">Ordered</p>
 					<p>{formatDate(order.orderedAt)}</p>
@@ -116,7 +116,7 @@ export function PoDetailPage() {
 					</p>
 				</div>
 			</div>
-			<div className="rounded-lg border bg-card">
+			<div className="rounded-xl border border-border bg-card shadow-sm">
 				<Table>
 					<TableHeader>
 						<TableRow>

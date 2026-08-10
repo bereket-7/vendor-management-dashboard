@@ -75,7 +75,7 @@ export function ContractDetailPage() {
 				)}
 			</div>
 			<div className="grid gap-6 md:grid-cols-[2fr_1fr]">
-				<section className="rounded-lg border bg-card p-6">
+				<section className="rounded-xl border border-border bg-card shadow-sm p-6">
 					<h2 className="mb-5 font-semibold">Agreement details</h2>
 					<dl className="grid gap-5 sm:grid-cols-2">
 						{details.map(([label, value]) => (
@@ -88,7 +88,7 @@ export function ContractDetailPage() {
 						))}
 					</dl>
 				</section>
-				<section className="rounded-lg border bg-card p-6">
+				<section className="rounded-xl border border-border bg-card shadow-sm p-6">
 					<h2 className="mb-3 font-semibold">Service level agreement</h2>
 					<p className="text-sm text-muted-foreground">
 						{contract.slaSummary || "No SLA has been specified."}

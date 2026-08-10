@@ -79,7 +79,7 @@ export function ContractsPage() {
 					</Link>
 				</Button>
 			</div>
-			<div className="flex flex-wrap gap-3 rounded-lg border bg-card p-4">
+			<div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card shadow-sm p-4">
 				<Input
 					className="max-w-sm"
 					placeholder="Search number, title, or vendor"
@@ -128,7 +128,7 @@ export function ContractsPage() {
 			) : error ? (
 				<p className="text-sm text-destructive">Unable to load contracts.</p>
 			) : (
-				<div className="rounded-lg border bg-card">
+				<div className="rounded-xl border border-border bg-card shadow-sm">
 					<Table>
 						<TableHeader>
 							<TableRow>

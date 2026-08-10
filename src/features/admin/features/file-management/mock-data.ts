@@ -1,4 +1,5 @@
 import type { ProgramFileType } from "@/types/UI/system.types";
+import { isMockEnabled } from "@/lib/mock-mode";
 
 export type FileDirection = "inbound" | "outbound";
 export type ProcessStatus =
@@ -78,6 +79,8 @@ export type FileRun = {
 	id: string;
 	runId: string;
 	vendor: string;
+	/** Live vendor-core UUID when data is remote (not mock directory id). */
+	vendorId?: string | null;
 	account: string;
 	client: string;
 	fileType: string;
@@ -2549,18 +2552,23 @@ function enrichIssue(run: FileRun, issue: ValidationIssue): ValidationIssue {
 	};
 }
 
-export const FILE_RUNS: FileRun[] = RAW_FILE_RUNS.map((run, index) => {
-	const withProgram: FileRun = {
-		...run,
-		program: index % 3 === 0 ? "MDH" : index % 3 === 1 ? "DHCF" : "BHP",
-	};
-	return {
-		...withProgram,
-		issues: withProgram.issues.map((issue) => enrichIssue(withProgram, issue)),
-	};
-});
+export const FILE_RUNS: FileRun[] = isMockEnabled()
+	? RAW_FILE_RUNS.map((run, index) => {
+			const withProgram: FileRun = {
+				...run,
+				program: index % 3 === 0 ? "MDH" : index % 3 === 1 ? "DHCF" : "BHP",
+			};
+			return {
+				...withProgram,
+				issues: withProgram.issues.map((issue) =>
+					enrichIssue(withProgram, issue)
+				),
+			};
+		})
+	: [];
 
 export function getFileRun(id: string): FileRun | undefined {
+	if (!isMockEnabled()) return undefined;
 	return FILE_RUNS.find((run) => run.id === id || run.runId === id);
 }
 

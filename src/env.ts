@@ -11,6 +11,8 @@ export const env = createEnv({
 		NEXT_PUBLIC_URL: z.string().url().optional(),
 		NEXT_PUBLIC_API_URL: z.string().url().optional(),
 		NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+		NEXT_PUBLIC_USE_MOCK: z.enum(["true", "false"]).optional(),
+		NEXT_PUBLIC_VENDOR_CORE_API_URL: z.string().url().optional(),
 		NEXT_PUBLIC_GA_ID: z.string().optional(),
 		NEXT_PUBLIC_GOOGLE_VERIFICATION: z.string().optional(),
 		NEXT_PUBLIC_YANDEX_VERIFICATION: z.string().optional(),
@@ -20,6 +22,9 @@ export const env = createEnv({
 		NEXT_PUBLIC_URL: process.env.NEXT_PUBLIC_URL,
 		NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
 		NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+		NEXT_PUBLIC_USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK,
+		NEXT_PUBLIC_VENDOR_CORE_API_URL:
+			process.env.NEXT_PUBLIC_VENDOR_CORE_API_URL,
 		NEXT_PUBLIC_GA_ID: process.env.NEXT_PUBLIC_GA_ID,
 		NEXT_PUBLIC_GOOGLE_VERIFICATION:
 			process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION,

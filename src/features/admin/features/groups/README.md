@@ -15,7 +15,7 @@ Reference implementation of the modular feature standard (`src/features/<domain>
 
 ### Read (current)
 
-1. `group.api.list()` fetches DTOs from the API, or mock data when `NEXT_PUBLIC_USE_MOCK_GROUPS=true` (no silent fallback when unset).
+1. `group.api.list()` fetches DTOs from the API, or mock data when `NEXT_PUBLIC_USE_MOCK=true` (no silent fallback when unset).
 2. `group.mapper` validates/maps to `GroupModel`.
 3. UI reads via `useGroupsList()` / `useGroup(groupId)` (Dexie live query when offline layer is enabled).
 
@@ -46,7 +46,7 @@ Reference implementation of the modular feature standard (`src/features/<domain>
 
 ## Env
 
-- `NEXT_PUBLIC_USE_MOCK_GROUPS=true` — use mock data instead of the API (no silent fallback when unset)
+- `NEXT_PUBLIC_USE_MOCK=true` — use mock data instead of the API (no silent fallback when unset)
 
 ## Tests
 

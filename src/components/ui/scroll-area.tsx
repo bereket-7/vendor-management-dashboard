@@ -30,7 +30,8 @@ function ScrollArea({
 				data-slot="scroll-area-viewport"
 				ref={viewportRef}
 				className={cn(
-					"focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1",
+					"size-full rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1",
+					"[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
 					viewportClassName ?? "[&>div]:!block [&>div]:min-w-0"
 				)}
 			>
@@ -43,7 +44,7 @@ function ScrollArea({
 			/>
 			<ScrollBar
 				orientation="horizontal"
-				className="h-2.5"
+				className={cn("z-10 flex h-2.5 flex-col", scrollbarClassName)}
 				thumbClassName={thumbClassName}
 			/>
 			<ScrollAreaPrimitive.Corner />

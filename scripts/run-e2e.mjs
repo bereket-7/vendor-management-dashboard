@@ -11,7 +11,7 @@ const localOnly = process.argv.includes("--local");
 const env = {
 	...process.env,
 	SKIP_ENV_VALIDATION: "true",
-	NEXT_PUBLIC_USE_MOCK_GROUPS: "true",
+	NEXT_PUBLIC_USE_MOCK: "true",
 	NEXT_PUBLIC_DEV_ADMIN: "true",
 	NEXT_PUBLIC_E2E: "true",
 };

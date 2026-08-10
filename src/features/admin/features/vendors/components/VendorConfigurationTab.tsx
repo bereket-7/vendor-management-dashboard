@@ -326,12 +326,12 @@ export function VendorConfigurationTab({
 
 	return (
 		<section className="min-w-0 space-y-4">
-			<div className="flex flex-wrap items-start gap-3">
-				<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+			<div className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+				<div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/20">
 					<Settings2 className="size-5" />
 				</div>
 				<div className="min-w-0">
-					<h2 className="text-base font-medium tracking-tight">
+					<h2 className="text-lg font-semibold tracking-tight text-foreground">
 						Configuration Setup
 					</h2>
 					<p className="mt-0.5 text-sm text-muted-foreground">
@@ -353,8 +353,8 @@ export function VendorConfigurationTab({
 							className={cn(
 								"rounded-lg border px-3 py-3 text-left transition-colors",
 								active
-									? "border-primary bg-primary/5 shadow-sm"
-									: "border-border/60 bg-card hover:bg-muted/30"
+									? "border-primary bg-primary/10 shadow-sm"
+									: "border-border bg-card shadow-sm hover:border-primary/30 hover:bg-primary/5"
 							)}
 						>
 							<div className="flex items-center gap-2">
@@ -374,7 +374,9 @@ export function VendorConfigurationTab({
 										step.id
 									)}
 								</span>
-								<p className="text-sm font-medium">{step.title}</p>
+								<p className="text-sm font-semibold tracking-tight text-foreground">
+									{step.title}
+								</p>
 							</div>
 							<p className="mt-1.5 pl-8 text-xs text-muted-foreground">
 								{step.description}
@@ -388,12 +390,14 @@ export function VendorConfigurationTab({
 				{/* Step 1 */}
 				<div
 					id="config-step-1"
-					className="rounded-lg border border-border/60 bg-card"
+					className="rounded-xl border border-border bg-card shadow-sm"
 				>
-					<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/50 px-4 py-3">
+					<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-sky-500/10 px-4 py-3.5">
 						<div>
-							<h3 className="text-sm font-medium">Step 1: SFTP Connection</h3>
-							<p className="mt-0.5 text-xs text-muted-foreground">
+							<h3 className="text-sm font-semibold tracking-tight text-foreground">
+								Step 1: SFTP Connection
+							</h3>
+							<p className="text-sm leading-relaxed text-muted-foreground">
 								Secure file transfer credentials and remote path for this
 								vendor.
 							</p>
@@ -401,10 +405,10 @@ export function VendorConfigurationTab({
 						<div className="flex items-center gap-2">
 							<span
 								className={cn(
-									"inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+									"inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold",
 									connected
-										? "bg-emerald-100 text-emerald-800"
-										: "bg-red-100 text-red-800"
+										? "border-emerald-200/80 bg-emerald-50 text-emerald-900"
+										: "border-red-200/80 bg-red-50 text-red-900"
 								)}
 							>
 								{connection.status}
@@ -476,12 +480,14 @@ export function VendorConfigurationTab({
 				{/* Step 2 */}
 				<div
 					id="config-step-2"
-					className="rounded-lg border border-border/60 bg-card"
+					className="rounded-xl border border-border bg-card shadow-sm"
 				>
-					<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/50 px-4 py-3">
+					<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-emerald-500/10 px-4 py-3.5">
 						<div>
-							<h3 className="text-sm font-medium">Step 2: Job Configuration</h3>
-							<p className="mt-0.5 text-xs text-muted-foreground">
+							<h3 className="text-sm font-semibold tracking-tight text-foreground">
+								Step 2: Job Configuration
+							</h3>
+							<p className="text-sm leading-relaxed text-muted-foreground">
 								Define processing jobs, mappings, schedules, alerts, and
 								encryption.
 							</p>
@@ -498,7 +504,7 @@ export function VendorConfigurationTab({
 					</div>
 
 					<div className="px-4 pt-3">
-						<nav className="flex gap-1 overflow-x-auto border-b border-border/60">
+						<nav className="flex gap-1 overflow-x-auto border-b border-border">
 							{JOB_SUBTABS.map((item) => (
 								<button
 									key={item}
@@ -520,7 +526,7 @@ export function VendorConfigurationTab({
 					<div className="p-4">
 						{jobSubtab === "Jobs" ? (
 							<>
-								<div className="overflow-hidden rounded-lg border border-border/50">
+								<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 									<div className="w-full overflow-x-auto">
 										<Table className="min-w-[980px] text-xs">
 											<TableHeader>
@@ -563,7 +569,7 @@ export function VendorConfigurationTab({
 															<TableCell>
 																<span
 																	className={cn(
-																		"inline-flex items-center rounded-full px-1.5 py-0 text-[10px] font-medium",
+																		"inline-flex items-center rounded-md border border-transparent px-1.5 py-0 text-[10px] font-medium",
 																		job.status === "Active"
 																			? "bg-emerald-100 text-emerald-800"
 																			: "bg-amber-100 text-amber-900"
@@ -672,7 +678,7 @@ export function VendorConfigurationTab({
 						) : null}
 
 						{jobSubtab === "File Mapping" ? (
-							<div className="overflow-hidden rounded-lg border border-border/50">
+							<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 								<Table className="text-xs">
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
@@ -702,7 +708,7 @@ export function VendorConfigurationTab({
 																: "Accumulator Balance v1"}
 												</TableCell>
 												<TableCell className="pr-3">
-													<span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800">
+													<span className="inline-flex items-center rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
 														Mapped
 													</span>
 												</TableCell>
@@ -714,7 +720,7 @@ export function VendorConfigurationTab({
 						) : null}
 
 						{jobSubtab === "Schedules" ? (
-							<div className="overflow-hidden rounded-lg border border-border/50">
+							<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 								<Table className="text-xs">
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
@@ -753,18 +759,20 @@ export function VendorConfigurationTab({
 									.map((label) => (
 										<div
 											key={label}
-											className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2.5"
+											className="flex items-center justify-between rounded-xl border border-border shadow-sm px-3 py-2.5"
 										>
 											<div className="flex items-center gap-2">
 												<Bell className="size-4 text-muted-foreground" />
 												<div>
-													<p className="text-sm font-medium">{label}</p>
+													<p className="text-sm font-semibold tracking-tight text-foreground">
+														{label}
+													</p>
 													<p className="text-xs text-muted-foreground">
 														Email notification
 													</p>
 												</div>
 											</div>
-											<span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800">
+											<span className="inline-flex items-center rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
 												Enabled
 											</span>
 										</div>
@@ -773,7 +781,7 @@ export function VendorConfigurationTab({
 						) : null}
 
 						{jobSubtab === "PGP / Encryption" ? (
-							<div className="grid gap-3 rounded-lg border border-border/50 p-4 sm:grid-cols-2">
+							<div className="grid gap-3 rounded-xl border border-border shadow-sm p-4 sm:grid-cols-2">
 								{[
 									["Encryption", integration.encryption],
 									["Protocol", integration.protocol],
@@ -794,7 +802,7 @@ export function VendorConfigurationTab({
 						) : null}
 					</div>
 
-					<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 px-4 py-3">
+					<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
 						<Button
 							type="button"
 							variant="outline"
@@ -818,11 +826,13 @@ export function VendorConfigurationTab({
 				{/* Step 3 */}
 				<div
 					id="config-step-3"
-					className="rounded-lg border border-border/60 bg-card"
+					className="rounded-xl border border-border bg-card shadow-sm"
 				>
-					<div className="border-b border-border/50 px-4 py-3">
-						<h3 className="text-sm font-medium">Step 3: Review & Activate</h3>
-						<p className="mt-0.5 text-xs text-muted-foreground">
+					<div className="border-b border-border bg-amber-500/10 px-4 py-3.5">
+						<h3 className="text-sm font-semibold tracking-tight text-foreground">
+							Step 3: Review & Activate
+						</h3>
+						<p className="text-sm leading-relaxed text-muted-foreground">
 							Confirm connection, jobs, and notification settings before going
 							live.
 						</p>
@@ -861,7 +871,7 @@ export function VendorConfigurationTab({
 						].map((card) => (
 							<div
 								key={card.label}
-								className="rounded-lg border border-border/50 bg-muted/20 p-3"
+								className="rounded-xl border border-border shadow-sm bg-muted/20 p-3"
 							>
 								<p className="text-[11px] font-medium text-muted-foreground">
 									{card.label}
@@ -881,7 +891,7 @@ export function VendorConfigurationTab({
 						))}
 					</div>
 
-					<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 px-4 py-3">
+					<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
 						<Button
 							type="button"
 							variant="outline"
@@ -904,10 +914,12 @@ export function VendorConfigurationTab({
 					</div>
 				</div>
 
-				<aside className="rounded-lg border border-border/60 bg-card">
-					<div className="border-b border-border/50 px-4 py-3">
-						<h3 className="text-sm font-medium">Configuration Summary</h3>
-						<p className="mt-0.5 text-xs text-muted-foreground">
+				<aside className="rounded-xl border border-border bg-card shadow-sm">
+					<div className="border-b border-border bg-primary/10 px-4 py-3.5">
+						<h3 className="text-sm font-semibold tracking-tight text-foreground">
+							Configuration Summary
+						</h3>
+						<p className="text-sm leading-relaxed text-muted-foreground">
 							Final checklist before activating this vendor configuration.
 						</p>
 					</div>
@@ -946,7 +958,7 @@ export function VendorConfigurationTab({
 							</li>
 						))}
 					</ul>
-					<div className="border-t border-border/50 p-4">
+					<div className="border-t border-border p-4">
 						<Button
 							type="button"
 							className="h-10 w-full sm:w-auto sm:min-w-[220px]"

@@ -6,8 +6,6 @@ import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { AdminBreadcrumb } from "@/components/admin/AdminBreadcrumb";
-import LocaleSwitcher from "@/components/shared/DropDown/LocaleSwitcher";
-import { ModeToggle } from "@/components/shared/DropDown/modeToggle";
 import UserAvatar from "@/components/shared/User/userAvater";
 import { Input } from "@/components/ui/input";
 import {
@@ -167,8 +165,6 @@ export function AdminHeader() {
 						<SelectItem value="BHP">BHP</SelectItem>
 					</SelectContent>
 				</Select>
-				<ModeToggle />
-				<LocaleSwitcher />
 				<UserAvatar />
 			</div>
 		</header>

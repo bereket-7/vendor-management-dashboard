@@ -174,7 +174,7 @@ export function AutomationsPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -279,7 +279,7 @@ export function AutomationsPage() {
 										<p className="font-medium leading-tight">{rule.name}</p>
 										<span
 											className={cn(
-												"inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+												"inline-flex items-center rounded-md border border-transparent px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
 												rule.status === "active"
 													? "bg-emerald-500/10 text-emerald-700"
 													: "bg-amber-500/10 text-amber-700"

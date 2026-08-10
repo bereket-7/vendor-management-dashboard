@@ -85,7 +85,7 @@ export function ContractCreatePage() {
 			</div>
 			<form
 				onSubmit={submit}
-				className="space-y-6 rounded-lg border bg-card p-6"
+				className="space-y-6 rounded-xl border border-border bg-card shadow-sm p-6"
 			>
 				<div className="grid gap-5 md:grid-cols-2">
 					<label className="space-y-2 text-sm font-medium">

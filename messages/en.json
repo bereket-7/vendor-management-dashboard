@@ -31,12 +31,12 @@
 		"contact": "Contact"
 	},
 	"Auth": {
-		"loginTitle": "Sign in",
-		"loginDescription": "Enter your credentials to access your account",
-		"signUpTitle": "Create account",
-		"signUpDescription": "Enter your details to get started",
-		"forgotTitle": "Reset password",
-		"forgotDescription": "Enter your email and we'll send reset instructions",
+		"loginTitle": "Welcome back",
+		"loginDescription": "Sign in to continue to Vendor Management",
+		"signUpTitle": "Create your account",
+		"signUpDescription": "Set up access for your organization",
+		"forgotTitle": "Reset your password",
+		"forgotDescription": "Enter your work email and we'll send reset instructions",
 		"inviteTitle": "Accept invitation",
 		"inviteDescription": "Set your password to join as a supplier"
 	},
@@ -46,10 +46,13 @@
 		"offline": "You are offline. Changes will resume when connection is restored.",
 		"sections": {
 			"top": "Overview",
-			"vendor_management": "Vendor Management",
+			"master_data": "Master Data",
+			"integration_file_operations": "Integration & File Operations",
 			"operations": "Operations",
 			"administration": "Administration",
-			"claim_encounter": "Claim & Encounter"
+			"claim_encounter": "Claims & Encounters",
+			"regulatory_compliance": "Regulatory & Compliance",
+			"program_monitoring": "Program Monitoring"
 		},
 		"nav": {
 			"dashboard": "Dashboard",
@@ -74,11 +77,31 @@
 			"exportcenter": "Export Center",
 			"settings": "Settings",
 			"support": "Support",
+			"claims": "Claims",
+			"inboundvendorfiles": "Inbound Vendor Files",
+			"outboundvendorfiles": "Outbound Vendor Files",
 			"inboundvendorfile": "Inbound Vendor File",
 			"outboundvendorfile": "Outbound Vendor File",
 			"responses": "Responses",
 			"acceptanceanalytics": "Acceptance Analytics",
-			"exceptionsrejections": "Exceptions / Rejections"
+			"exceptionsrejections": "Exceptions / Rejections",
+			"filemanagement": "File Management",
+			"edgeserverdata": "Edge Server Data",
+			"masterdataentry": "Master Data Entry",
+			"errorcorrection": "Error Correction",
+			"cmsedge": "CMS EDGE",
+			"medicaidencounterreporting": "Medicaid Encounter Reporting",
+			"medicarereporting": "Medicare Reporting",
+			"riskadjustment": "Risk Adjustment",
+			"hedisquality": "HEDIS / Quality",
+			"auditmanagement": "Audit Management",
+			"compliancecalendar": "Compliance Calendar",
+			"esrddialysis": "ESRD / Dialysis",
+			"dme": "DME",
+			"homehealth": "Home Health",
+			"hospice": "Hospice",
+			"ltss": "LTSS",
+			"behavioralhealth": "Behavioral Health"
 		},
 		"placeholders": {
 			"usersTitle": "Users",
@@ -158,13 +181,18 @@
 		"refreshing": "(refreshing…)",
 		"searchPlaceholder": "Search users…",
 		"emptyList": "No users found.",
+		"loginEvents": "Login events",
 		"table": {
 			"name": "Name",
 			"email": "Email",
 			"roles": "Roles",
 			"status": "Status",
 			"active": "Active",
-			"inactive": "Inactive"
+			"inactive": "Inactive",
+			"username": "Username",
+			"when": "When",
+			"type": "Type",
+			"ip": "IP"
 		}
 	},
 	"Roles": {

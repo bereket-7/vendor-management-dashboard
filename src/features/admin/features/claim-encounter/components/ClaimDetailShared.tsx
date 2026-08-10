@@ -15,7 +15,7 @@ import {
 	type ClaimLine,
 	formatCurrency,
 } from "@/features/admin/features/claim-encounter/mock-data";
-import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 
 export function MetaItem({
 	label,
@@ -27,17 +27,17 @@ export function MetaItem({
 	icon?: React.ComponentType<{ className?: string }>;
 }) {
 	return (
-		<div className="flex items-start gap-2 py-0.5">
+		<div className="flex items-start gap-2.5 py-1">
 			{Icon ? (
-				<div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary">
-					<Icon className="size-3" />
+				<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary ring-1 ring-inset ring-primary/10">
+					<Icon className="size-3.5" />
 				</div>
 			) : null}
 			<div className="min-w-0">
-				<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+				<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 					{label}
 				</p>
-				<div className="mt-0.5 text-xs font-normal break-words">
+				<div className="mt-0.5 text-sm font-medium break-words text-foreground">
 					{value ?? "—"}
 				</div>
 			</div>
@@ -46,27 +46,7 @@ export function MetaItem({
 }
 
 export function StatusPill({ status }: { status: string }) {
-	const tone =
-		status === "paid" || status === "accepted" || status === "submitted"
-			? "bg-emerald-100 text-emerald-800"
-			: status === "rejected" || status === "denied"
-				? "bg-red-100 text-red-800"
-				: status === "partial"
-					? "bg-amber-100 text-amber-900"
-					: status === "pending"
-						? "bg-slate-100 text-slate-800"
-						: "bg-orange-100 text-orange-800";
-
-	return (
-		<span
-			className={cn(
-				"inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-				tone
-			)}
-		>
-			{status}
-		</span>
-	);
+	return <StatusBadge status={status} />;
 }
 
 export function ClaimsTable({
@@ -77,7 +57,7 @@ export function ClaimsTable({
 	mode?: "response" | "batch";
 }) {
 	return (
-		<div className="rounded-lg border border-border/50">
+		<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 			<ScrollArea
 				className="w-full"
 				scrollbarClassName="w-1.5"

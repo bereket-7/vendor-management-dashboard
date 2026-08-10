@@ -60,6 +60,7 @@ import {
 	responsesForProgram,
 	vendorPerformanceForProgram,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
@@ -124,10 +125,7 @@ export function ClaimDirectionFileDashboard({
 		[direction, programFilter]
 	);
 
-	const vendors = useMemo(
-		() => Array.from(new Set(directionFiles.map((r) => r.vendor))).sort(),
-		[directionFiles]
-	);
+	const vendors = VENDOR_NAMES;
 
 	const fileTypes = useMemo(
 		() =>
@@ -363,7 +361,7 @@ export function ClaimDirectionFileDashboard({
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<ClaimPageHeader
 				title={title}
 				description={`${description} · Filtered to ${programFilter}`}
@@ -490,21 +488,21 @@ export function ClaimDirectionFileDashboard({
 					return (
 						<div
 							key={k.label}
-							className="rounded-lg border border-border/50 bg-card/70 p-2.5"
+							className="rounded-xl border border-border bg-card p-3.5 shadow-sm"
 						>
 							<div className="flex items-start justify-between gap-2">
 								<div className="min-w-0">
-									<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 										{k.label}
 									</p>
-									<p className="mt-1 text-lg font-medium tabular-nums tracking-tight">
+									<p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
 										{k.value}
 									</p>
 									<p className="mt-1 text-xs text-muted-foreground">{k.hint}</p>
 								</div>
 								<div
 									className={cn(
-										"flex size-8 shrink-0 items-center justify-center rounded-lg",
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-black/5 dark:ring-white/10",
 										k.tone
 									)}
 								>
@@ -629,7 +627,7 @@ export function ClaimDirectionFileDashboard({
 						<CardTitle className="text-sm font-medium">
 							Response dashboard
 						</CardTitle>
-						<p className="mt-0.5 text-xs text-muted-foreground">
+						<p className="text-sm leading-relaxed text-muted-foreground">
 							{responseFocus}
 						</p>
 					</div>
@@ -828,7 +826,7 @@ export function ClaimDirectionFileDashboard({
 							iconTone="text-sky-700 bg-sky-500/10"
 						>
 							<p className="mb-2 text-sm font-semibold">
-								UST Medical Claims File
+								UST Healthcare Medical Claims File
 							</p>
 							<ul className="space-y-1 text-xs text-muted-foreground">
 								<li>
@@ -867,7 +865,7 @@ export function ClaimDirectionFileDashboard({
 										GW_SUB_20260725_001
 									</span>
 								</li>
-								<li>Vendor: UST</li>
+								<li>Vendor: UST Healthcare</li>
 								<li>Claims submitted: {formatCount(21980)}</li>
 								<li>Response received: Yes</li>
 								<li className="font-medium text-emerald-700">
@@ -954,7 +952,7 @@ export function ClaimDirectionFileDashboard({
 							>
 								<div
 									className={cn(
-										"flex size-8 shrink-0 items-center justify-center rounded-lg",
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-black/5 dark:ring-white/10",
 										item.tone
 									)}
 								>

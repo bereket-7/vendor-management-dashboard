@@ -3,16 +3,19 @@
 import { useMemo, useState } from "react";
 
 import {
+	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
+	Clock3,
 	Download,
 	RefreshCw,
 	Search,
 	Stethoscope,
-	Users,
+	UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,28 +33,35 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { providersToSummaries } from "@/features/admin/features/providers/live-providers";
 import {
 	PROVIDER_SUMMARIES,
 	type ProviderStatus,
+	type ProviderSummary,
 	displayProviderName,
 	formatCompact,
 	formatCurrency,
 } from "@/features/admin/features/providers/mock-data";
 import { Link, useRouter } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import {
+	useInvalidateVendorCore,
+	useVendorCoreProviders,
+} from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 function StatusPill({ status }: { status: ProviderStatus }) {
 	const map: Record<ProviderStatus, string> = {
-		active: "bg-emerald-100 text-emerald-800",
-		inactive: "bg-slate-100 text-slate-700",
-		pending: "bg-amber-100 text-amber-900",
-		termed: "bg-red-100 text-red-800",
+		active: "border-emerald-200/80 bg-emerald-50 text-emerald-900",
+		inactive: "border-slate-200/80 bg-slate-50 text-slate-800",
+		pending: "border-amber-200/80 bg-amber-50 text-amber-950",
+		termed: "border-red-200/80 bg-red-50 text-red-900",
 	};
 	return (
 		<span
 			className={cn(
-				"inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+				"inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold capitalize",
 				map[status]
 			)}
 		>
@@ -61,8 +71,21 @@ function StatusPill({ status }: { status: ProviderStatus }) {
 }
 
 export function ProvidersPage() {
+	if (!isMockEnabled()) {
+		return (
+			<VendorCoreGate title="Providers">
+				<ProvidersBody useLive />
+			</VendorCoreGate>
+		);
+	}
+	return <ProvidersBody useLive={false} />;
+}
+
+function ProvidersBody({ useLive }: { useLive: boolean }) {
 	const router = useRouter();
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const invalidate = useInvalidateVendorCore();
+	const providersQ = useVendorCoreProviders(useLive);
 	const [search, setSearch] = useState("");
 	const [status, setStatus] = useState("all");
 	const [specialty, setSpecialty] = useState("all");
@@ -71,10 +94,15 @@ export function ProvidersPage() {
 	const [pageSize, setPageSize] = useState(10);
 	const [refreshing, setRefreshing] = useState(false);
 
-	const programScoped = useMemo(
-		() => PROVIDER_SUMMARIES.filter((p) => p.program === programFilter),
-		[programFilter]
-	);
+	const programScoped = useMemo((): ProviderSummary[] => {
+		if (useLive) {
+			return providersToSummaries(
+				providersQ.data ?? [],
+				programFilter as ProviderSummary["program"]
+			);
+		}
+		return PROVIDER_SUMMARIES.filter((p) => p.program === programFilter);
+	}, [useLive, providersQ.data, programFilter]);
 
 	const specialties = useMemo(
 		() => Array.from(new Set(programScoped.map((p) => p.specialty))).sort(),
@@ -122,9 +150,16 @@ export function ProvidersPage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		await new Promise((r) => setTimeout(r, 350));
-		setRefreshing(false);
-		toast.success("Provider directory refreshed");
+		try {
+			if (useLive) {
+				await invalidate();
+			} else {
+				await new Promise((r) => setTimeout(r, 350));
+			}
+			toast.success("Provider directory refreshed");
+		} finally {
+			setRefreshing(false);
+		}
 	}
 
 	const hasFilters =
@@ -134,81 +169,119 @@ export function ProvidersPage() {
 		providerType !== "all";
 
 	return (
-		<div className="space-y-3">
-			<div className="flex flex-wrap items-start justify-between gap-2">
-				<div>
-					<h1 className="text-lg font-medium tracking-tight sm:text-xl">
+		<div className="space-y-4">
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+				<div className="min-w-0 space-y-1">
+					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
 						Providers
 					</h1>
-					<p className="mt-0.5 text-xs text-muted-foreground">
-						Search and manage provider profiles · {programFilter}
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						Search and manage provider profiles ·{" "}
+						<span className="font-semibold text-primary">{programFilter}</span>
 					</p>
 				</div>
-				<div className="flex flex-wrap gap-1.5">
+				<div className="flex flex-wrap gap-2">
 					<Button
 						variant="outline"
 						size="sm"
-						className="h-9"
-						onClick={handleRefresh}
-						disabled={refreshing}
+						className="h-9 border-primary/25 font-semibold"
+						onClick={() => void handleRefresh()}
+						disabled={refreshing || (useLive && providersQ.isLoading)}
 					>
 						<RefreshCw
-							className={cn("mr-1.5 size-3.5", refreshing && "animate-spin")}
+							className={cn(
+								"mr-1.5 size-3.5",
+								(refreshing || (useLive && providersQ.isLoading)) &&
+									"animate-spin"
+							)}
 						/>
 						Refresh
 					</Button>
-					<Button variant="outline" size="sm" className="h-9">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9 border-primary/25 font-semibold"
+					>
 						<Download className="mr-1.5 size-3.5" />
 						Export
 					</Button>
 				</div>
 			</div>
 
-			<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+			{useLive && providersQ.error ? (
+				<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+					Could not load providers: {providersQ.error.message}
+				</div>
+			) : null}
+
+			{useLive &&
+			!providersQ.isLoading &&
+			programScoped.length === 0 ? (
+				<div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+					No providers returned from vendor-core yet. Run{" "}
+					<code className="rounded bg-muted px-1 py-0.5 text-xs">
+						pnpm seed:providers
+					</code>{" "}
+					(after vendor-core provider seed is deployed), then refresh.
+				</div>
+			) : null}
+
+			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 				{[
 					{
 						label: "Providers",
 						value: stats.total,
 						hint: programFilter,
-						icon: Users,
+						icon: Stethoscope,
+						tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
 					},
 					{
 						label: "Active",
 						value: stats.active,
 						hint: "Currently enrolled",
-						icon: Stethoscope,
+						icon: CheckCircle2,
+						tone: "text-emerald-700 bg-emerald-500/15 ring-emerald-500/20",
 					},
 					{
 						label: "Pending",
 						value: stats.pending,
 						hint: "Awaiting credentialing",
-						icon: Stethoscope,
+						icon: Clock3,
+						tone: "text-amber-700 bg-amber-500/15 ring-amber-500/20",
 					},
 					{
 						label: "Termed",
 						value: stats.termed,
 						hint: "Enrollment ended",
-						icon: Stethoscope,
+						icon: UserX,
+						tone: "text-red-700 bg-red-500/15 ring-red-500/20",
 					},
 				].map((s) => {
 					const Icon = s.icon;
 					return (
 						<div
 							key={s.label}
-							className="rounded-lg border border-border/50 bg-card/70 p-2.5"
+							className="rounded-xl border border-border bg-card p-3.5 shadow-sm"
 						>
-							<div className="flex items-start justify-between gap-2">
-								<div>
-									<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+							<div className="flex items-start justify-between gap-3">
+								<div className="min-w-0">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 										{s.label}
 									</p>
-									<p className="mt-1 text-lg font-medium tabular-nums">
+									<p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
 										{s.value.toLocaleString()}
 									</p>
-									<p className="mt-1 text-xs text-muted-foreground">{s.hint}</p>
+									<p className="mt-1.5 text-xs text-muted-foreground">
+										{s.hint}
+									</p>
 								</div>
-								<span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-									<Icon className="size-4" />
+								<span
+									className={cn(
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset",
+										s.tone
+									)}
+								>
+									<Icon className="size-[18px]" />
 								</span>
 							</div>
 						</div>
@@ -216,12 +289,14 @@ export function ProvidersPage() {
 				})}
 			</div>
 
-			<div className="rounded-lg border border-border/50 bg-card/70 p-3">
-				<label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-					Provider search
-				</label>
-				<div className="relative mt-1">
-					<Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+			<div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+				<div className="-mx-4 -mt-4 mb-3 rounded-t-xl border-b border-border bg-muted/40 px-4 py-2.5">
+					<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-violet-800">
+						Provider search
+					</label>
+				</div>
+				<div className="relative">
+					<Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-violet-600" />
 					<Input
 						value={search}
 						onChange={(e) => {
@@ -229,12 +304,12 @@ export function ProvidersPage() {
 							setPage(1);
 						}}
 						placeholder="Search providers by Name, NPI, Tax ID, TIN, or Specialty..."
-						className="h-11 pl-10 text-sm"
+						className="h-11 border-violet-200/60 pl-10 text-sm focus-visible:ring-violet-500/30"
 					/>
 				</div>
-				<div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+				<div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
 					<div className="space-y-1">
-						<label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+						<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 							Status
 						</label>
 						<Select
@@ -257,7 +332,7 @@ export function ProvidersPage() {
 						</Select>
 					</div>
 					<div className="space-y-1">
-						<label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+						<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 							Specialty
 						</label>
 						<Select
@@ -281,7 +356,7 @@ export function ProvidersPage() {
 						</Select>
 					</div>
 					<div className="space-y-1">
-						<label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+						<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 							Provider type
 						</label>
 						<Select
@@ -307,7 +382,7 @@ export function ProvidersPage() {
 							<Button
 								variant="ghost"
 								size="sm"
-								className="h-9"
+								className="h-9 font-semibold text-primary"
 								onClick={() => {
 									setSearch("");
 									setStatus("all");
@@ -319,19 +394,24 @@ export function ProvidersPage() {
 								Clear filters
 							</Button>
 						) : (
-							<p className="pb-2 text-[11px] text-muted-foreground">
-								{filtered.length} providers match
+							<p className="pb-2 text-[11px] font-medium text-muted-foreground">
+								<span className="font-semibold text-foreground">
+									{filtered.length}
+								</span>{" "}
+								providers match
 							</p>
 						)}
 					</div>
 				</div>
 			</div>
 
-			<section className="overflow-hidden rounded-lg border border-border/50 bg-card/70">
-				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
+			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-3">
 					<div>
-						<p className="text-sm font-medium">Provider directory</p>
-						<p className="text-[11px] text-muted-foreground">
+						<p className="text-sm font-semibold tracking-tight text-foreground">
+							Provider directory
+						</p>
+						<p className="mt-0.5 text-xs text-muted-foreground">
 							{filtered.length} matching · click a row to open the profile
 						</p>
 					</div>
@@ -407,7 +487,9 @@ export function ProvidersPage() {
 										colSpan={9}
 										className="h-24 text-center text-muted-foreground"
 									>
-										No providers match the current search and filters.
+										{useLive && providersQ.isLoading
+											? "Loading providers from vendor-core…"
+											: "No providers match the current search and filters."}
 									</TableCell>
 								</TableRow>
 							)}

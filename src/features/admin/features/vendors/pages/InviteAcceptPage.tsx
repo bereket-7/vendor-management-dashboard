@@ -20,7 +20,7 @@ export function InviteAcceptPage() {
 
 	return (
 		<main className="mx-auto flex min-h-[70vh] max-w-md items-center px-4 py-12">
-			<div className="w-full rounded-lg border bg-card p-6 shadow-sm">
+			<div className="w-full rounded-xl border border-border bg-card shadow-sm p-6 shadow-sm">
 				{accepted ? (
 					<div className="space-y-4 text-center">
 						<h1 className="text-xl font-semibold">Invitation accepted</h1>

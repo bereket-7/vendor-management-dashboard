@@ -1,10 +1,5 @@
-import { redirect } from "next/navigation";
+import { FileManagementPage } from "@/features/admin/features/claim-encounter/file-management/FileManagementPage";
 
-type Props = {
-	params: Promise<{ locale: string }>;
-};
-
-export default async function Page({ params }: Props) {
-	const { locale } = await params;
-	redirect(`/${locale}/admin/file-monitoring`);
+export default function Page() {
+	return <FileManagementPage />;
 }

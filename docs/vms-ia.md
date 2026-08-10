@@ -15,7 +15,7 @@ Dev overrides:
 
 - `NEXT_PUBLIC_DEV_ADMIN=true` — buyer admin ABAC
 - `NEXT_PUBLIC_DEV_VENDOR=true` — vendor portal ABAC (takes precedence)
-- `NEXT_PUBLIC_USE_MOCK_VMS` — defaults on unless set to `"false"`
+- `NEXT_PUBLIC_USE_MOCK` — defaults on unless set to `"false"`
 
 ## Buyer navigation
 

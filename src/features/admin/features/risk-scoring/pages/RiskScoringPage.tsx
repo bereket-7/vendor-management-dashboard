@@ -123,20 +123,20 @@ function trendFromRuns(
 function RiskBadge({ level }: { level: RiskLevel }) {
 	if (level === "high") {
 		return (
-			<span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0 text-[10px] font-medium text-red-800 dark:bg-red-950 dark:text-red-200">
+			<span className="inline-flex items-center rounded-md border border-transparent bg-red-100 px-1.5 py-0 text-[10px] font-medium text-red-800 dark:bg-red-950 dark:text-red-200">
 				High
 			</span>
 		);
 	}
 	if (level === "medium") {
 		return (
-			<span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+			<span className="inline-flex items-center rounded-md border border-transparent bg-amber-100 px-1.5 py-0 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
 				Medium
 			</span>
 		);
 	}
 	return (
-		<span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+		<span className="inline-flex items-center rounded-md border border-transparent bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
 			Low
 		</span>
 	);
@@ -310,13 +310,13 @@ export function RiskScoringPage() {
 	];
 
 	return (
-		<div className="space-y-3">
-			<div className="flex flex-wrap items-start justify-between gap-2">
+		<div className="space-y-4">
+			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div>
-					<h1 className="text-lg font-medium tracking-tight sm:text-xl">
+					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
 						Vendor Risk Scoring
 					</h1>
-					<p className="mt-0.5 text-xs text-muted-foreground">
+					<p className="text-sm leading-relaxed text-muted-foreground">
 						Composite risk from health, SLA attainment, open alerts, and failed
 						or warning file runs.
 					</p>
@@ -369,20 +369,23 @@ export function RiskScoringPage() {
 				{kpis.map((k) => {
 					const Icon = k.icon;
 					return (
-						<div key={k.label} className="rounded-lg border bg-card p-2.5">
+						<div
+							key={k.label}
+							className="rounded-xl border border-border bg-card shadow-sm p-2.5"
+						>
 							<div className="flex items-start justify-between gap-2">
 								<div className="min-w-0">
-									<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 										{k.label}
 									</p>
-									<p className="mt-1 text-lg font-medium tabular-nums tracking-tight">
+									<p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
 										{k.value}
 									</p>
 									<p className="mt-1 text-xs text-muted-foreground">{k.hint}</p>
 								</div>
 								<div
 									className={cn(
-										"flex size-8 shrink-0 items-center justify-center rounded-lg",
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-black/5 dark:ring-white/10",
 										k.tone
 									)}
 								>
@@ -393,8 +396,8 @@ export function RiskScoringPage() {
 					);
 				})}
 
-				<div className="rounded-lg border bg-card p-2.5">
-					<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="rounded-xl border border-border bg-card shadow-sm p-2.5">
+					<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 						Risk Distribution
 					</p>
 					<div className="mt-1 flex items-center gap-2">

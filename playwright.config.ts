@@ -8,7 +8,7 @@ const webServerReadyUrl = `${baseURL}/robots.txt`;
 
 const e2eServerEnv = {
 	SKIP_ENV_VALIDATION: "true",
-	NEXT_PUBLIC_USE_MOCK_GROUPS: "true",
+	NEXT_PUBLIC_USE_MOCK: "true",
 	NEXT_PUBLIC_DEV_ADMIN: "true",
 	...process.env,
 };

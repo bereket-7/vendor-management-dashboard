@@ -46,6 +46,7 @@ import {
 	exportRowsAsCsv,
 	responsesForProgram,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
@@ -67,7 +68,7 @@ function statusBadge(status: ClaimFileStatus) {
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+				"inline-flex items-center rounded-md border border-transparent px-2 py-0.5 text-[10px] font-medium capitalize",
 				tone[status]
 			)}
 		>
@@ -97,10 +98,7 @@ export function ResponsesPage() {
 		[programFilter]
 	);
 
-	const vendors = useMemo(
-		() => Array.from(new Set(baseRows.map((r) => r.vendor))).sort(),
-		[baseRows]
-	);
+	const vendors = VENDOR_NAMES;
 
 	const filteredRows = useMemo(() => {
 		return baseRows.filter((row) => {
@@ -222,7 +220,7 @@ export function ResponsesPage() {
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<ClaimPageHeader
 				title="Responses"
 				description={`277CA, 999, TA1, and 835 acknowledgements · Filtered to ${programFilter}`}

@@ -1,3 +1,6 @@
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { fixtureRecord, isMockEnabled } from "@/lib/mock-mode";
+
 export type MemberStatus = "active" | "inactive" | "pending" | "termed";
 export type EligibilityStatus =
 	| "eligible"
@@ -44,14 +47,19 @@ export type EligibilityHistoryRow = {
 	status: EligibilityStatus;
 	source: string;
 	groupCaseId: string;
+	reason: string;
+	verifiedBy: string;
 };
 
 export type PlanHistoryRow = {
 	id: string;
 	planName: string;
 	planType: string;
+	planId: string;
+	carrier: string;
 	startDate: string;
 	endDate: string | null;
+	changeReason: string;
 };
 
 export type DependentRow = {
@@ -62,6 +70,8 @@ export type DependentRow = {
 	gender: string;
 	coverageStatus: MemberStatus;
 	memberId?: string;
+	pcpName?: string;
+	planName?: string;
 };
 
 export type MemberClaimRow = {
@@ -90,6 +100,9 @@ export type VendorSourceRow = {
 	fileFeedType: string;
 	lastReceived: string;
 	status: "success" | "warning" | "failed";
+	frequency: string;
+	recordsProcessed: number;
+	direction: "Inbound" | "Outbound";
 };
 
 export type EligibilityExceptionRow = {
@@ -114,6 +127,20 @@ export type MemberDetail = MemberSummary & {
 	coverageStart: string;
 	coverageEnd: string | null;
 	planId: string;
+	preferredName: string | null;
+	preferredLanguage: string;
+	race: string;
+	ethnicity: string;
+	communicationPreference: "Phone" | "Email" | "Mail" | "SMS";
+	emergencyContactName: string;
+	emergencyContactPhone: string;
+	emergencyContactRelation: string;
+	mailingAddressLine1: string;
+	mailingAddressLine2?: string;
+	mailingCity: string;
+	mailingState: string;
+	mailingZip: string;
+	dataAsOf: string;
 	alerts: MemberAlert[];
 	eligibilityHistory: EligibilityHistoryRow[];
 	planHistory: PlanHistoryRow[];
@@ -180,7 +207,7 @@ const PLANS = [
 	"UnitedHealthcare Community",
 	"Kaiser Permanente Medicaid",
 ];
-const VENDORS = ["UST", "CVS", "Avesis", "Beacon Health", "Cascade Net"];
+const VENDORS = VENDOR_NAMES;
 const PROGRAMS: Array<"MDH" | "DHCF" | "BHP"> = ["MDH", "DHCF", "BHP"];
 
 function pad(n: number, w = 8) {
@@ -263,14 +290,37 @@ function buildSummaries(): MemberSummary[] {
 	john.lastClaimDate = "2026-07-22";
 	john.claimsYtd = 14;
 	john.paidYtd = 12840.5;
-	john.vendorSource = "UST";
+	john.vendorSource = VENDOR_NAMES[0]!;
 	return rows;
 }
 
-export const MEMBER_SUMMARIES: MemberSummary[] = buildSummaries();
+export const MEMBER_SUMMARIES: MemberSummary[] = isMockEnabled()
+	? buildSummaries()
+	: [];
 
 function detailFor(summary: MemberSummary): MemberDetail {
 	const isJohn = summary.id === "mem-1";
+	const idx = Number(summary.id.replace(/\D/g, "")) || 1;
+	const languages = ["English", "Spanish", "Amharic", "French", "Mandarin"];
+	const races = [
+		"White",
+		"Black or African American",
+		"Asian",
+		"Two or More Races",
+		"Decline to Answer",
+	];
+	const ethnicities = [
+		"Not Hispanic or Latino",
+		"Hispanic or Latino",
+		"Decline to Answer",
+	];
+	const comms: Array<"Phone" | "Email" | "Mail" | "SMS"> = [
+		"Phone",
+		"Email",
+		"Mail",
+		"SMS",
+	];
+
 	return {
 		...summary,
 		eligibilityStatus: summary.status === "termed" ? "termed" : "eligible",
@@ -281,6 +331,26 @@ function detailFor(summary: MemberSummary): MemberDetail {
 		planId: isJohn
 			? "MFC-DC-MED-001"
 			: `PLAN-${summary.program}-00${summary.id.slice(-1)}`,
+		preferredName: isJohn ? "Johnny" : null,
+		preferredLanguage: isJohn ? "English" : languages[idx % languages.length]!,
+		race: isJohn ? "White" : races[idx % races.length]!,
+		ethnicity: isJohn
+			? "Not Hispanic or Latino"
+			: ethnicities[idx % ethnicities.length]!,
+		communicationPreference: isJohn ? "Email" : comms[idx % comms.length]!,
+		emergencyContactName: isJohn ? "Jane Doe" : `${summary.lastName}, Contact`,
+		emergencyContactPhone: isJohn ? "(202) 555-0190" : summary.phone,
+		emergencyContactRelation: isJohn
+			? "Spouse"
+			: idx % 2 === 0
+				? "Parent"
+				: "Sibling",
+		mailingAddressLine1: summary.addressLine1,
+		mailingAddressLine2: summary.addressLine2,
+		mailingCity: summary.city,
+		mailingState: summary.state,
+		mailingZip: summary.zip,
+		dataAsOf: "07/28/2026 08:30 AM ET",
 		alerts: isJohn
 			? [
 					{
@@ -320,6 +390,8 @@ function detailFor(summary: MemberSummary): MemberDetail {
 				status: "eligible",
 				source: "834 Eligibility",
 				groupCaseId: isJohn ? "CASE-DC-88211" : `CASE-${summary.program}-100`,
+				reason: "Annual enrollment / continuous coverage",
+				verifiedBy: "System — 834 inbound",
 			},
 			{
 				id: "eh2",
@@ -328,6 +400,8 @@ function detailFor(summary: MemberSummary): MemberDetail {
 				status: "eligible",
 				source: "834 Eligibility",
 				groupCaseId: isJohn ? "CASE-DC-77102" : `CASE-${summary.program}-090`,
+				reason: "Plan year renewal",
+				verifiedBy: "Eligibility Ops",
 			},
 			{
 				id: "eh3",
@@ -336,72 +410,136 @@ function detailFor(summary: MemberSummary): MemberDetail {
 				status: "termed",
 				source: "Manual",
 				groupCaseId: isJohn ? "CASE-DC-66001" : `CASE-${summary.program}-080`,
+				reason: isJohn
+					? "Address verification hold resolved; prior span closed"
+					: "Coverage gap",
+				verifiedBy: "Member Services",
 			},
+			...(isJohn
+				? [
+						{
+							id: "eh4",
+							startDate: "2022-06-01",
+							endDate: "2022-12-31",
+							status: "eligible" as const,
+							source: "834 Eligibility",
+							groupCaseId: "CASE-DC-55120",
+							reason: "New enrollment after Medicaid redetermination",
+							verifiedBy: "System — 834 inbound",
+						},
+						{
+							id: "eh5",
+							startDate: "2022-01-01",
+							endDate: "2022-05-31",
+							status: "pending" as const,
+							source: "Manual",
+							groupCaseId: "CASE-DC-54002",
+							reason: "Pending income documentation",
+							verifiedBy: "Eligibility Ops",
+						},
+					]
+				: []),
 		],
 		planHistory: [
 			{
 				id: "ph1",
 				planName: summary.planName,
 				planType: summary.planType,
+				planId: isJohn
+					? "MFC-DC-MED-001"
+					: `PLAN-${summary.program}-00${summary.id.slice(-1)}`,
+				carrier: isJohn
+					? "MedStar Family Choice"
+					: `${summary.program} Carrier`,
 				startDate: isJohn ? "2024-01-01" : summary.memberSince,
 				endDate: null,
+				changeReason: "Current active plan",
 			},
 			{
 				id: "ph2",
 				planName: "Legacy Medicaid Plan",
 				planType: "Medicaid",
+				planId: isJohn ? "MFC-DC-LEG-009" : `PLAN-${summary.program}-LEG`,
+				carrier: isJohn
+					? "MedStar Family Choice"
+					: `${summary.program} Carrier`,
 				startDate: "2021-01-01",
-				endDate: isJohn ? "2023-12-31" : "2023-12-31",
+				endDate: "2023-12-31",
+				changeReason: "Plan redesign / product migration",
 			},
+			...(isJohn
+				? [
+						{
+							id: "ph3",
+							planName: "DC Healthy Families",
+							planType: "Medicaid",
+							planId: "DHCF-HF-2019",
+							carrier: "DHCF",
+							startDate: "2019-06-01",
+							endDate: "2020-12-31",
+							changeReason: "Initial enrollment",
+						},
+					]
+				: []),
 		],
 		dependents: isJohn
 			? [
 					{
 						id: "d1",
 						name: "John Michael Doe",
-						relationship: "Self",
+						relationship: "Self" as const,
 						dob: "1985-03-14",
 						gender: "Male",
-						coverageStatus: "active",
+						coverageStatus: "active" as const,
 						memberId: summary.memberId,
+						pcpName: "Jane Smith, MD",
+						planName: summary.planName,
 					},
 					{
 						id: "d2",
 						name: "Sarah Anne Doe",
-						relationship: "Spouse",
+						relationship: "Spouse" as const,
 						dob: "1987-09-02",
 						gender: "Female",
-						coverageStatus: "active",
+						coverageStatus: "active" as const,
 						memberId: "MFC-2401843",
+						pcpName: "Jane Smith, MD",
+						planName: summary.planName,
 					},
 					{
 						id: "d3",
 						name: "Emily Rose Doe",
-						relationship: "Daughter",
+						relationship: "Daughter" as const,
 						dob: "2014-05-21",
 						gender: "Female",
-						coverageStatus: "active",
+						coverageStatus: "active" as const,
 						memberId: "MFC-2401844",
+						pcpName: "Children's National PCP",
+						planName: summary.planName,
 					},
 					{
 						id: "d4",
 						name: "Noah James Doe",
-						relationship: "Son",
+						relationship: "Son" as const,
 						dob: "2018-11-08",
 						gender: "Male",
-						coverageStatus: "active",
+						coverageStatus: "active" as const,
 						memberId: "MFC-2401845",
+						pcpName: "Children's National PCP",
+						planName: summary.planName,
 					},
 				]
 			: [
 					{
 						id: "d1",
 						name: displayName(summary),
-						relationship: "Self",
+						relationship: "Self" as const,
 						dob: summary.dob,
 						gender: summary.gender,
 						coverageStatus: summary.status,
 						memberId: summary.memberId,
+						pcpName: summary.pcpName,
+						planName: summary.planName,
 					},
 				],
 		claims: [
@@ -512,26 +650,42 @@ function detailFor(summary: MemberSummary): MemberDetail {
 			{
 				id: "ac1",
 				label: "Deductible",
-				individual: 250,
-				family: 500,
+				individual: isJohn ? 250 : 180 + (idx % 100),
+				family: isJohn ? 500 : 400,
 				remaining: 0,
-				limit: 250,
+				limit: isJohn ? 250 : 250,
 			},
 			{
 				id: "ac2",
 				label: "Out of Pocket Max",
-				individual: 1840,
-				family: 3200,
-				remaining: 1660,
-				limit: 3500,
+				individual: isJohn ? 1840 : 1200 + (idx % 400),
+				family: isJohn ? 3200 : 2800,
+				remaining: isJohn ? 1660 : 1400,
+				limit: isJohn ? 3500 : 3500,
 			},
 			{
 				id: "ac3",
 				label: "Pharmacy Deductible",
-				individual: 50,
-				family: 100,
+				individual: isJohn ? 50 : 25,
+				family: isJohn ? 100 : 75,
 				remaining: 0,
-				limit: 50,
+				limit: isJohn ? 50 : 50,
+			},
+			{
+				id: "ac4",
+				label: "Dental Annual Max",
+				individual: isJohn ? 420 : 200 + (idx % 150),
+				family: isJohn ? 980 : 600,
+				remaining: isJohn ? 580 : 800,
+				limit: isJohn ? 1000 : 1000,
+			},
+			{
+				id: "ac5",
+				label: "Vision Annual Max",
+				individual: isJohn ? 85 : 40,
+				family: isJohn ? 160 : 100,
+				remaining: isJohn ? 65 : 110,
+				limit: isJohn ? 150 : 150,
 			},
 		],
 		vendorHistory: [
@@ -541,28 +695,54 @@ function detailFor(summary: MemberSummary): MemberDetail {
 				fileFeedType: "834 Eligibility",
 				lastReceived: "2026-07-28 06:14",
 				status: "success",
+				frequency: "Daily",
+				recordsProcessed: isJohn ? 1842 : 420 + idx * 11,
+				direction: "Inbound",
 			},
 			{
 				id: "vh2",
-				vendor: "Beacon Health",
+				vendor: VENDOR_NAMES[6] ?? VENDOR_NAMES[1]!,
 				fileFeedType: "837 Claims",
 				lastReceived: "2026-07-27 18:02",
 				status: "success",
+				frequency: "Daily",
+				recordsProcessed: isJohn ? 96 : 40 + idx,
+				direction: "Inbound",
 			},
 			{
 				id: "vh3",
-				vendor: "CVS",
+				vendor: VENDOR_NAMES[1]!,
 				fileFeedType: "NCPDP Pharmacy",
 				lastReceived: "2026-07-26 09:41",
 				status: "warning",
+				frequency: "Daily",
+				recordsProcessed: isJohn ? 28 : 12 + (idx % 10),
+				direction: "Inbound",
 			},
 			{
 				id: "vh4",
-				vendor: "Avesis",
+				vendor: VENDOR_NAMES[3]!,
 				fileFeedType: "837 Vision",
 				lastReceived: "2026-07-20 11:05",
 				status: "success",
+				frequency: "Weekly",
+				recordsProcessed: isJohn ? 6 : 3,
+				direction: "Inbound",
 			},
+			...(isJohn
+				? [
+						{
+							id: "vh5",
+							vendor: VENDOR_NAMES[2]!,
+							fileFeedType: "277CA Response",
+							lastReceived: "2026-07-25 14:22",
+							status: "failed" as const,
+							frequency: "Daily",
+							recordsProcessed: 0,
+							direction: "Outbound" as const,
+						},
+					]
+				: []),
 		],
 		exceptions: buildExceptions(summary),
 	};
@@ -673,8 +853,8 @@ function buildExceptions(summary: MemberSummary): EligibilityExceptionRow[] {
 	return catalog.slice(start, start + count);
 }
 
-export const MEMBER_DETAILS: Record<string, MemberDetail> = Object.fromEntries(
-	MEMBER_SUMMARIES.map((s) => [s.id, detailFor(s)])
+export const MEMBER_DETAILS: Record<string, MemberDetail> = fixtureRecord(
+	Object.fromEntries(MEMBER_SUMMARIES.map((s) => [s.id, detailFor(s)]))
 );
 
 export function displayName(
@@ -684,6 +864,7 @@ export function displayName(
 }
 
 export function getMember(idOrMemberId: string): MemberDetail | undefined {
+	if (!isMockEnabled()) return undefined;
 	const decoded = decodeURIComponent(idOrMemberId);
 	const byId = MEMBER_DETAILS[decoded];
 	if (byId) return byId;
@@ -710,4 +891,13 @@ export function formatDate(iso: string | null | undefined) {
 
 export function maskSsn(last4: string) {
 	return `***-**-${last4}`;
+}
+
+export function memberAge(dob: string, asOf = "2026-08-04") {
+	const [y, m, d] = dob.split("-").map(Number);
+	const [ay, am, ad] = asOf.split("-").map(Number);
+	if (!y || !m || !d || !ay || !am || !ad) return null;
+	let age = ay - y;
+	if (am < m || (am === m && ad < d)) age -= 1;
+	return age;
 }

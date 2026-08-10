@@ -44,10 +44,11 @@
 		"offline": "ከመስመር ውጭ ነዎት። ግንኙነት ሲመለስ ለውጦች ይቀጥላሉ።",
 		"sections": {
 			"top": "አጠቃላይ",
-			"vendor_management": "የአቅራቢ አስተዳደር",
+			"master_data": "ዋና ውሂብ",
+			"integration_file_operations": "ውህደት እና የፋይል ክንውኖች",
 			"operations": "ክንውኖች",
 			"administration": "አስተዳደር",
-			"claim_encounter": "ይገባኛል እና ግንኙነት"
+			"claim_encounter": "ይገባኛል እና ግንኙነቶች"
 		},
 		"nav": {
 			"dashboard": "ዳሽቦርድ",
@@ -67,6 +68,9 @@
 			"reports": "ሪፖርቶች",
 			"settings": "ቅንብሮች",
 			"support": "ድጋፍ",
+			"claims": "ይገባኛሎች",
+			"inboundvendorfiles": "የገቡ አቅራቢ ፋይሎች",
+			"outboundvendorfiles": "የወጡ አቅራቢ ፋይሎች",
 			"inboundvendorfile": "የገባ አቅራቢ ፋይል",
 			"outboundvendorfile": "የወጣ አቅራቢ ፋይል",
 			"responses": "ምላሾች",

@@ -49,7 +49,7 @@ function SummaryItem({
 }) {
 	return (
 		<div className="min-w-0 flex-1 basis-0 px-4 py-3">
-			<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+			<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 				{label}
 			</p>
 			<div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
@@ -72,7 +72,7 @@ function Panel({
 	return (
 		<section
 			className={cn(
-				"overflow-hidden rounded-lg border border-border/50 bg-card",
+				"overflow-hidden rounded-xl border border-border bg-card shadow-sm",
 				className
 			)}
 		>
@@ -97,7 +97,7 @@ export function ValidationInvestigationPage() {
 
 	if (!run || !issue) {
 		return (
-			<div className="space-y-3">
+			<div className="space-y-4">
 				<Link
 					href={`/admin/file-monitoring/${params.runId}`}
 					className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -309,7 +309,7 @@ export function ValidationInvestigationPage() {
 				{/* Left — Investigation Workspace */}
 				<div className="space-y-0 xl:col-span-5">
 					<Panel title="Investigation Workspace">
-						<ol className="space-y-3">
+						<ol className="space-y-4">
 							{steps.map((step) => (
 								<li key={step.n} className="flex gap-2.5">
 									<div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
@@ -500,7 +500,7 @@ export function ValidationInvestigationPage() {
 					</div>
 				</Panel>
 
-				<section className="overflow-hidden rounded-lg border border-border/50 bg-card">
+				<section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 					<div className="border-b border-border/50 px-3 py-2">
 						<h2 className="text-sm font-medium">Investigation History</h2>
 					</div>

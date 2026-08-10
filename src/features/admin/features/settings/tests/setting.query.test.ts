@@ -11,7 +11,7 @@ const mockApiClient = jest.mocked(apiClient);
 describe("settingApi.list", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
-		process.env.NEXT_PUBLIC_USE_MOCK_SETTINGS = "true";
+		process.env.NEXT_PUBLIC_USE_MOCK = "true";
 	});
 
 	it("returns mock settings when mock flag is set", async () => {

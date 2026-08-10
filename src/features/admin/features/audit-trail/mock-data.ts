@@ -1,3 +1,5 @@
+import { isMockEnabled } from "@/lib/mock-mode";
+
 export type AuditActionType = "Updated" | "Created" | "Deleted" | "Login";
 
 export type AuditModule =
@@ -91,6 +93,7 @@ export function buildAuditActivities(options?: {
 	vendorName?: string;
 	count?: number;
 }): AuditActivity[] {
+	if (!isMockEnabled()) return [];
 	const count = options?.count ?? (options?.vendorId ? 48 : 128);
 	const actions: AuditActionType[] = ["Updated", "Created", "Deleted", "Login"];
 

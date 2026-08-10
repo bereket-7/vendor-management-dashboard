@@ -35,7 +35,7 @@ export function PerformancePage() {
 			) : error ? (
 				<p className="text-sm text-destructive">Unable to load scorecards.</p>
 			) : (
-				<div className="rounded-lg border bg-card">
+				<div className="rounded-xl border border-border bg-card shadow-sm">
 					<Table>
 						<TableHeader>
 							<TableRow>

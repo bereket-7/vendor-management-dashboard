@@ -3,6 +3,7 @@ import {
 	type FileRun,
 	displayRunStatus,
 } from "@/features/admin/features/file-management/mock-data";
+import { fixtureList, fixtureRecord, isMockEnabled } from "@/lib/mock-mode";
 
 export type VendorHealth = "healthy" | "warning" | "failed" | "in_progress";
 
@@ -26,16 +27,17 @@ export type VendorIntegrationProfile = {
 	notes: string;
 };
 
-export const VENDOR_INTEGRATION: Record<string, VendorIntegrationProfile> = {
+export const VENDOR_INTEGRATION: Record<string, VendorIntegrationProfile> =
+	fixtureRecord({
 	"vnd-1": {
 		vendorId: "vnd-1",
 		vendorType: "Clearinghouse",
-		sftpHost: "sftp.apex-supply.example",
-		timezone: "Central CT",
+		sftpHost: "sftp.ust-healthcare.example",
+		timezone: "Eastern ET",
 		transmissionMethod: "SFTP",
 		encryption: "PGP",
-		fileFormats: ["XML", "EDI X12", "CSV"],
-		tradingPartnerId: "VND-0001",
+		fileFormats: ["EDI X12", "XML", "CSV"],
+		tradingPartnerId: "VND-0003",
 		slaPercent: 99.2,
 		protocol: "SFTP / AS2",
 		createdBy: "Admin",
@@ -45,17 +47,17 @@ export const VENDOR_INTEGRATION: Record<string, VendorIntegrationProfile> = {
 		avgProcessingTime: "00:02:14",
 		health: "healthy",
 		notes:
-			"Preferred supplier for packaging and raw materials. Daily invoice EDI and remittance feeds are active.",
+			"Primary clearinghouse for professional and institutional claims. Daily 837 and remittance feeds are active.",
 	},
 	"vnd-2": {
 		vendorId: "vnd-2",
-		vendorType: "Logistics",
-		sftpHost: "sftp.horizon.example",
-		timezone: "East Africa EAT",
+		vendorType: "PBM",
+		sftpHost: "sftp.cvs-caremark.example",
+		timezone: "Eastern ET",
 		transmissionMethod: "SFTP",
 		encryption: "PGP",
-		fileFormats: ["CSV", "JSON"],
-		tradingPartnerId: "VND-0002",
+		fileFormats: ["NCPDP", "CSV"],
+		tradingPartnerId: "VND-0011",
 		slaPercent: 96.4,
 		protocol: "SFTP",
 		createdBy: "Admin",
@@ -65,17 +67,17 @@ export const VENDOR_INTEGRATION: Record<string, VendorIntegrationProfile> = {
 		avgProcessingTime: "00:03:48",
 		health: "failed",
 		notes:
-			"Regional freight partner. ASN and claims feeds have recent SLA and validation failures requiring follow-up.",
+			"Pharmacy benefits manager. Recent NCPDP claim file failures require follow-up with vendor ops.",
 	},
 	"vnd-3": {
 		vendorId: "vnd-3",
 		vendorType: "Laboratory",
-		sftpHost: "as2.novatech.example",
-		timezone: "Central Europe CET",
+		sftpHost: "as2.labcorp.example",
+		timezone: "Eastern ET",
 		transmissionMethod: "AS2",
 		encryption: "AS2 + TLS",
-		fileFormats: ["XML", "X12"],
-		tradingPartnerId: "VND-0003",
+		fileFormats: ["HL7", "CSV", "X12"],
+		tradingPartnerId: "VND-0007",
 		slaPercent: 98.8,
 		protocol: "AS2",
 		createdBy: "Admin",
@@ -85,17 +87,17 @@ export const VENDOR_INTEGRATION: Record<string, VendorIntegrationProfile> = {
 		avgProcessingTime: "00:01:38",
 		health: "warning",
 		notes:
-			"EU component supplier. Weekly catalog feed missed the last SLA window; invoice EDI remains healthy.",
+			"Lab results and claim feeds. Weekly results file had validation warnings on the last run.",
 	},
 	"vnd-4": {
 		vendorId: "vnd-4",
-		vendorType: "PBM",
-		sftpHost: "sftp.greenfield.example",
-		timezone: "East Africa EAT",
+		vendorType: "Dental",
+		sftpHost: "sftp.avesis.example",
+		timezone: "Eastern ET",
 		transmissionMethod: "SFTP",
 		encryption: "PGP",
-		fileFormats: ["CSV"],
-		tradingPartnerId: "VND-0004",
+		fileFormats: ["EDI X12", "CSV"],
+		tradingPartnerId: "VND-0014",
 		slaPercent: 97.1,
 		protocol: "SFTP",
 		createdBy: "Admin",
@@ -105,9 +107,9 @@ export const VENDOR_INTEGRATION: Record<string, VendorIntegrationProfile> = {
 		avgProcessingTime: "00:02:12",
 		health: "warning",
 		notes:
-			"Onboarding in progress. Inventory feed shows schema drift warnings under tolerant mode.",
+			"Dental / vision claims partner. Schema drift warnings on recent 837D files under tolerant mode.",
 	},
-};
+});
 
 export type VendorListStatus = "active" | "at_risk" | "inactive";
 export type VendorListHealth = "healthy" | "warning" | "critical";
@@ -125,10 +127,12 @@ export type VendorDirectoryRow = {
 	health: VendorListHealth;
 	mark: string;
 	avatarBg: string;
+	/** ISO timestamp for live sorting (optional for mock rows) */
+	createdAt?: string;
 };
 
 /** Directory used by the Vendors list page (matches ops console mock). */
-export const VENDOR_DIRECTORY: VendorDirectoryRow[] = [
+export const VENDOR_DIRECTORY: VendorDirectoryRow[] = fixtureList([
 	{
 		id: "vnd-1",
 		name: "UST Healthcare",
@@ -243,7 +247,7 @@ export const VENDOR_DIRECTORY: VendorDirectoryRow[] = [
 	},
 	{
 		id: "vnd-9",
-		name: "Availity",
+		name: "Cotviti",
 		vendorCode: "VND-0020",
 		vendorType: "Clearinghouse",
 		status: "active",
@@ -252,7 +256,7 @@ export const VENDOR_DIRECTORY: VendorDirectoryRow[] = [
 		lastFileReceived: "07/24/2026 1:18 AM",
 		lastFileRelative: "Today",
 		health: "healthy",
-		mark: "A",
+		mark: "C",
 		avatarBg: "bg-[#b45309]",
 	},
 	{
@@ -269,203 +273,36 @@ export const VENDOR_DIRECTORY: VendorDirectoryRow[] = [
 		mark: "D",
 		avatarBg: "bg-[#0f766e]",
 	},
-	{
-		id: "vnd-11",
-		name: "Humana Pharmacy",
-		vendorCode: "VND-0022",
-		vendorType: "PBM",
-		status: "at_risk",
-		linkedAccounts: 6,
-		activeJobs: 3,
-		lastFileReceived: "07/22/2026 6:44 PM",
-		lastFileRelative: "2 days ago",
-		health: "critical",
-		mark: "H",
-		avatarBg: "bg-[#9333ea]",
-	},
-	{
-		id: "vnd-12",
-		name: "BioReference Labs",
-		vendorCode: "VND-0008",
-		vendorType: "Laboratory",
-		status: "active",
-		linkedAccounts: 5,
-		activeJobs: 4,
-		lastFileReceived: "07/24/2026 12:51 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "B",
-		avatarBg: "bg-[#2563eb]",
-	},
-	{
-		id: "vnd-13",
-		name: "Trizetto Provider",
-		vendorCode: "VND-0024",
-		vendorType: "Clearinghouse",
-		status: "inactive",
-		linkedAccounts: 2,
-		activeJobs: 0,
-		lastFileReceived: "06/30/2026 4:20 PM",
-		lastFileRelative: "24 days ago",
-		health: "warning",
-		mark: "T",
-		avatarBg: "bg-[#475569]",
-	},
-	{
-		id: "vnd-14",
-		name: "MetLife Dental",
-		vendorCode: "VND-0016",
-		vendorType: "Dental",
-		status: "active",
-		linkedAccounts: 6,
-		activeJobs: 5,
-		lastFileReceived: "07/23/2026 9:33 PM",
-		lastFileRelative: "Yesterday",
-		health: "healthy",
-		mark: "M",
-		avatarBg: "bg-[#047857]",
-	},
-	{
-		id: "vnd-15",
-		name: "EmblemHealth Rx",
-		vendorCode: "VND-0019",
-		vendorType: "PBM",
-		status: "active",
-		linkedAccounts: 8,
-		activeJobs: 7,
-		lastFileReceived: "07/24/2026 5:05 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "E",
-		avatarBg: "bg-[#dc2626]",
-	},
-	{
-		id: "vnd-16",
-		name: "Sonic Healthcare",
-		vendorCode: "VND-0010",
-		vendorType: "Laboratory",
-		status: "active",
-		linkedAccounts: 7,
-		activeJobs: 6,
-		lastFileReceived: "07/24/2026 3:22 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "S",
-		avatarBg: "bg-[#0284c7]",
-	},
-	{
-		id: "vnd-17",
-		name: "Office Ally",
-		vendorCode: "VND-0005",
-		vendorType: "Clearinghouse",
-		status: "active",
-		linkedAccounts: 9,
-		activeJobs: 8,
-		lastFileReceived: "07/24/2026 2:11 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "O",
-		avatarBg: "bg-[#4f46e5]",
-	},
-	{
-		id: "vnd-18",
-		name: "Prime Therapeutics",
-		vendorCode: "VND-0021",
-		vendorType: "PBM",
-		status: "active",
-		linkedAccounts: 10,
-		activeJobs: 12,
-		lastFileReceived: "07/24/2026 4:48 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "P",
-		avatarBg: "bg-[#ea580c]",
-	},
-	{
-		id: "vnd-19",
-		name: "PathGroup",
-		vendorCode: "VND-0012",
-		vendorType: "Laboratory",
-		status: "active",
-		linkedAccounts: 4,
-		activeJobs: 3,
-		lastFileReceived: "07/23/2026 10:15 PM",
-		lastFileRelative: "Yesterday",
-		health: "healthy",
-		mark: "P",
-		avatarBg: "bg-[#0891b2]",
-	},
-	{
-		id: "vnd-20",
-		name: "Guardian Dental",
-		vendorCode: "VND-0017",
-		vendorType: "Dental",
-		status: "active",
-		linkedAccounts: 3,
-		activeJobs: 2,
-		lastFileReceived: "07/23/2026 8:01 PM",
-		lastFileRelative: "Yesterday",
-		health: "warning",
-		mark: "G",
-		avatarBg: "bg-[#65a30d]",
-	},
-	{
-		id: "vnd-21",
-		name: "Waystar",
-		vendorCode: "VND-0006",
-		vendorType: "Clearinghouse",
-		status: "active",
-		linkedAccounts: 11,
-		activeJobs: 9,
-		lastFileReceived: "07/24/2026 1:47 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "W",
-		avatarBg: "bg-[#1e40af]",
-	},
-	{
-		id: "vnd-22",
-		name: "Magellan Rx",
-		vendorCode: "VND-0023",
-		vendorType: "PBM",
-		status: "active",
-		linkedAccounts: 5,
-		activeJobs: 4,
-		lastFileReceived: "07/24/2026 12:20 AM",
-		lastFileRelative: "Today",
-		health: "healthy",
-		mark: "M",
-		avatarBg: "bg-[#9f1239]",
-	},
-	{
-		id: "vnd-23",
-		name: "ARUP Laboratories",
-		vendorCode: "VND-0013",
-		vendorType: "Laboratory",
-		status: "active",
-		linkedAccounts: 6,
-		activeJobs: 5,
-		lastFileReceived: "07/23/2026 6:55 PM",
-		lastFileRelative: "Yesterday",
-		health: "healthy",
-		mark: "A",
-		avatarBg: "bg-[#0d9488]",
-	},
-	{
-		id: "vnd-24",
-		name: "SSI Claims",
-		vendorCode: "VND-0004",
-		vendorType: "Clearinghouse",
-		status: "inactive",
-		linkedAccounts: 1,
-		activeJobs: 0,
-		lastFileReceived: "07/01/2026 2:30 PM",
-		lastFileRelative: "23 days ago",
-		health: "critical",
-		mark: "S",
-		avatarBg: "bg-[#334155]",
-	},
-];
+]);
+
+/** Canonical vendor display names — use this everywhere mock UIs list vendors. */
+export const VENDOR_NAMES = VENDOR_DIRECTORY.map((v) => v.name);
+
+/** Map vendor type → claim/encounter file type label for mock seeding. */
+export function claimFileTypeForVendorType(vendorType: string): string {
+	switch (vendorType) {
+		case "PBM":
+			return "Pharmacy Claims";
+		case "Dental":
+			return "Vision/Dental";
+		case "Laboratory":
+			return "Laboratory Claims";
+		case "Clearinghouse":
+			return "Medical Claims";
+		default:
+			return "Medical Claims";
+	}
+}
+
+/** Seed metadata for claim/encounter files (same vendors as Vendor Comparison). */
+export const CLAIM_VENDOR_SEED = VENDOR_DIRECTORY.map((v) => ({
+	id: v.id,
+	name: v.name,
+	fileType: claimFileTypeForVendorType(v.vendorType),
+	vendorType: v.vendorType,
+	mark: v.mark,
+	avatarBg: v.avatarBg,
+}));
 
 export function summarizeVendorDirectory(rows: VendorDirectoryRow[]) {
 	const total = rows.length;
@@ -508,6 +345,8 @@ export function summarizeVendorDirectory(rows: VendorDirectoryRow[]) {
 }
 
 const VENDOR_NAME_MAP: Record<string, string> = {
+	...Object.fromEntries(VENDOR_DIRECTORY.map((row) => [row.name, row.id])),
+	// Legacy file-run vendor names still present in file-management mocks
 	"Apex Industrial Supply": "vnd-1",
 	"Horizon Logistics": "vnd-2",
 	"NovaTech Components": "vnd-3",
@@ -516,6 +355,7 @@ const VENDOR_NAME_MAP: Record<string, string> = {
 };
 
 export function vendorIdForRun(run: FileRun): string | null {
+	if (run.vendorId) return run.vendorId;
 	for (const [name, id] of Object.entries(VENDOR_NAME_MAP)) {
 		if (run.vendor.startsWith(name) || name.startsWith(run.vendor)) return id;
 	}
@@ -526,6 +366,7 @@ export function runsForVendor(
 	vendorId: string,
 	program?: FileRun["program"]
 ): FileRun[] {
+	if (!isMockEnabled()) return [];
 	return FILE_RUNS.filter(
 		(run) =>
 			vendorIdForRun(run) === vendorId &&
@@ -588,14 +429,14 @@ export function summarizeRuns(runs: FileRun[]) {
 		warnings,
 		failed,
 		inProgress,
-		pending: Math.max(pending, total === 0 ? 2 : 0),
+		pending,
 		successPct: total ? ((successful / total) * 100).toFixed(1) : "0.0",
 		warningPct: total ? ((warnings / total) * 100).toFixed(1) : "0.0",
 		failedPct: total ? ((failed / total) * 100).toFixed(1) : "0.0",
 	};
 }
 
-export const PROCESSING_TREND = [
+export const PROCESSING_TREND = fixtureList([
 	{ day: "Jul 18", successful: 18, warnings: 2, failed: 1 },
 	{ day: "Jul 19", successful: 20, warnings: 1, failed: 0 },
 	{ day: "Jul 20", successful: 17, warnings: 3, failed: 2 },
@@ -603,12 +444,12 @@ export const PROCESSING_TREND = [
 	{ day: "Jul 22", successful: 19, warnings: 4, failed: 1 },
 	{ day: "Jul 23", successful: 21, warnings: 2, failed: 0 },
 	{ day: "Jul 24", successful: 23, warnings: 3, failed: 2 },
-];
+]);
 
 export const VENDOR_TREND_BY_ID: Record<
 	string,
 	{ day: string; successful: number; warnings: number; failed: number }[]
-> = {
+> = fixtureRecord({
 	"vnd-1": [
 		{ day: "Jul 18", successful: 6, warnings: 0, failed: 0 },
 		{ day: "Jul 19", successful: 7, warnings: 1, failed: 0 },
@@ -645,7 +486,7 @@ export const VENDOR_TREND_BY_ID: Record<
 		{ day: "Jul 23", successful: 2, warnings: 2, failed: 0 },
 		{ day: "Jul 24", successful: 2, warnings: 1, failed: 0 },
 	],
-};
+});
 
 export type VendorAlert = {
 	id: string;
@@ -658,13 +499,13 @@ export type VendorAlert = {
 	runId?: string;
 };
 
-export const VENDOR_ALERTS: VendorAlert[] = [
+export const VENDOR_ALERTS: VendorAlert[] = fixtureList([
 	{
 		id: "va1",
 		vendorId: "vnd-2",
-		vendorName: "Horizon Logistics",
-		title: "Horizon Logistics - ASN file processing failed.",
-		fileName: "ASN_HORIZON_20260724.xml",
+		vendorName: "CVS Caremark",
+		title: "CVS Caremark — pharmacy claims file processing failed.",
+		fileName: "NCPDP_CVS_20260724.edi",
 		when: "Yesterday 8:25 PM",
 		severity: "error",
 		runId: "f2",
@@ -672,9 +513,9 @@ export const VENDOR_ALERTS: VendorAlert[] = [
 	{
 		id: "va2",
 		vendorId: "vnd-3",
-		vendorName: "NovaTech Components",
-		title: "NovaTech Components - Catalog feed has 102 warnings.",
-		fileName: "CATALOG_NOVATECH_W30.csv",
+		vendorName: "Labcorp",
+		title: "Labcorp — lab results feed has 102 warnings.",
+		fileName: "LAB_LABCORP_W30.csv",
 		when: "Yesterday 7:18 PM",
 		severity: "warning",
 		runId: "f3",
@@ -682,9 +523,9 @@ export const VENDOR_ALERTS: VendorAlert[] = [
 	{
 		id: "va3",
 		vendorId: "vnd-1",
-		vendorName: "Apex Industrial Supply",
-		title: "Apex Industrial Supply - Invoice EDI received successfully.",
-		fileName: "INV_APEX_20260724.edi",
+		vendorName: "UST Healthcare",
+		title: "UST Healthcare — 837 professional file received successfully.",
+		fileName: "837P_UST_20260724.edi",
 		when: "6:02 AM",
 		severity: "info",
 		runId: "f6",
@@ -692,24 +533,24 @@ export const VENDOR_ALERTS: VendorAlert[] = [
 	{
 		id: "va4",
 		vendorId: "vnd-4",
-		vendorName: "GreenField Organics",
-		title: "GreenField Organics - Inventory schema drift warning.",
-		fileName: "INV_GREENFIELD_DAILY.csv",
+		vendorName: "Avesis",
+		title: "Avesis — dental claim schema drift warning.",
+		fileName: "837D_AVESIS_DAILY.edi",
 		when: "Today 7:50 AM",
 		severity: "warning",
 		runId: "f5",
 	},
 	{
 		id: "va5",
-		vendorId: "vnd-2",
-		vendorName: "Horizon Logistics",
-		title: "Horizon Logistics - Claims file not delivered.",
-		fileName: "CLAIMS_HORIZON_20260723.csv",
+		vendorId: "vnd-7",
+		vendorName: "Change Healthcare",
+		title: "Change Healthcare — claims file not delivered.",
+		fileName: "837I_CHANGE_20260723.edi",
 		when: "Yesterday 9:15 AM",
 		severity: "error",
 		runId: "f7",
 	},
-];
+]);
 
 export type AccountFileStatus = "success" | "none" | "warning" | "error";
 
@@ -766,6 +607,7 @@ function fileStatusFor(
 }
 
 export function getVendorAccounts(vendorId: string): VendorAccountRow[] {
+	if (!isMockEnabled()) return [];
 	const profile = getVendorIntegration(vendorId);
 	const directory = VENDOR_DIRECTORY.find((row) => row.id === vendorId);
 	const count = Math.max(
@@ -894,6 +736,7 @@ export function getVendorConfigJobs(
 	vendorId: string,
 	vendorName?: string
 ): VendorConfigJob[] {
+	if (!isMockEnabled()) return [];
 	const profile = getVendorIntegration(vendorId);
 	const short =
 		(vendorName ?? profile.tradingPartnerId)

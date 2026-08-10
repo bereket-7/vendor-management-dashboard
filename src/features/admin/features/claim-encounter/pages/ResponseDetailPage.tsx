@@ -102,7 +102,7 @@ export function ResponseDetailPage() {
 
 	if (!response) {
 		return (
-			<div className="space-y-3">
+			<div className="space-y-4">
 				<Link
 					href="/admin/claim-encounter/inbound"
 					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -153,7 +153,7 @@ export function ResponseDetailPage() {
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<div className="space-y-3 border-b border-border/50 pb-3">
 				<Link
 					href={backHref}
@@ -181,7 +181,7 @@ export function ResponseDetailPage() {
 									{response.responseType}
 								</span>
 							</div>
-							<p className="mt-0.5 text-xs text-muted-foreground">
+							<p className="text-sm leading-relaxed text-muted-foreground">
 								What Gainwell returned for {response.vendor} ·{" "}
 								{response.program}
 							</p>
@@ -325,7 +325,7 @@ export function ResponseDetailPage() {
 			</div>
 
 			{tab === "Overview" && (
-				<div className="space-y-3">
+				<div className="space-y-4">
 					<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
 						{[
 							{
@@ -351,9 +351,9 @@ export function ResponseDetailPage() {
 						].map((card) => (
 							<div
 								key={card.label}
-								className="rounded-lg border border-border/50 bg-card/70 p-3"
+								className="rounded-xl border border-border bg-card shadow-sm p-3"
 							>
-								<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+								<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 									{card.label}
 								</p>
 								<p className="mt-1 text-xl font-medium tabular-nums">
@@ -390,8 +390,8 @@ export function ResponseDetailPage() {
 			)}
 
 			{tab === "Remittance" && (
-				<div className="space-y-3">
-					<div className="rounded-lg border border-border/50 bg-card/70 p-4">
+				<div className="space-y-4">
+					<div className="rounded-xl border border-border bg-card shadow-sm p-4">
 						<h2 className="text-sm font-medium">
 							Remittance / acknowledgement
 						</h2>
@@ -426,7 +426,7 @@ export function ResponseDetailPage() {
 							</div>
 						</div>
 					</div>
-					<div className="rounded-lg border border-border/50 bg-card/70 p-4">
+					<div className="rounded-xl border border-border bg-card shadow-sm p-4">
 						<h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 							Top paid claims
 						</h3>
@@ -476,9 +476,9 @@ export function ResponseDetailPage() {
 			)}
 
 			{tab === "Linked Batch" && (
-				<div className="rounded-lg border border-border/50 bg-card/70 p-4">
+				<div className="rounded-xl border border-border bg-card shadow-sm p-4">
 					{batch ? (
-						<div className="space-y-3">
+						<div className="space-y-4">
 							<p className="text-xs text-muted-foreground">
 								This response answers the MFC submission batch below. Open the
 								batch to inspect what was sent to Gainwell.

@@ -32,6 +32,7 @@ import {
 	type ConnectionDto,
 	type ErrorRecordDto,
 	type IntakeJobDto,
+	type IntakeJobRunDto,
 	type MonitoringDashboardDto,
 	clearTokens,
 	getStoredAccessToken,
@@ -77,6 +78,7 @@ export function IntegrationOverviewPage() {
 	);
 	const [connections, setConnections] = useState<ConnectionDto[]>([]);
 	const [jobs, setJobs] = useState<IntakeJobDto[]>([]);
+	const [jobRuns, setJobRuns] = useState<IntakeJobRunDto[]>([]);
 	const [errors, setErrors] = useState<ErrorRecordDto[]>([]);
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
@@ -87,17 +89,70 @@ export function IntegrationOverviewPage() {
 		setLoading(true);
 		setError(null);
 		try {
-			const [mon, conns, jobPage, errPage] = await Promise.all([
+			const settled = await Promise.allSettled([
 				vendorCoreApi.getMonitoring(),
 				vendorCoreApi.listConnections(),
 				vendorCoreApi.listIntakeJobs(),
+				vendorCoreApi.listIntakeJobRuns(),
 				vendorCoreApi.listErrors({ status: "open" }),
 			]);
-			setMonitoring(mon);
-			setConnections(conns.results ?? []);
-			setJobs(jobPage.results ?? []);
-			setErrors(errPage.results ?? []);
+
+			const [mon, conns, jobPage, runsPage, errPage] = settled;
+			const failures: string[] = [];
+
+			if (mon.status === "fulfilled") {
+				setMonitoring(mon.value);
+			} else {
+				failures.push(`monitoring: ${mon.reason?.message ?? mon.reason}`);
+			}
+			if (conns.status === "fulfilled") {
+				setConnections(conns.value.results ?? []);
+			} else {
+				setConnections([]);
+				failures.push(`connections: ${conns.reason?.message ?? conns.reason}`);
+			}
+			if (jobPage.status === "fulfilled") {
+				setJobs(jobPage.value.results ?? []);
+			} else {
+				setJobs([]);
+				failures.push(`intake-jobs: ${jobPage.reason?.message ?? jobPage.reason}`);
+			}
+			if (runsPage.status === "fulfilled") {
+				setJobRuns(runsPage.value.results ?? []);
+			} else {
+				setJobRuns([]);
+				failures.push(
+					`intake-job-runs: ${runsPage.reason?.message ?? runsPage.reason}`
+				);
+			}
+			if (errPage.status === "fulfilled") {
+				setErrors(errPage.value.results ?? []);
+			} else {
+				setErrors([]);
+				failures.push(`errors: ${errPage.reason?.message ?? errPage.reason}`);
+			}
+
+			const authFailed = settled.some((r) => {
+				if (r.status !== "rejected") return false;
+				const reason = r.reason as { status?: number; message?: string };
+				if (reason?.status === 401 || reason?.status === 403) return true;
+				const message = String(reason?.message ?? reason).toLowerCase();
+				return /401|unauthor|credent/.test(message);
+			});
+			if (authFailed) {
+				setAuthed(false);
+				clearTokens();
+				setError("Authentication required — sign in with a Django user.");
+				return;
+			}
+
 			setAuthed(true);
+			if (failures.length && mon.status !== "fulfilled") {
+				setError(failures.join(" · "));
+			} else if (failures.length) {
+				// Partial success — keep dashboard usable
+				setError(`Some endpoints unavailable: ${failures.join(" · ")}`);
+			}
 		} catch (err) {
 			const message =
 				err instanceof Error ? err.message : "Failed to load vendor-core data";
@@ -198,12 +253,23 @@ export function IntegrationOverviewPage() {
 							Set in <code>.env</code>:
 						</p>
 						<pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
-							{`NEXT_PUBLIC_USE_VENDOR_CORE_API=true
-NEXT_PUBLIC_VENDOR_CORE_API_URL=http://localhost:8010`}
+							{`NEXT_PUBLIC_VENDOR_CORE_API_URL=https://api.vm.tillahealth.com
+# Nest stays mocked; remote vendor-core enables live intake:
+NEXT_PUBLIC_USE_MOCK=false
+NEXT_PUBLIC_DEV_ADMIN=true`}
 						</pre>
 						<p>
-							Then restart <code>pnpm dev</code> and sign in with a Django JWT
-							user.
+							Restart <code>pnpm dev</code>, open this page, and sign in with a
+							Django JWT user from{" "}
+							<a
+								className="underline"
+								href="https://api.vm.tillahealth.com/admin/"
+								target="_blank"
+								rel="noreferrer"
+							>
+								Django admin
+							</a>
+							.
 						</p>
 					</CardContent>
 				</Card>
@@ -222,7 +288,7 @@ NEXT_PUBLIC_VENDOR_CORE_API_URL=http://localhost:8010`}
 						Sign in to {getVendorCoreBaseUrl()}
 					</p>
 				</div>
-				<form onSubmit={onLogin} className="space-y-3">
+				<form onSubmit={onLogin} className="space-y-4">
 					<Input
 						placeholder="Username"
 						value={username}
@@ -363,20 +429,23 @@ NEXT_PUBLIC_VENDOR_CORE_API_URL=http://localhost:8010`}
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{(monitoring?.recent_runs ?? []).slice(0, 8).map((run) => (
-									<TableRow key={run.id}>
-										<TableCell className="font-medium">
-											{run.job__name}
-										</TableCell>
-										<TableCell>
-											<StatusBadge status={run.stage} />
-										</TableCell>
-										<TableCell>
-											{run.files_processed}/{run.files_found}
-										</TableCell>
-									</TableRow>
-								))}
-								{!monitoring?.recent_runs?.length ? (
+								{jobRuns.slice(0, 8).map((run) => {
+									const jobName =
+										jobs.find((j) => j.id === run.job_id)?.name ||
+										run.job_id.slice(0, 8);
+									return (
+										<TableRow key={run.id}>
+											<TableCell className="font-medium">{jobName}</TableCell>
+											<TableCell>
+												<StatusBadge status={run.stage} />
+											</TableCell>
+											<TableCell>
+												{run.files_processed}/{run.files_found}
+											</TableCell>
+										</TableRow>
+									);
+								})}
+								{!jobRuns.length ? (
 									<TableRow>
 										<TableCell colSpan={3} className="text-muted-foreground">
 											No runs yet — trigger an intake job below.

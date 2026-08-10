@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -51,24 +51,29 @@ import {
 	getFileRun,
 	markFileRunReviewed,
 } from "@/features/admin/features/file-management/mock-data";
+import {
+	type ProcessingLogRow,
+	processingEventsToLogs,
+	validationResultsToLogs,
+} from "@/features/admin/features/file-management/live-processing";
+import { inboundFileToRun } from "@/features/admin/features/dashboard/live-file-runs";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import {
+	useVendorCoreInboundFile,
+	useVendorCoreInboundFileEvents,
+	useVendorCoreInboundFiles,
+	useVendorCoreValidationResults,
+	useVendorCoreVendors,
+} from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 type LogSource = "File Receiver" | "Parser" | "Validation" | "Processor";
 
-type ViewerLog = {
-	id: string;
-	timestamp: string;
-	timeSort: number;
-	level: LogEntry["level"];
-	source: LogSource;
-	message: string;
-	relatedRecord: string | null;
-	errorCode?: string;
-	memberId?: string;
-	lineNumber?: number;
-};
+type ViewerLog = ProcessingLogRow;
 
 function pad2(n: number) {
 	return String(n).padStart(2, "0");
@@ -83,6 +88,19 @@ function formatTime12h(h: number, m: number, s: number) {
 function formatProcessDateTime(run: FileRun) {
 	const raw = run.startedAt ?? run.expectedAt;
 	if (!raw) return "—";
+	if (raw.includes("T")) {
+		const date = new Date(raw);
+		if (!Number.isNaN(date.getTime())) {
+			return date.toLocaleString(undefined, {
+				month: "2-digit",
+				day: "2-digit",
+				year: "numeric",
+				hour: "numeric",
+				minute: "2-digit",
+				second: "2-digit",
+			});
+		}
+	}
 	const [datePart, timePart] = raw.split(" ");
 	if (!datePart || !timePart) return raw;
 	const [y, mo, d] = datePart.split("-");
@@ -367,30 +385,83 @@ const outlineBtn =
 	"h-9 border-primary/30 bg-card text-primary hover:bg-primary/5 hover:text-primary";
 
 export function ProcessingLogsPage() {
+	if (!isMockEnabled()) {
+		return (
+			<VendorCoreGate title="Processing logs">
+				<ProcessingLogsBody />
+			</VendorCoreGate>
+		);
+	}
+	return <ProcessingLogsBody />;
+}
+
+function ProcessingLogsBody() {
+	const useLive = !isMockEnabled();
 	const params = useParams();
 	const searchParams = useSearchParams();
 	const programFilter = useAdminModuleStore((s) => s.fileType);
 	const runIdFromPath = typeof params?.runId === "string" ? params.runId : null;
 	const runFilter = runIdFromPath ?? searchParams.get("run");
+	const filesQ = useVendorCoreInboundFiles();
+	const fileQ = useVendorCoreInboundFile(
+		useLive && runFilter ? runFilter : ""
+	);
+	const eventsQ = useVendorCoreInboundFileEvents(
+		useLive && runFilter ? runFilter : ""
+	);
+	const validationQ = useVendorCoreValidationResults(
+		useLive && runFilter ? { inbound_file_id: runFilter } : undefined
+	);
+	const vendorsQ = useVendorCoreVendors();
+	const nameById = useMemo(
+		() => new Map((vendorsQ.data ?? []).map((v) => [v.id, v.name])),
+		[vendorsQ.data]
+	);
+
 	const programRuns = FILE_RUNS.filter((r) => r.program === programFilter);
-	const run =
+	const mockRun =
 		(runFilter ? getFileRun(runFilter) : undefined) ??
 		programRuns.find((r) => r.status === "failed") ??
 		programRuns[0] ??
 		FILE_RUNS[0]!;
 
-	const runHref = `/admin/file-monitoring/${run.id}`;
-	const firstErrorIssue = run.issues.find((i) => i.severity === "error");
-	const investigationHref = firstErrorIssue
-		? `/admin/file-monitoring/${run.id}/investigate/${firstErrorIssue.id}`
-		: runHref;
+	const liveRun = useMemo(() => {
+		if (!useLive) return undefined;
+		const id = runFilter ?? filesQ.data?.[0]?.id;
+		if (!id) return undefined;
+		const file =
+			fileQ.data ?? filesQ.data?.find((candidate) => candidate.id === id);
+		if (!file) return undefined;
+		return inboundFileToRun(file, nameById);
+	}, [useLive, runFilter, fileQ.data, filesQ.data, nameById]);
 
-	const allLogs = useMemo(() => logsForRun(run), [run]);
+	const run = useLive ? liveRun : mockRun;
 
-	const [reviewed, setReviewed] = useState(run.reviewed);
-	const [selectedLogId, setSelectedLogId] = useState<string | null>(
-		() => allLogs.find((l) => l.level === "error")?.id ?? allLogs[0]?.id ?? null
-	);
+	const runHref = run ? `/admin/file-monitoring/${run.id}` : "/admin/file-monitoring";
+	const firstErrorIssue = run?.issues.find((i) => i.severity === "error");
+	const investigationHref = run
+		? firstErrorIssue
+			? `/admin/file-monitoring/${run.id}/investigate/${firstErrorIssue.id}`
+			: runHref
+		: "/admin/file-monitoring";
+
+	const logDataSource = useMemo(() => {
+		if (!useLive) return "mock" as const;
+		if ((eventsQ.data?.length ?? 0) > 0) return "events" as const;
+		if ((validationQ.data?.length ?? 0) > 0) return "validation" as const;
+		return "empty" as const;
+	}, [useLive, eventsQ.data, validationQ.data]);
+
+	const allLogs = useMemo(() => {
+		if (!run) return [];
+		if (!useLive) return logsForRun(run);
+		const eventLogs = processingEventsToLogs(eventsQ.data ?? []);
+		if (eventLogs.length > 0) return eventLogs;
+		return validationResultsToLogs(validationQ.data ?? []);
+	}, [run, useLive, eventsQ.data, validationQ.data]);
+
+	const [reviewed, setReviewed] = useState(false);
+	const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 	const [page, setPage] = useState(1);
 	const pageSize = 50;
 
@@ -404,7 +475,25 @@ export function ProcessingLogsPage() {
 	const [section, setSection] = useState("all");
 	const [timeRange, setTimeRange] = useState("entire");
 
+	useEffect(() => {
+		if (!run) return;
+		setReviewed(run.reviewed);
+		const logs = useLive
+			? (() => {
+					const eventLogs = processingEventsToLogs(eventsQ.data ?? []);
+					return eventLogs.length > 0
+						? eventLogs
+						: validationResultsToLogs(validationQ.data ?? []);
+				})()
+			: logsForRun(run);
+		setSelectedLogId(
+			logs.find((l) => l.level === "error")?.id ?? logs[0]?.id ?? null
+		);
+		setPage(1);
+	}, [run, useLive, eventsQ.data, validationQ.data]);
+
 	const filtered = useMemo(() => {
+		if (!run) return [];
 		const q = query.trim().toLowerCase();
 		const minSort =
 			timeRange === "first5"
@@ -434,17 +523,7 @@ export function ProcessingLogsPage() {
 				.toLowerCase()
 				.includes(q);
 		});
-	}, [allLogs, level, query, run.correlationId, section, timeRange]);
-
-	const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-	const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-	const selectedLog =
-		filtered.find((l) => l.id === selectedLogId) ??
-		allLogs.find((l) => l.id === selectedLogId) ??
-		pageRows[0] ??
-		allLogs[0] ??
-		null;
+	}, [allLogs, level, query, run, section, timeRange]);
 
 	const summary = useMemo(() => {
 		const errors = allLogs.filter((l) => l.level === "error");
@@ -461,6 +540,55 @@ export function ProcessingLogsPage() {
 			lastEventTime: lastEvent?.timestamp ?? "—",
 		};
 	}, [allLogs]);
+
+	if (
+		useLive &&
+		(filesQ.isLoading ||
+			(runFilter && fileQ.isLoading) ||
+			(runFilter && eventsQ.isLoading) ||
+			(runFilter && validationQ.isLoading)) &&
+		!run
+	) {
+		return (
+			<div className="space-y-4 p-6">
+				<Skeleton className="h-8 w-64" />
+				<Skeleton className="h-40 w-full" />
+				<Skeleton className="h-96 w-full" />
+			</div>
+		);
+	}
+
+	if (!run) {
+		return (
+			<div className="space-y-4 p-6">
+				<h1 className="text-xl font-semibold">Processing Log Viewer</h1>
+				<p className="text-sm text-muted-foreground">
+					No inbound files found. Open a file run from{" "}
+					<Link href="/admin/file-monitoring" className="text-primary underline">
+						File Monitoring
+					</Link>
+					.
+				</p>
+				{(eventsQ.error ?? filesQ.error) ? (
+					<p className="text-sm text-destructive">
+						{(eventsQ.error ?? filesQ.error)?.message}
+					</p>
+				) : null}
+			</div>
+		);
+	}
+
+	const fileRun = run;
+
+	const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+	const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+	const selectedLog =
+		filtered.find((l) => l.id === selectedLogId) ??
+		allLogs.find((l) => l.id === selectedLogId) ??
+		pageRows[0] ??
+		allLogs[0] ??
+		null;
 
 	function applyFilters() {
 		setQuery(draftQuery);
@@ -500,7 +628,7 @@ export function ProcessingLogsPage() {
 					`[${l.timestamp}] [${l.level.toUpperCase()}] [${l.source}] ${l.message}${l.relatedRecord ? ` | ${l.relatedRecord}` : ""}`
 			)
 			.join("\n");
-		downloadTextFile(`${run.runId}-processing.log`, text);
+		downloadTextFile(`${fileRun.runId}-processing.log`, text);
 		toast.success("Log download started");
 	}
 
@@ -520,7 +648,7 @@ export function ProcessingLogsPage() {
 			].join(",")
 		);
 		downloadTextFile(
-			`${run.runId}-log-export.csv`,
+			`${fileRun.runId}-log-export.csv`,
 			[header, ...rows].join("\n"),
 			"text/csv"
 		);
@@ -634,6 +762,37 @@ export function ProcessingLogsPage() {
 					/>
 				</div>
 			</div>
+
+			{useLive && eventsQ.error ? (
+				<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+					Could not load processing events: {eventsQ.error.message}
+				</div>
+			) : null}
+
+			{useLive &&
+			!eventsQ.isLoading &&
+			!validationQ.isLoading &&
+			logDataSource === "validation" ? (
+				<div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+					No processing events were returned for this file. Showing validation
+					results from the API instead.
+				</div>
+			) : null}
+
+			{useLive &&
+			!eventsQ.isLoading &&
+			!validationQ.isLoading &&
+			logDataSource === "empty" ? (
+				<div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+					No processing events or validation results exist for this inbound file
+					yet. Run{" "}
+					<code className="rounded bg-muted px-1 py-0.5 text-xs">
+						pnpm seed:inbound-processing
+					</code>{" "}
+					(after vendor-core seed endpoints are deployed), or wait for the
+					intake pipeline to record events.
+				</div>
+			) : null}
 
 			{/* Filters */}
 			<div className="flex flex-wrap items-end gap-3">
@@ -814,7 +973,18 @@ export function ProcessingLogsPage() {
 											colSpan={5}
 											className="h-24 text-center text-sm text-muted-foreground"
 										>
-											No log entries match the current filters.
+											{useLive &&
+											(eventsQ.isLoading || validationQ.isLoading) ? (
+												"Loading log entries from vendor-core…"
+											) : useLive &&
+											  logDataSource === "empty" &&
+											  !query &&
+											  level === "all" &&
+											  section === "all" ? (
+												"No log entries returned from vendor-core for this file."
+											) : (
+												"No log entries match the current filters."
+											)}
 										</TableCell>
 									</TableRow>
 								)}

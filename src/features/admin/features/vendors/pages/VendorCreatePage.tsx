@@ -4,19 +4,34 @@ import { FormEvent, useState } from "react";
 
 import { toast } from "sonner";
 
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateVendorMutation } from "@/features/shared/vms/queries";
 import { useRouter } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { useInvalidateVendorCore } from "@/lib/vendor-core/hooks";
 
 export function VendorCreatePage() {
+	if (!isMockEnabled()) {
+		return (
+			<VendorCoreGate title="Add vendor">
+				<VendorCreateForm />
+			</VendorCoreGate>
+		);
+	}
+	return <VendorCreateForm />;
+}
+
+function VendorCreateForm() {
 	const router = useRouter();
 	const createVendor = useCreateVendorMutation();
+	const invalidateVendorCore = useInvalidateVendorCore();
 	const [form, setForm] = useState({
 		legalName: "",
 		tradeName: "",
-		country: "",
+		country: "US",
 		city: "",
 		categories: "",
 		description: "",
@@ -28,19 +43,20 @@ export function VendorCreatePage() {
 			const vendor = await createVendor.mutateAsync({
 				legalName: form.legalName.trim(),
 				tradeName: form.tradeName.trim() || null,
-				status: "prospect",
+				status: "active",
 				categories: form.categories
 					.split(",")
 					.map((item) => item.trim())
 					.filter(Boolean),
 				tags: [],
-				country: form.country.trim(),
+				country: form.country.trim() || "US",
 				city: form.city.trim(),
 				taxId: null,
 				website: null,
 				description: form.description.trim() || null,
 				riskLevel: "medium",
 			});
+			await invalidateVendorCore();
 			toast.success("Vendor created");
 			router.push(`/admin/vendors/${vendor.id}`);
 		} catch (error) {
@@ -55,12 +71,12 @@ export function VendorCreatePage() {
 			<div>
 				<h1 className="text-lg font-medium tracking-tight">Add vendor</h1>
 				<p className="text-sm text-muted-foreground">
-					Create a supplier master record.
+					Create a supplier master record on vendor-core.
 				</p>
 			</div>
 			<form
 				onSubmit={submit}
-				className="space-y-3 rounded-lg border bg-card p-4"
+				className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
 			>
 				<div className="grid gap-3 sm:grid-cols-2">
 					<Field label="Legal name" required>

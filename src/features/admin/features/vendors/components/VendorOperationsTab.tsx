@@ -74,30 +74,30 @@ function ActivityStatus({ status }: { status: string }) {
 	const bucket = runBucket(status as FileRun["status"]);
 	if (bucket === "success")
 		return (
-			<span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800">
+			<span className="inline-flex items-center rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
 				Success
 			</span>
 		);
 	if (bucket === "failed")
 		return (
-			<span className="inline-flex rounded-full bg-red-100 px-1.5 py-0 text-[10px] font-medium text-red-800">
+			<span className="inline-flex items-center rounded-md border border-red-200/80 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-900">
 				Failed
 			</span>
 		);
 	if (bucket === "warning")
 		return (
-			<span className="inline-flex rounded-full bg-amber-100 px-1.5 py-0 text-[10px] font-medium text-amber-900">
+			<span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
 				Warning
 			</span>
 		);
 	if (bucket === "in_progress")
 		return (
-			<span className="inline-flex rounded-full bg-sky-100 px-1.5 py-0 text-[10px] font-medium text-sky-800">
+			<span className="inline-flex items-center rounded-md border border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-900">
 				In Progress
 			</span>
 		);
 	return (
-		<span className="inline-flex rounded-full bg-slate-100 px-1.5 py-0 text-[10px] font-medium text-slate-700">
+		<span className="inline-flex items-center rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-800">
 			{status}
 		</span>
 	);
@@ -262,10 +262,12 @@ export function VendorOperationsTab({
 
 	return (
 		<section className="min-w-0 space-y-4">
-			<div className="space-y-3">
+			<div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
 				<div>
-					<h2 className="text-sm font-medium">Operations Summary</h2>
-					<p className="mt-0.5 text-xs text-muted-foreground">
+					<h2 className="text-lg font-semibold tracking-tight text-foreground">
+						Operations Summary
+					</h2>
+					<p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
 						Monitor file runs, jobs, logs, and alerts for {vendorName}.
 					</p>
 				</div>
@@ -275,58 +277,58 @@ export function VendorOperationsTab({
 							label: "Total Runs",
 							value: summary.total,
 							icon: FileText,
-							tone: "text-primary bg-primary/10",
+							tone: "text-primary bg-primary/15 ring-primary/20",
 						},
 						{
 							label: "Successful",
 							value: summary.successful,
 							icon: CheckCircle2,
-							tone: "text-emerald-700 bg-emerald-500/10",
+							tone: "text-emerald-700 bg-emerald-500/15 ring-emerald-500/20",
 						},
 						{
 							label: "Warnings",
 							value: summary.warnings,
 							icon: AlertTriangle,
-							tone: "text-amber-700 bg-amber-500/10",
+							tone: "text-amber-700 bg-amber-500/15 ring-amber-500/20",
 						},
 						{
 							label: "Failed",
 							value: summary.failed,
 							icon: XCircle,
-							tone: "text-red-700 bg-red-500/10",
+							tone: "text-red-700 bg-red-500/15 ring-red-500/20",
 						},
 						{
 							label: "Active Jobs",
 							value: activeJobs,
 							icon: Clock3,
-							tone: "text-sky-700 bg-sky-500/10",
+							tone: "text-sky-700 bg-sky-500/15 ring-sky-500/20",
 						},
 						{
 							label: "Open Alerts",
 							value: openAlerts || alerts.length,
 							icon: Bell,
-							tone: "text-violet-700 bg-violet-500/10",
+							tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
 						},
 					].map((item) => {
 						const Icon = item.icon;
 						return (
 							<div
 								key={item.label}
-								className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-3.5"
+								className="flex items-center gap-3 rounded-xl border border-border bg-card shadow-sm p-3.5"
 							>
 								<div
 									className={cn(
-										"flex size-9 shrink-0 items-center justify-center rounded-lg",
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-black/5 dark:ring-white/10",
 										item.tone
 									)}
 								>
 									<Icon className="size-4" />
 								</div>
 								<div className="min-w-0">
-									<p className="text-xl font-semibold tabular-nums tracking-tight">
+									<p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
 										{item.value}
 									</p>
-									<p className="text-[11px] text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
 										{item.label}
 									</p>
 								</div>
@@ -351,10 +353,10 @@ export function VendorOperationsTab({
 							setFileTypeFilter("all");
 						}}
 						className={cn(
-							"rounded-md border px-2 py-2 text-center text-xs font-medium transition-colors",
+							"rounded-lg border px-2.5 py-2.5 text-center text-xs font-semibold transition-colors shadow-sm",
 							opsTab === id
-								? "border-primary/40 bg-primary/10 text-primary"
-								: "border-border/60 bg-card text-muted-foreground hover:border-primary/25 hover:bg-primary/5 hover:text-foreground"
+								? "border-primary bg-primary text-primary-foreground"
+								: "border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
 						)}
 					>
 						{label}
@@ -382,8 +384,8 @@ export function VendorOperationsTab({
 				))}
 			</nav>
 
-			<div className="overflow-hidden rounded-lg border border-border/60 bg-card">
-				<div className="flex flex-wrap items-center gap-2 border-b border-border/50 p-3">
+			<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+				<div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 p-3.5">
 					{(opsTab === "history" || opsTab === "logs") && (
 						<div className="relative min-w-[200px] flex-1">
 							<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -890,7 +892,7 @@ export function VendorOperationsTab({
 					</div>
 				) : null}
 
-				<div className="border-t border-border/50 px-4 py-2.5 text-xs text-muted-foreground">
+				<div className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
 					{opsTab === "history"
 						? `Showing ${filteredRuns.length} of ${runs.length} runs`
 						: opsTab === "jobs"

@@ -6,11 +6,19 @@ import { useTranslations } from "next-intl";
 
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isMockEnabled } from "@/lib/mock-mode";
+import { isVendorCoreLive } from "@/lib/vendor-core";
 
 import { UsersTable } from "../components/UsersTable";
 import { useUsersList } from "../service/queries/user.query";
+import { UsersLivePage } from "./UsersLivePage";
 
 export function UsersPage() {
+	if (isVendorCoreLive() || !isMockEnabled()) return <UsersLivePage />;
+	return <UsersMockOrNestPage />;
+}
+
+function UsersMockOrNestPage() {
 	const t = useTranslations("Users");
 	const { users, isInitialLoading, isRefreshing, isEmpty, error } =
 		useUsersList();
@@ -45,7 +53,7 @@ export function UsersPage() {
 	return (
 		<div className="container space-y-6 py-8">
 			<div>
-				<h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+				<h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
 				<p className="text-sm text-muted-foreground">
 					{t("subtitle")} {isRefreshing ? t("refreshing") : ""}
 				</p>

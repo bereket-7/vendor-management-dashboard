@@ -195,7 +195,7 @@ export function ExportCenterPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -277,7 +277,7 @@ export function ExportCenterPage() {
 				})}
 			</div>
 
-			<section className="space-y-3">
+			<section className="space-y-4">
 				<div>
 					<h2 className="text-base font-semibold tracking-tight">
 						Scheduled exports
@@ -297,7 +297,7 @@ export function ExportCenterPage() {
 									<div className="min-w-0 space-y-1">
 										<div className="flex flex-wrap items-center gap-2">
 											<p className="font-medium">{item.name}</p>
-											<span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+											<span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 												{item.format}
 											</span>
 										</div>

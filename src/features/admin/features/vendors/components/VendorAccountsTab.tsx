@@ -70,27 +70,27 @@ import { cn } from "@/lib/utils";
 function AccountStatusPill({ status }: { status: VendorAccountRow["status"] }) {
 	if (status === "healthy") {
 		return (
-			<span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+			<span className="inline-flex items-center rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
 				Healthy
 			</span>
 		);
 	}
 	if (status === "warning") {
 		return (
-			<span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+			<span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-950 dark:bg-amber-950 dark:text-amber-200">
 				Warning
 			</span>
 		);
 	}
 	if (status === "error") {
 		return (
-			<span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0 text-[10px] font-medium text-red-800 dark:bg-red-950 dark:text-red-200">
+			<span className="inline-flex items-center rounded-md border border-red-200/80 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-900 dark:bg-red-950 dark:text-red-200">
 				Error
 			</span>
 		);
 	}
 	return (
-		<span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0 text-[10px] font-medium text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+		<span className="inline-flex items-center rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-800 dark:bg-slate-900 dark:text-slate-200">
 			Inactive
 		</span>
 	);
@@ -337,61 +337,64 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 	}
 
 	return (
-		<section className="min-w-0 space-y-3">
-			<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+		<section className="min-w-0 space-y-4">
+			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 				{[
 					{
 						label: "Total Linked Accounts",
 						value: String(summary.total),
 						hint: "100%",
 						icon: Building2,
-						tone: "text-primary bg-primary/10",
+						tone: "text-primary bg-primary/15 ring-primary/20",
 					},
 					{
 						label: "Active Accounts",
 						value: String(summary.active),
 						hint: `${summary.activePct}%`,
 						icon: CheckCircle2,
-						tone: "text-emerald-700 bg-emerald-500/10",
+						tone: "text-emerald-700 bg-emerald-500/15 ring-emerald-500/20",
 					},
 					{
 						label: "Accounts w/ Warnings",
 						value: String(summary.warnings),
 						hint: `${summary.warningPct}%`,
 						icon: AlertTriangle,
-						tone: "text-amber-700 bg-amber-500/10",
+						tone: "text-amber-700 bg-amber-500/15 ring-amber-500/20",
 					},
 					{
 						label: "Accounts w/ Errors",
 						value: String(summary.errors),
 						hint: `${summary.errorPct}%`,
 						icon: XCircle,
-						tone: "text-red-700 bg-red-500/10",
+						tone: "text-red-700 bg-red-500/15 ring-red-500/20",
 					},
 					{
 						label: "Files Processed Today",
 						value: String(summary.filesToday),
 						hint: "+12% vs yesterday",
 						icon: FileText,
-						tone: "text-violet-700 bg-violet-500/10",
+						tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
 					},
 					{
 						label: "Last File Received",
 						value: summary.lastFile,
 						hint: summary.lastType,
 						icon: Clock3,
-						tone: "text-zinc-700 bg-zinc-500/10",
+						tone: "text-zinc-700 bg-zinc-500/15 ring-zinc-500/20",
 					},
 				].map((item) => {
 					const Icon = item.icon;
 					return (
-						<div key={item.label} className="rounded-lg bg-card p-2.5">
+						<div
+							key={item.label}
+							className="rounded-xl border border-border bg-card p-3.5 shadow-sm"
+						>
 							<div className="flex items-start justify-between gap-2">
 								<div className="min-w-0">
-									<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 										{item.label}
 									</p>
-									<p className="mt-1 truncate text-sm font-medium tracking-tight">
+									<p className="mt-1.5 truncate text-xl font-semibold tracking-tight text-foreground">
 										{item.value}
 									</p>
 									<p className="mt-1 text-xs text-muted-foreground">
@@ -400,7 +403,7 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 								</div>
 								<div
 									className={cn(
-										"flex size-8 shrink-0 items-center justify-center rounded-lg",
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-black/5 dark:ring-white/10",
 										item.tone
 									)}
 								>
@@ -499,7 +502,7 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 				</Button>
 			</div>
 
-			<div className="overflow-hidden rounded-lg border border-border/50">
+			<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-primary/5">
 				<div className="w-full overflow-x-auto">
 					<Table className="min-w-[1100px] text-xs">
 						<TableHeader>
@@ -662,12 +665,12 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 														<div className="mb-3 flex flex-wrap items-start justify-between gap-3">
 															<div className="min-w-0">
 																<div className="flex flex-wrap items-center gap-2">
-																	<h3 className="text-sm font-medium">
+																	<h3 className="text-sm font-semibold tracking-tight text-foreground">
 																		{account.name}
 																	</h3>
 																	<AccountStatusPill status={account.status} />
 																	{account.active ? (
-																		<span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800">
+																		<span className="inline-flex items-center rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
 																			Active
 																		</span>
 																	) : null}
@@ -745,7 +748,7 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 
 														<div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
 															<div className="min-w-0 space-y-3">
-																<nav className="flex gap-1 border-b border-border/60">
+																<nav className="flex gap-1 border-b border-border">
 																	{(
 																		[
 																			["activity", "Recent File Activity"],
@@ -773,7 +776,7 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 																</nav>
 
 																{accountDetailTab === "activity" ? (
-																	<div className="overflow-hidden rounded-lg border border-border/50 bg-card">
+																	<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-primary/5">
 																		<Table className="text-xs">
 																			<TableHeader>
 																				<TableRow className="hover:bg-transparent">
@@ -848,7 +851,7 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 																) : null}
 
 																{accountDetailTab === "issues" ? (
-																	<div className="rounded-lg border border-border/50 bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+																	<div className="rounded-xl border border-border bg-card shadow-sm px-4 py-8 text-center text-sm text-muted-foreground">
 																		{account.openIssues === 0
 																			? "No open issues for this account."
 																			: `${account.openIssues} open issue(s) require follow-up.`}
@@ -856,7 +859,7 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 																) : null}
 
 																{accountDetailTab === "details" ? (
-																	<div className="grid gap-3 rounded-lg border border-border/50 bg-card p-4 sm:grid-cols-2">
+																	<div className="grid gap-3 rounded-xl border border-border bg-card shadow-sm p-4 sm:grid-cols-2">
 																		{[
 																			["Payer ID", account.payerId],
 																			["Time Zone", account.timezone],
@@ -887,8 +890,8 @@ export function VendorAccountsTab({ accounts }: VendorAccountsTabProps) {
 																) : null}
 															</div>
 
-															<div className="rounded-lg border border-border/50 bg-card p-3">
-																<h4 className="text-sm font-medium">
+															<div className="rounded-xl border border-border bg-card shadow-sm p-3">
+																<h4 className="text-sm font-semibold tracking-tight text-foreground">
 																	Health Trend (Last 7 Days)
 																</h4>
 																<div className="mt-3 h-40">

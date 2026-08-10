@@ -78,6 +78,7 @@ import {
 	formatCurrency,
 	getVendorFile,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
@@ -105,10 +106,7 @@ export function OutboundVendorFilePage() {
 		[programFilter]
 	);
 
-	const vendors = useMemo(
-		() => Array.from(new Set(base.map((f) => f.vendor))).sort(),
-		[base]
-	);
+	const vendors = VENDOR_NAMES;
 
 	const rows = useMemo(() => {
 		const filtered = base.filter((f) => {
@@ -356,7 +354,7 @@ export function OutboundVendorFilePage() {
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<ClaimPageHeader
 				title="Outbound Vendor File"
 				description={`Accepted to Gainwell + denied claims · ${programFilter}`}

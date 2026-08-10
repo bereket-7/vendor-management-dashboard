@@ -110,7 +110,7 @@ export function OnboardingDetailPage() {
 				<StatusBadge status={caseItem.status} />
 			</div>
 			<div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-				<section className="rounded-lg border bg-card">
+				<section className="rounded-xl border border-border bg-card shadow-sm">
 					<div className="border-b px-5 py-4">
 						<h2 className="font-semibold">Required checklist</h2>
 					</div>
@@ -135,7 +135,7 @@ export function OnboardingDetailPage() {
 						))}
 					</ul>
 				</section>
-				<aside className="space-y-4 rounded-lg border bg-card p-5">
+				<aside className="space-y-4 rounded-xl border border-border bg-card shadow-sm p-5">
 					<div>
 						<h2 className="font-semibold">Review decision</h2>
 						<p className="mt-1 text-xs text-muted-foreground">

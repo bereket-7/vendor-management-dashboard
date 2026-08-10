@@ -72,7 +72,7 @@ export function InvoiceDetailPage() {
 					</Button>
 				)}
 			</div>
-			<section className="rounded-lg border bg-card p-6">
+			<section className="rounded-xl border border-border bg-card shadow-sm p-6">
 				<h2 className="mb-5 font-semibold">Invoice details</h2>
 				<dl className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 					{items.map(([label, value]) => (

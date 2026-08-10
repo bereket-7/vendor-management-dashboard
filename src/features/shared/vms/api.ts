@@ -1,7 +1,13 @@
-import { vendorCoreEndpoints } from "@/lib/vendor-core/api";
-import { vendorCoreFetch } from "@/lib/vendor-core/client";
-import type { PaginatedResult } from "@/lib/vendor-core/types";
+import { apiClient } from "@/lib/api/client";
+import { isMockEnabled, isNestApiEnabled, withMockOrRemote } from "@/lib/mock-mode";
+import {
+	VendorCoreApiError,
+	getStoredAccessToken,
+	isVendorCoreLive,
+} from "@/lib/vendor-core/client";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 
+import { vendorDtoToModel } from "./map-vendor-core";
 import { CURRENT_VENDOR_ID, vmsStore } from "./mock-store";
 import {
 	mapDjangoCategory,
@@ -10,78 +16,217 @@ import {
 	vendorToCreatePayload,
 } from "./mappers";
 import type {
+	ActivityEventModel,
+	ApprovalRequestModel,
 	BidModel,
+	CertificateModel,
 	ContractModel,
 	DocumentModel,
 	InvoiceModel,
+	NotificationModel,
 	OnboardingCaseModel,
 	PurchaseOrderModel,
 	RfxModel,
+	ScorecardModel,
+	VendorCategoryModel,
 	VendorModel,
+	VendorTeamMember,
 } from "./types";
-import { isVmsMockEnabled } from "./use-mock";
+
+/** NestJS admin paths — see docs/api-contracts/vms.md */
+const vmsPaths = {
+	vendors: "/api/admin/vendors/",
+	vendor: (id: string) => `/api/admin/vendors/${id}/`,
+	invite: "/api/admin/vendors/invite/",
+	categories: "/api/admin/categories/",
+	onboarding: "/api/admin/onboarding/",
+	onboardingDetail: (id: string) => `/api/admin/onboarding/${id}/`,
+	documents: "/api/admin/documents/",
+	document: (id: string) => `/api/admin/documents/${id}/`,
+	certificates: "/api/admin/certificates/",
+	contracts: "/api/admin/contracts/",
+	contract: (id: string) => `/api/admin/contracts/${id}/`,
+	rfx: "/api/admin/rfx/",
+	rfxDetail: (id: string) => `/api/admin/rfx/${id}/`,
+	rfxBids: (id: string) => `/api/admin/rfx/${id}/bids/`,
+	bids: "/api/admin/bids/",
+	purchaseOrders: "/api/admin/purchase-orders/",
+	purchaseOrder: (id: string) => `/api/admin/purchase-orders/${id}/`,
+	invoices: "/api/admin/invoices/",
+	invoice: (id: string) => `/api/admin/invoices/${id}/`,
+	approvals: "/api/admin/approvals/",
+	approval: (id: string) => `/api/admin/approvals/${id}/`,
+	scorecards: "/api/admin/scorecards/",
+	activities: "/api/admin/activities/",
+	notifications: "/api/admin/notifications/",
+	notificationRead: (id: string) => `/api/admin/notifications/${id}/read/`,
+	team: "/api/admin/vendor/team/",
+	me: "/api/admin/vendor/me/",
+} as const;
 
 async function mockDelay<T>(value: T): Promise<T> {
 	await new Promise((r) => setTimeout(r, 80));
 	return value;
 }
 
-async function remoteListVendors(): Promise<VendorModel[]> {
-	const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-		vendorCoreEndpoints.vendors
-	);
-	return unwrapPage(page).map((row) => mapDjangoVendor(row as never));
+async function unwrapList<T>(
+	res: T[] | { results?: T[] | null }
+): Promise<T[]> {
+	return Array.isArray(res) ? res : (res.results ?? []);
 }
 
-async function remoteGetVendor(id: string): Promise<VendorModel> {
-	const row = await vendorCoreFetch<Record<string, unknown>>(
-		vendorCoreEndpoints.vendorDetail(id)
-	);
-	return mapDjangoVendor(row as never);
+async function listVendorsFromVendorCore(): Promise<VendorModel[]> {
+	if (!getStoredAccessToken()) return [];
+	try {
+		const page = await vendorCoreApi.listVendors();
+		return (page.results ?? []).map(vendorDtoToModel);
+	} catch (err) {
+		if (
+			err instanceof VendorCoreApiError &&
+			(err.status === 401 || err.status === 403)
+		) {
+			return [];
+		}
+		throw err;
+	}
+}
+
+async function getVendorFromVendorCore(id: string): Promise<VendorModel> {
+	const dto = await vendorCoreApi.getVendor(id);
+	return vendorDtoToModel(dto);
 }
 
 export const vmsApi = {
 	async listVendors() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listVendors());
-		return remoteListVendors();
+		if (isMockEnabled()) return mockDelay(vmsStore.listVendors());
+		if (isVendorCoreLive()) return listVendorsFromVendorCore();
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel[] | { results?: VendorModel[] }>(
+				vmsPaths.vendors
+			).then(unwrapList);
+		}
+		return [];
 	},
 	async getVendor(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getVendor(id));
-		return remoteGetVendor(id);
+		if (isMockEnabled()) return mockDelay(vmsStore.getVendor(id));
+		if (isVendorCoreLive()) return getVendorFromVendorCore(id);
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel>(vmsPaths.vendor(id));
+		}
+		throw new Error("Vendor API unavailable");
 	},
 	async createVendor(
 		input: Parameters<typeof vmsStore.createVendor>[0]
 	): Promise<VendorModel> {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.createVendor(input));
-		const created = await vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.vendors,
-			{
+		if (isMockEnabled()) return mockDelay(vmsStore.createVendor(input));
+		if (isVendorCoreLive()) {
+			const code =
+				input.tags?.[0]?.trim() ||
+				`VND-${Date.now().toString().slice(-8)}`;
+			const dto = await vendorCoreApi.createVendor({
+				vendor_code: code,
+				legal_name: input.legalName,
+				trade_name: input.tradeName ?? undefined,
+				country: input.country || "US",
+				city: input.city || "Unknown",
+				status:
+					input.status === "offboarded"
+						? "terminated"
+						: input.status === "invited" || input.status === "under_review"
+							? "prospect"
+							: input.status === "active" ||
+								  input.status === "onboarding" ||
+								  input.status === "prospect" ||
+								  input.status === "suspended"
+								? input.status
+								: "active",
+				metadata: {
+					...(input.categories?.length
+						? { vendor_type: input.categories[0] }
+						: {}),
+					...(input.description ? { description: input.description } : {}),
+				},
+			});
+			return vendorDtoToModel(dto);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel>(vmsPaths.vendors, {
 				method: "POST",
-				body: JSON.stringify(vendorToCreatePayload(input)),
-			}
-		);
-		return mapDjangoVendor(created as never);
+				body: JSON.stringify(input),
+			});
+		}
+		throw new Error("Vendor create unavailable");
 	},
 	async updateVendor(id: string, patch: Partial<VendorModel>) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.updateVendor(id, patch));
-		const body: Record<string, unknown> = {};
-		if (patch.legalName !== undefined) body.legal_name = patch.legalName;
-		if (patch.tradeName !== undefined) body.trade_name = patch.tradeName;
-		if (patch.status !== undefined) body.status = patch.status;
-		if (patch.country !== undefined) body.country = patch.country;
-		if (patch.city !== undefined) body.city = patch.city;
-		const updated = await vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.vendorDetail(id),
-			{ method: "PATCH", body: JSON.stringify(body) }
-		);
-		return mapDjangoVendor(updated as never);
+		if (isMockEnabled()) return mockDelay(vmsStore.updateVendor(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.legalName !== undefined) body.legal_name = patch.legalName;
+			if (patch.tradeName !== undefined) body.trade_name = patch.tradeName;
+			if (patch.country !== undefined) body.country = patch.country;
+			if (patch.city !== undefined) body.city = patch.city;
+			if (patch.status !== undefined) {
+				body.status =
+					patch.status === "offboarded"
+						? "terminated"
+						: patch.status === "invited" || patch.status === "under_review"
+							? "prospect"
+							: patch.status === "active" ||
+								  patch.status === "onboarding" ||
+								  patch.status === "prospect" ||
+								  patch.status === "suspended"
+								? patch.status
+								: "prospect";
+			}
+			const dto = await vendorCoreApi.updateVendor(id, body);
+			return vendorDtoToModel(dto);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel>(vmsPaths.vendor(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			});
+		}
+		throw new Error("Vendor update unavailable");
+	},
+	async deleteVendor(id: string) {
+		if (isMockEnabled()) {
+			await mockDelay(undefined);
+			return;
+		}
+		if (isVendorCoreLive()) {
+			await vendorCoreApi.deleteVendor(id);
+			return;
+		}
+		throw new Error("Vendor delete unavailable");
+	},
+	async hardDeleteVendor(id: string) {
+		if (isMockEnabled()) {
+			await mockDelay(undefined);
+			return;
+		}
+		if (isVendorCoreLive()) {
+			await vendorCoreApi.hardDeleteVendor(id);
+			return;
+		}
+		throw new Error("Vendor hard delete unavailable");
+	},
+	async restoreVendor(id: string) {
+		if (isMockEnabled()) {
+			return mockDelay(vmsStore.getVendor(id));
+		}
+		if (isVendorCoreLive()) {
+			const dto = await vendorCoreApi.restoreVendor(id);
+			return vendorDtoToModel(dto);
+		}
+		throw new Error("Vendor restore unavailable");
 	},
 	async inviteVendor(data: {
 		legalName: string;
 		email: string;
 		categories: string[];
 	}) {
-		if (isVmsMockEnabled()) {
+		if (isMockEnabled()) {
 			return mockDelay(
 				vmsStore.createVendor({
 					legalName: data.legalName,
@@ -108,265 +253,370 @@ export const vmsApi = {
 				})
 			);
 		}
-		const created = await vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.vendorInvite,
-			{
+		if (isVendorCoreLive()) {
+			return vmsApi.createVendor({
+				legalName: data.legalName,
+				tradeName: null,
+				status: "prospect",
+				categories: data.categories,
+				tags: [],
+				country: "US",
+				city: "Unknown",
+				taxId: null,
+				website: null,
+				description: null,
+				riskLevel: "medium",
+				contacts: [
+					{
+						id: `c-${Date.now()}`,
+						name: data.email.split("@")[0] ?? data.email,
+						email: data.email,
+						phone: null,
+						role: "Primary",
+						isPrimary: true,
+					},
+				],
+			});
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel>(vmsPaths.invite, {
 				method: "POST",
-				body: JSON.stringify({
-					legal_name: data.legalName,
-					email: data.email,
-					categories: data.categories,
-				}),
-			}
-		);
-		return mapDjangoVendor(created as never);
+				body: JSON.stringify(data),
+			});
+		}
+		throw new Error("Vendor invite unavailable");
 	},
 	async listCategories() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listCategories());
-		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.categories
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listCategories()),
+			() =>
+				apiClient<VendorCategoryModel[] | { results?: VendorCategoryModel[] }>(
+					vmsPaths.categories
+				).then(unwrapList)
 		);
-		return unwrapPage(page).map((row) => mapDjangoCategory(row as never));
 	},
 	async listOnboarding() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listOnboarding());
-		const page = await vendorCoreFetch<PaginatedResult<OnboardingCaseModel>>(
-			vendorCoreEndpoints.onboarding
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listOnboarding()),
+			() =>
+				apiClient<OnboardingCaseModel[] | { results?: OnboardingCaseModel[] }>(
+					vmsPaths.onboarding
+				).then(unwrapList)
 		);
-		return unwrapPage(page);
 	},
 	async getOnboarding(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getOnboarding(id));
-		return vendorCoreFetch<OnboardingCaseModel>(
-			vendorCoreEndpoints.onboardingDetail(id)
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getOnboarding(id)),
+			() => apiClient<OnboardingCaseModel>(vmsPaths.onboardingDetail(id))
 		);
 	},
 	async updateOnboarding(id: string, patch: Partial<OnboardingCaseModel>) {
-		if (isVmsMockEnabled())
-			return mockDelay(vmsStore.updateOnboarding(id, patch));
-		return vendorCoreFetch<OnboardingCaseModel>(
-			vendorCoreEndpoints.onboardingDetail(id),
-			{ method: "PATCH", body: JSON.stringify(patch) }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updateOnboarding(id, patch)),
+			() =>
+				apiClient<OnboardingCaseModel>(vmsPaths.onboardingDetail(id), {
+					method: "PATCH",
+					body: JSON.stringify(patch),
+				})
 		);
 	},
 	async listDocuments(vendorId?: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listDocuments(vendorId));
-		const page = await vendorCoreFetch<PaginatedResult<DocumentModel>>(
-			vendorCoreEndpoints.documents,
-			{ params: vendorId ? { vendor_id: vendorId } : undefined }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listDocuments(vendorId)),
+			() =>
+				apiClient<DocumentModel[] | { results?: DocumentModel[] }>(
+					vmsPaths.documents,
+					vendorId ? { params: { vendorId } } : undefined
+				).then(unwrapList)
 		);
-		return unwrapPage(page);
 	},
 	async getDocument(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getDocument(id));
-		return vendorCoreFetch<DocumentModel>(vendorCoreEndpoints.documentDetail(id));
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getDocument(id)),
+			() => apiClient<DocumentModel>(vmsPaths.document(id))
+		);
 	},
 	async updateDocument(id: string, patch: Partial<DocumentModel>) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.updateDocument(id, patch));
-		return vendorCoreFetch<DocumentModel>(
-			vendorCoreEndpoints.documentDetail(id),
-			{ method: "PATCH", body: JSON.stringify(patch) }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updateDocument(id, patch)),
+			() =>
+				apiClient<DocumentModel>(vmsPaths.document(id), {
+					method: "PATCH",
+					body: JSON.stringify(patch),
+				})
 		);
 	},
 	async addDocument(doc: Parameters<typeof vmsStore.addDocument>[0]) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.addDocument(doc));
-		return vendorCoreFetch<DocumentModel>(vendorCoreEndpoints.documents, {
-			method: "POST",
-			body: JSON.stringify(doc),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.addDocument(doc)),
+			() =>
+				apiClient<DocumentModel>(vmsPaths.documents, {
+					method: "POST",
+					body: JSON.stringify(doc),
+				})
+		);
 	},
 	async listCertificates() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listCertificates());
-		const page = await vendorCoreFetch<PaginatedResult<unknown>>(
-			vendorCoreEndpoints.certificates
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listCertificates()),
+			() =>
+				apiClient<CertificateModel[] | { results?: CertificateModel[] }>(
+					vmsPaths.certificates
+				).then(unwrapList)
 		);
-		return unwrapPage(page) as ReturnType<typeof vmsStore.listCertificates>;
 	},
 	async listContracts(vendorId?: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listContracts(vendorId));
-		const page = await vendorCoreFetch<PaginatedResult<ContractModel>>(
-			vendorCoreEndpoints.contracts,
-			{ params: vendorId ? { vendor_id: vendorId } : undefined }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listContracts(vendorId)),
+			() =>
+				apiClient<ContractModel[] | { results?: ContractModel[] }>(
+					vmsPaths.contracts,
+					vendorId ? { params: { vendorId } } : undefined
+				).then(unwrapList)
 		);
-		return unwrapPage(page);
 	},
 	async getContract(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getContract(id));
-		return vendorCoreFetch<ContractModel>(
-			vendorCoreEndpoints.contractDetail(id)
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getContract(id)),
+			() => apiClient<ContractModel>(vmsPaths.contract(id))
 		);
 	},
 	async createContract(input: Omit<ContractModel, "id" | "updatedAt">) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.createContract(input));
-		return vendorCoreFetch<ContractModel>(vendorCoreEndpoints.contracts, {
-			method: "POST",
-			body: JSON.stringify(input),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.createContract(input)),
+			() =>
+				apiClient<ContractModel>(vmsPaths.contracts, {
+					method: "POST",
+					body: JSON.stringify(input),
+				})
+		);
 	},
 	async updateContract(id: string, patch: Partial<ContractModel>) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.updateContract(id, patch));
-		return vendorCoreFetch<ContractModel>(
-			vendorCoreEndpoints.contractDetail(id),
-			{ method: "PATCH", body: JSON.stringify(patch) }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updateContract(id, patch)),
+			() =>
+				apiClient<ContractModel>(vmsPaths.contract(id), {
+					method: "PATCH",
+					body: JSON.stringify(patch),
+				})
 		);
 	},
 	async listRfx() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listRfx());
-		const page = await vendorCoreFetch<PaginatedResult<RfxModel>>(
-			vendorCoreEndpoints.rfx
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listRfx()),
+			() =>
+				apiClient<RfxModel[] | { results?: RfxModel[] }>(vmsPaths.rfx).then(
+					unwrapList
+				)
 		);
-		return unwrapPage(page);
 	},
 	async getRfx(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getRfx(id));
-		return vendorCoreFetch<RfxModel>(vendorCoreEndpoints.rfxDetail(id));
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getRfx(id)),
+			() => apiClient<RfxModel>(vmsPaths.rfxDetail(id))
+		);
 	},
 	async createRfx(input: Omit<RfxModel, "id" | "updatedAt" | "bidCount">) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.createRfx(input));
-		return vendorCoreFetch<RfxModel>(vendorCoreEndpoints.rfx, {
-			method: "POST",
-			body: JSON.stringify(input),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.createRfx(input)),
+			() =>
+				apiClient<RfxModel>(vmsPaths.rfx, {
+					method: "POST",
+					body: JSON.stringify(input),
+				})
+		);
 	},
 	async updateRfx(id: string, patch: Partial<RfxModel>) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.updateRfx(id, patch));
-		return vendorCoreFetch<RfxModel>(vendorCoreEndpoints.rfxDetail(id), {
-			method: "PATCH",
-			body: JSON.stringify(patch),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updateRfx(id, patch)),
+			() =>
+				apiClient<RfxModel>(vmsPaths.rfxDetail(id), {
+					method: "PATCH",
+					body: JSON.stringify(patch),
+				})
+		);
 	},
 	async listBids(rfxId?: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listBids(rfxId));
-		if (!rfxId) return [];
-		const page = await vendorCoreFetch<PaginatedResult<BidModel>>(
-			vendorCoreEndpoints.rfxBids(rfxId)
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listBids(rfxId)),
+			() =>
+				rfxId
+					? apiClient<BidModel[] | { results?: BidModel[] }>(
+							vmsPaths.rfxBids(rfxId)
+						).then(unwrapList)
+					: apiClient<BidModel[] | { results?: BidModel[] }>(
+							vmsPaths.bids
+						).then(unwrapList)
 		);
-		return unwrapPage(page);
 	},
 	async submitBid(input: Omit<BidModel, "id" | "submittedAt" | "status">) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.submitBid(input));
-		return vendorCoreFetch<BidModel>(vendorCoreEndpoints.rfxBids(input.rfxId), {
-			method: "POST",
-			body: JSON.stringify(input),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.submitBid(input)),
+			() =>
+				apiClient<BidModel>(vmsPaths.rfxBids(input.rfxId), {
+					method: "POST",
+					body: JSON.stringify(input),
+				})
+		);
 	},
 	async listPurchaseOrders(vendorId?: string) {
-		if (isVmsMockEnabled())
-			return mockDelay(vmsStore.listPurchaseOrders(vendorId));
-		const page = await vendorCoreFetch<PaginatedResult<PurchaseOrderModel>>(
-			vendorCoreEndpoints.purchaseOrders,
-			{ params: vendorId ? { vendor_id: vendorId } : undefined }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listPurchaseOrders(vendorId)),
+			() =>
+				apiClient<PurchaseOrderModel[] | { results?: PurchaseOrderModel[] }>(
+					vmsPaths.purchaseOrders,
+					{
+						params: vendorId ? { vendorId } : undefined,
+					}
+				).then(unwrapList)
 		);
-		return unwrapPage(page);
 	},
 	async getPurchaseOrder(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getPurchaseOrder(id));
-		return vendorCoreFetch<PurchaseOrderModel>(
-			vendorCoreEndpoints.purchaseOrderDetail(id)
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getPurchaseOrder(id)),
+			() => apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrder(id))
 		);
 	},
 	async createPurchaseOrder(
 		input: Omit<PurchaseOrderModel, "id" | "updatedAt" | "acknowledgedAt">
 	) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.createPurchaseOrder(input));
-		return vendorCoreFetch<PurchaseOrderModel>(
-			vendorCoreEndpoints.purchaseOrders,
-			{ method: "POST", body: JSON.stringify(input) }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.createPurchaseOrder(input)),
+			() =>
+				apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrders, {
+					method: "POST",
+					body: JSON.stringify(input),
+				})
 		);
 	},
 	async updatePurchaseOrder(id: string, patch: Partial<PurchaseOrderModel>) {
-		if (isVmsMockEnabled())
-			return mockDelay(vmsStore.updatePurchaseOrder(id, patch));
-		return vendorCoreFetch<PurchaseOrderModel>(
-			vendorCoreEndpoints.purchaseOrderDetail(id),
-			{ method: "PATCH", body: JSON.stringify(patch) }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updatePurchaseOrder(id, patch)),
+			() =>
+				apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrder(id), {
+					method: "PATCH",
+					body: JSON.stringify(patch),
+				})
 		);
 	},
 	async listInvoices(vendorId?: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listInvoices(vendorId));
-		const page = await vendorCoreFetch<PaginatedResult<InvoiceModel>>(
-			vendorCoreEndpoints.invoices,
-			{ params: vendorId ? { vendor_id: vendorId } : undefined }
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listInvoices(vendorId)),
+			() =>
+				apiClient<InvoiceModel[] | { results?: InvoiceModel[] }>(
+					vmsPaths.invoices,
+					vendorId ? { params: { vendorId } } : undefined
+				).then(unwrapList)
 		);
-		return unwrapPage(page);
 	},
 	async getInvoice(id: string) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.getInvoice(id));
-		return vendorCoreFetch<InvoiceModel>(vendorCoreEndpoints.invoiceDetail(id));
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getInvoice(id)),
+			() => apiClient<InvoiceModel>(vmsPaths.invoice(id))
+		);
 	},
 	async createInvoice(input: Omit<InvoiceModel, "id" | "updatedAt">) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.createInvoice(input));
-		return vendorCoreFetch<InvoiceModel>(vendorCoreEndpoints.invoices, {
-			method: "POST",
-			body: JSON.stringify(input),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.createInvoice(input)),
+			() =>
+				apiClient<InvoiceModel>(vmsPaths.invoices, {
+					method: "POST",
+					body: JSON.stringify(input),
+				})
+		);
 	},
 	async updateInvoice(id: string, patch: Partial<InvoiceModel>) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.updateInvoice(id, patch));
-		return vendorCoreFetch<InvoiceModel>(vendorCoreEndpoints.invoiceDetail(id), {
-			method: "PATCH",
-			body: JSON.stringify(patch),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updateInvoice(id, patch)),
+			() =>
+				apiClient<InvoiceModel>(vmsPaths.invoice(id), {
+					method: "PATCH",
+					body: JSON.stringify(patch),
+				})
+		);
 	},
 	async listApprovals() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listApprovals());
-		const page = await vendorCoreFetch<PaginatedResult<unknown>>(
-			vendorCoreEndpoints.approvals
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listApprovals()),
+			() =>
+				apiClient<
+					ApprovalRequestModel[] | { results?: ApprovalRequestModel[] }
+				>(vmsPaths.approvals).then(unwrapList)
 		);
-		return unwrapPage(page) as ReturnType<typeof vmsStore.listApprovals>;
 	},
 	async updateApproval(
 		id: string,
 		status: "approved" | "rejected" | "changes_requested" | "pending"
 	) {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.updateApproval(id, status));
-		return vendorCoreFetch(vendorCoreEndpoints.approvalDetail(id), {
-			method: "PATCH",
-			body: JSON.stringify({ status }),
-		});
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.updateApproval(id, status)),
+			() =>
+				apiClient<ApprovalRequestModel>(vmsPaths.approval(id), {
+					method: "PATCH",
+					body: JSON.stringify({ status }),
+				})
+		);
 	},
 	async listScorecards() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listScorecards());
-		const page = await vendorCoreFetch<PaginatedResult<unknown>>(
-			vendorCoreEndpoints.scorecards
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listScorecards()),
+			() =>
+				apiClient<ScorecardModel[] | { results?: ScorecardModel[] }>(
+					vmsPaths.scorecards
+				).then(unwrapList)
 		);
-		return unwrapPage(page) as ReturnType<typeof vmsStore.listScorecards>;
 	},
 	async listActivities(vendorId?: string) {
-		return mockDelay(vmsStore.listActivities(vendorId));
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listActivities(vendorId)),
+			() =>
+				apiClient<ActivityEventModel[] | { results?: ActivityEventModel[] }>(
+					vmsPaths.activities,
+					{
+						params: vendorId ? { vendorId } : undefined,
+					}
+				).then(unwrapList)
+		);
 	},
 	async listNotifications() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listNotifications());
-		const page = await vendorCoreFetch<PaginatedResult<unknown>>(
-			vendorCoreEndpoints.notifications
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listNotifications()),
+			() =>
+				apiClient<NotificationModel[] | { results?: NotificationModel[] }>(
+					vmsPaths.notifications
+				).then(unwrapList)
 		);
-		return unwrapPage(page) as ReturnType<typeof vmsStore.listNotifications>;
 	},
 	async markNotificationRead(id: string) {
-		if (isVmsMockEnabled()) {
-			vmsStore.markNotificationRead(id);
-			return mockDelay(true);
-		}
-		await vendorCoreFetch(`${vendorCoreEndpoints.notifications}${id}/`, {
-			method: "PATCH",
-			body: JSON.stringify({ read: true }),
-		});
-		return true;
+		return withMockOrRemote(
+			() => {
+				vmsStore.markNotificationRead(id);
+				return mockDelay(true);
+			},
+			() =>
+				apiClient<boolean>(vmsPaths.notificationRead(id), {
+					method: "POST",
+				})
+		);
 	},
 	async listTeam() {
-		if (isVmsMockEnabled()) return mockDelay(vmsStore.listTeam());
-		const page = await vendorCoreFetch<PaginatedResult<unknown>>(
-			vendorCoreEndpoints.vendorTeam
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listTeam()),
+			() =>
+				apiClient<VendorTeamMember[] | { results?: VendorTeamMember[] }>(
+					vmsPaths.team
+				).then(unwrapList)
 		);
-		return unwrapPage(page) as ReturnType<typeof vmsStore.listTeam>;
 	},
 	async getCurrentVendor() {
-		if (isVmsMockEnabled())
-			return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
-		const row = await vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.vendorMe
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID)),
+			() => apiClient<VendorModel>(vmsPaths.me)
 		);
-		return mapDjangoVendor(row as never);
 	},
 	currentVendorId: CURRENT_VENDOR_ID,
+	/** Whether this client is serving mock fixtures. */
+	get isMock() {
+		return isMockEnabled();
+	},
 };

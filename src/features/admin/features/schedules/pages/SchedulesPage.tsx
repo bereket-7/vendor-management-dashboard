@@ -37,7 +37,9 @@ import {
 	type ProcessStatus,
 	displayRunStatus,
 } from "@/features/admin/features/file-management/mock-data";
+import { SchedulesLivePage } from "@/features/admin/features/schedules/pages/SchedulesLivePage";
 import { Link } from "@/i18n/navigation";
+import { isVendorCoreLive } from "@/lib/vendor-core";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -67,6 +69,11 @@ function statusTone(status: string) {
 }
 
 export function SchedulesPage() {
+	if (isVendorCoreLive()) return <SchedulesLivePage />;
+	return <SchedulesMockPage />;
+}
+
+function SchedulesMockPage() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
 	const [search, setSearch] = useState("");
 	const [vendor, setVendor] = useState("all");
@@ -161,7 +168,7 @@ export function SchedulesPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">

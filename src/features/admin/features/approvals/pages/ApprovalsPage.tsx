@@ -91,9 +91,9 @@ function ApprovalSection({
 	actions?: (item: ApprovalRequestModel) => React.ReactNode;
 }) {
 	return (
-		<section className="space-y-3">
+		<section className="space-y-4">
 			<h2 className="text-sm font-semibold">{title}</h2>
-			<div className="divide-y rounded-lg border bg-card">
+			<div className="divide-y rounded-xl border border-border bg-card shadow-sm">
 				{items.map((item) => (
 					<div
 						key={item.id}

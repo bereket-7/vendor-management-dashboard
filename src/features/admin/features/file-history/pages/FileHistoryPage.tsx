@@ -34,27 +34,55 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { inboundFilesToRuns } from "@/features/admin/features/dashboard/live-file-runs";
 import {
 	FILE_RUNS,
 	displayRunStatus,
 } from "@/features/admin/features/file-management/mock-data";
 import { Link } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import {
+	useInvalidateVendorCore,
+	useVendorCoreInboundFiles,
+	useVendorCoreVendors,
+} from "@/lib/vendor-core/hooks";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#94a3b8"];
 
 export function FileHistoryPage() {
+	if (!isMockEnabled()) {
+		return (
+			<VendorCoreGate title="File history">
+				<FileHistoryDashboard />
+			</VendorCoreGate>
+		);
+	}
+	return <FileHistoryDashboard />;
+}
+
+function FileHistoryDashboard() {
+	const useLive = !isMockEnabled();
+	const invalidate = useInvalidateVendorCore();
+	const filesQ = useVendorCoreInboundFiles();
+	const vendorsQ = useVendorCoreVendors();
 	const programFilter = useAdminModuleStore((s) => s.fileType);
 	const [search, setSearch] = useState("");
 	const [vendor, setVendor] = useState("all");
 	const [status, setStatus] = useState("all");
 	const [direction, setDirection] = useState("all");
 
-	const programRuns = useMemo(
-		() => FILE_RUNS.filter((run) => run.program === programFilter),
-		[programFilter]
+	const nameById = useMemo(
+		() => new Map((vendorsQ.data ?? []).map((v) => [v.id, v.name])),
+		[vendorsQ.data]
 	);
+
+	const programRuns = useMemo(() => {
+		if (useLive) return inboundFilesToRuns(filesQ.data ?? [], nameById);
+		return FILE_RUNS.filter((run) => run.program === programFilter);
+	}, [useLive, filesQ.data, nameById, programFilter]);
 
 	const vendors = useMemo(
 		() => Array.from(new Set(programRuns.map((run) => run.vendor))).sort(),
@@ -133,8 +161,12 @@ export function FileHistoryPage() {
 		setDirection("all");
 	}
 
+	async function handleRefresh() {
+		if (useLive) await invalidate();
+	}
+
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -148,7 +180,12 @@ export function FileHistoryPage() {
 					<Button asChild size="sm" className="h-9">
 						<Link href="/admin/file-monitoring">Open File Monitoring</Link>
 					</Button>
-					<Button variant="outline" size="sm" className="h-9">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9"
+						onClick={() => void handleRefresh()}
+					>
 						<RefreshCw className="mr-1.5 size-3.5" />
 						Refresh
 					</Button>

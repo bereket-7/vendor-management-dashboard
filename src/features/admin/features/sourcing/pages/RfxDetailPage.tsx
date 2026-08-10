@@ -114,7 +114,7 @@ export function RfxDetailPage() {
 					</Button>
 				)}
 			</div>
-			<section className="grid gap-5 rounded-lg border bg-card p-6 sm:grid-cols-2 lg:grid-cols-4">
+			<section className="grid gap-5 rounded-xl border border-border bg-card shadow-sm p-6 sm:grid-cols-2 lg:grid-cols-4">
 				<div>
 					<p className="text-xs uppercase text-muted-foreground">Type</p>
 					<p className="font-medium">{rfx.type}</p>
@@ -180,7 +180,7 @@ export function RfxDetailPage() {
 						</div>
 					)}
 				</div>
-				<div className="rounded-lg border bg-card">
+				<div className="rounded-xl border border-border bg-card shadow-sm">
 					<Table>
 						<TableHeader>
 							<TableRow>

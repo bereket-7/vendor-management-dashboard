@@ -217,7 +217,7 @@ export function DocumentsPage() {
 
 	if (isLoading) {
 		return (
-			<div className="space-y-6">
+			<div className="space-y-4">
 				<Skeleton className="h-10 w-72" />
 				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 					{Array.from({ length: 4 }).map((_, i) => (
@@ -230,7 +230,7 @@ export function DocumentsPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -435,7 +435,7 @@ export function DocumentsPage() {
 							Expiry horizon and parsing status across the repository
 						</CardDescription>
 					</CardHeader>
-					<CardContent className="space-y-3">
+					<CardContent className="space-y-4">
 						<div className="grid grid-cols-3 gap-2">
 							{[
 								{
@@ -464,7 +464,7 @@ export function DocumentsPage() {
 									key={bucket.label}
 									className="rounded-lg border border-border/50 bg-background/60 p-2.5 text-center"
 								>
-									<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 										{bucket.label}
 									</p>
 									<p className="mt-1 text-lg font-semibold tabular-nums">

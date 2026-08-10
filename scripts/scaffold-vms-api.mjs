@@ -27,8 +27,11 @@ export default function Page() {
 // ── Shared API helper pattern factory ─────────────────────────────
 write(
 	"src/features/shared/vms/use-mock.ts",
-	`export function isVmsMockEnabled() {
-	return process.env.NEXT_PUBLIC_USE_MOCK_VMS !== "false";
+	`import { isMockEnabled } from "@/lib/mock-mode";
+
+/** @deprecated Prefer \`isMockEnabled\` from \`@/lib/mock-mode\`. */
+export function isVmsMockEnabled() {
+	return isMockEnabled();
 }
 `
 );

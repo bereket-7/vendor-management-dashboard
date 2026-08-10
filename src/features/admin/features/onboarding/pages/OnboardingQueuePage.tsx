@@ -83,7 +83,7 @@ export function OnboardingQueuePage() {
 			{error ? (
 				<p className="text-sm text-destructive">{error.message}</p>
 			) : (
-				<div className="divide-y rounded-lg border bg-card">
+				<div className="divide-y rounded-xl border border-border bg-card shadow-sm">
 					{cases.map((item) => (
 						<div
 							key={item.id}

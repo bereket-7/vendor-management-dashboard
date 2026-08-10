@@ -404,46 +404,48 @@ export function VendorNotesTab({
 
 	return (
 		<section className="min-w-0 space-y-4">
-			<div className="space-y-3">
-				<h2 className="text-sm font-medium">Notes Summary</h2>
+			<div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+				<h2 className="text-lg font-semibold tracking-tight text-foreground">
+					Notes Summary
+				</h2>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 					{[
 						{
 							label: "Total Notes",
 							value: summary.total,
 							icon: FileText,
-							tone: "text-sky-700 bg-sky-500/10",
+							tone: "text-sky-700 bg-sky-500/15 ring-sky-500/20",
 						},
 						{
 							label: "Open Notes",
 							value: summary.open,
 							icon: FileText,
-							tone: "text-emerald-700 bg-emerald-500/10",
+							tone: "text-emerald-700 bg-emerald-500/15 ring-emerald-500/20",
 						},
 						{
 							label: "Action Items",
 							value: summary.actionItems,
 							icon: Flag,
-							tone: "text-amber-700 bg-amber-500/10",
+							tone: "text-amber-700 bg-amber-500/15 ring-amber-500/20",
 						},
 						{
 							label: "With Attachments",
 							value: summary.withAttachments,
 							icon: Paperclip,
-							tone: "text-violet-700 bg-violet-500/10",
+							tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
 						},
 						{
 							label: "Archived Notes",
 							value: summary.archived,
 							icon: Archive,
-							tone: "text-zinc-700 bg-zinc-500/10",
+							tone: "text-zinc-700 bg-zinc-500/15 ring-zinc-500/20",
 						},
 					].map((item) => {
 						const Icon = item.icon;
 						return (
 							<div
 								key={item.label}
-								className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-4"
+								className="flex items-center gap-3 rounded-xl border border-border bg-card shadow-sm p-4"
 							>
 								<div
 									className={cn(
@@ -457,7 +459,7 @@ export function VendorNotesTab({
 									<p className="text-2xl font-semibold tabular-nums tracking-tight">
 										{item.value}
 									</p>
-									<p className="mt-0.5 text-xs text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
 										{item.label}
 									</p>
 								</div>
@@ -468,8 +470,8 @@ export function VendorNotesTab({
 			</div>
 
 			<div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-				<div className="overflow-hidden rounded-lg border border-border/60 bg-card">
-					<div className="flex flex-wrap items-center gap-2 border-b border-border/50 p-3">
+				<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+					<div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-500/10 p-3.5">
 						<div className="relative min-w-[180px] flex-1">
 							<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 							<Input
@@ -684,7 +686,7 @@ export function VendorNotesTab({
 						</Table>
 					</div>
 
-					<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 px-4 py-3 text-sm text-muted-foreground">
+					<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground">
 						<p>
 							Showing{" "}
 							{filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1} to{" "}
@@ -749,12 +751,14 @@ export function VendorNotesTab({
 					</div>
 				</div>
 
-				<aside className="h-fit rounded-lg border border-border/60 bg-card xl:sticky xl:top-4">
+				<aside className="h-fit rounded-xl border border-border bg-card shadow-sm xl:sticky xl:top-4">
 					{selected ? (
 						<>
-							<div className="flex items-start justify-between gap-2 border-b border-border/50 px-4 py-3">
+							<div className="flex items-start justify-between gap-2 border-b border-border bg-violet-500/10 px-4 py-3.5">
 								<div>
-									<p className="text-sm font-medium">Note Details</p>
+									<p className="text-sm font-semibold tracking-tight text-foreground">
+										Note Details
+									</p>
 									<div className="mt-1.5 flex flex-wrap items-center gap-2">
 										<span
 											className={cn(
@@ -908,7 +912,7 @@ export function VendorNotesTab({
 
 								<div>
 									<p className="mb-2 text-sm font-medium">Activity</p>
-									<ul className="space-y-3">
+									<ul className="space-y-4">
 										{selected.activity.map((item) => (
 											<li key={item.id} className="flex gap-2.5">
 												<div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">

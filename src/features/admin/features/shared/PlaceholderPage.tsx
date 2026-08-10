@@ -20,7 +20,7 @@ export function PlaceholderPage({
 	description = "This workspace is scaffolded and will be connected to live data in a later release.",
 }: PlaceholderPageProps) {
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div>
 				<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
 					{title}

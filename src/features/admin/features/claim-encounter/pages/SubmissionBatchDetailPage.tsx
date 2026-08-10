@@ -79,7 +79,7 @@ export function SubmissionBatchDetailPage() {
 
 	if (!batch) {
 		return (
-			<div className="space-y-3">
+			<div className="space-y-4">
 				<Link
 					href="/admin/claim-encounter/inbound"
 					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -168,7 +168,7 @@ export function SubmissionBatchDetailPage() {
 	];
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<div className="space-y-3 border-b border-border/50 pb-3">
 				<Link
 					href={backHref}
@@ -204,7 +204,7 @@ export function SubmissionBatchDetailPage() {
 										: "Awaiting response"}
 								</span>
 							</div>
-							<p className="mt-0.5 text-xs text-muted-foreground">
+							<p className="text-sm leading-relaxed text-muted-foreground">
 								What MFC sent to Gainwell for {batch.vendor} · {batch.program}
 							</p>
 						</div>
@@ -361,7 +361,7 @@ export function SubmissionBatchDetailPage() {
 			</div>
 
 			{tab === "Overview" && (
-				<div className="space-y-3">
+				<div className="space-y-4">
 					<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
 						{[
 							{
@@ -387,9 +387,9 @@ export function SubmissionBatchDetailPage() {
 						].map((card) => (
 							<div
 								key={card.label}
-								className="rounded-lg border border-border/50 bg-card/70 p-3"
+								className="rounded-xl border border-border bg-card shadow-sm p-3"
 							>
-								<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+								<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 									{card.label}
 								</p>
 								<p className="mt-1 truncate text-lg font-medium tabular-nums">
@@ -425,9 +425,9 @@ export function SubmissionBatchDetailPage() {
 			)}
 
 			{tab === "Transmission" && (
-				<div className="space-y-3">
+				<div className="space-y-4">
 					<div className="grid gap-2 sm:grid-cols-3">
-						<div className="rounded-lg border border-border/50 bg-card/70 p-3">
+						<div className="rounded-xl border border-border bg-card shadow-sm p-3">
 							<p className="text-[10px] uppercase text-muted-foreground">
 								ISA control
 							</p>
@@ -435,7 +435,7 @@ export function SubmissionBatchDetailPage() {
 								000000{String(batch.batchId.length).padStart(3, "0")}
 							</p>
 						</div>
-						<div className="rounded-lg border border-border/50 bg-card/70 p-3">
+						<div className="rounded-xl border border-border bg-card shadow-sm p-3">
 							<p className="text-[10px] uppercase text-muted-foreground">
 								GS control
 							</p>
@@ -443,7 +443,7 @@ export function SubmissionBatchDetailPage() {
 								{1000 + (batch.claimsSubmitted % 900)}
 							</p>
 						</div>
-						<div className="rounded-lg border border-border/50 bg-card/70 p-3">
+						<div className="rounded-xl border border-border bg-card shadow-sm p-3">
 							<p className="text-[10px] uppercase text-muted-foreground">
 								ST count
 							</p>
@@ -452,7 +452,7 @@ export function SubmissionBatchDetailPage() {
 							</p>
 						</div>
 					</div>
-					<div className="space-y-2 rounded-lg border border-border/50 bg-card/70 p-4">
+					<div className="space-y-2 rounded-xl border border-border bg-card shadow-sm p-4">
 						{transmissionEvents.map((event) => (
 							<div
 								key={event.title}
@@ -480,9 +480,9 @@ export function SubmissionBatchDetailPage() {
 			)}
 
 			{tab === "Linked Response" && (
-				<div className="rounded-lg border border-border/50 bg-card/70 p-4">
+				<div className="rounded-xl border border-border bg-card shadow-sm p-4">
 					{response ? (
-						<div className="space-y-3">
+						<div className="space-y-4">
 							<p className="text-xs text-muted-foreground">
 								Gainwell returned a business response for this batch. Open it to
 								review paid / rejected claim outcomes and remittance detail.

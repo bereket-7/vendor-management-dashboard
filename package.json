@@ -26,6 +26,13 @@
 		"test": "jest",
 		"test:e2e": "node scripts/run-e2e.mjs",
 		"test:e2e:local": "node scripts/run-e2e.mjs --local",
+		"test:vendor-core": "node scripts/smoke-vendor-core.mjs",
+		"seed:vendor-core": "node scripts/seed-vendor-core-from-mocks.mjs",
+		"seed:inbound-processing": "node scripts/seed-inbound-processing.mjs",
+		"seed:errors": "node scripts/seed-errors.mjs",
+		"seed:providers": "node scripts/seed-providers.mjs",
+		"seed:claim-lines": "node scripts/seed-claim-lines.mjs",
+		"seed:member-coverages": "node scripts/seed-member-coverages.mjs",
 		"test-all": "pnpm run check-types && pnpm run check-format && pnpm run lint && pnpm run test && pnpm run build",
 		"analyze": "ANALYZE=true pnpm build"
 	},

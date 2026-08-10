@@ -74,7 +74,7 @@ export function ClaimFileDetailPage() {
 
 	if (!file) {
 		return (
-			<div className="space-y-3">
+			<div className="space-y-4">
 				<Link
 					href="/admin/claim-encounter/inbound"
 					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

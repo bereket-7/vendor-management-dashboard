@@ -25,6 +25,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 
 import { BulkActionsToolbar } from "@/components/admin/BulkActionsToolbar";
+import { SummaryCard, SummaryCardsGrid } from "@/components/admin/SummaryCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,6 +51,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
+import { Skeleton } from "@/components/ui/skeleton";
+import { liveVendorsToDirectoryRows } from "@/features/admin/features/vendors/live-directory";
+import { VendorActionsMenu } from "@/features/admin/features/vendors/components/VendorActionsMenu";
 import {
 	VENDOR_DIRECTORY,
 	type VendorDirectoryRow,
@@ -57,29 +62,21 @@ import {
 	type VendorListStatus,
 	summarizeVendorDirectory,
 } from "@/features/admin/features/vendors/vendor-integration-mock";
-import { Link } from "@/i18n/navigation";
+import { StatusBadge } from "@/features/shared/vms/StatusBadge";
+import { Link, useRouter } from "@/i18n/navigation";
+import { isMockEnabled } from "@/lib/mock-mode";
+import {
+	useInvalidateVendorCore,
+	useVendorCoreAccounts,
+	useVendorCoreConnections,
+	useVendorCoreInboundFiles,
+	useVendorCoreJobs,
+	useVendorCoreVendors,
+} from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
 
 function StatusPill({ status }: { status: VendorListStatus }) {
-	if (status === "active") {
-		return (
-			<span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-				Active
-			</span>
-		);
-	}
-	if (status === "at_risk") {
-		return (
-			<span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-				At Risk
-			</span>
-		);
-	}
-	return (
-		<span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0 text-[10px] font-medium text-slate-700 dark:bg-slate-900 dark:text-slate-200">
-			Inactive
-		</span>
-	);
+	return <StatusBadge status={status} />;
 }
 
 function HealthDot({ health }: { health: VendorListHealth }) {
@@ -104,9 +101,7 @@ function HealthDot({ health }: { health: VendorListHealth }) {
 }
 
 function detailHref(row: VendorDirectoryRow) {
-	const n = Number(row.id.replace("vnd-", ""));
-	if (n >= 1 && n <= 4) return `/admin/vendors/${row.id}`;
-	return `/admin/vendors/vnd-${((n - 1) % 4) + 1}`;
+	return `/admin/vendors/${row.id}`;
 }
 
 type SortKey =
@@ -117,9 +112,62 @@ type SortKey =
 	| "linkedAccounts"
 	| "activeJobs"
 	| "lastFileReceived"
-	| "health";
+	| "health"
+	| "createdAt";
 
 export function VendorsPage() {
+	if (!isMockEnabled()) {
+		return (
+			<VendorCoreGate title="Vendors">
+				<VendorsDirectoryPage />
+			</VendorCoreGate>
+		);
+	}
+	return <VendorsDirectoryPage />;
+}
+
+function VendorsDirectoryPage() {
+	const router = useRouter();
+	const useLive = !isMockEnabled();
+	const invalidate = useInvalidateVendorCore();
+	const vendorsQ = useVendorCoreVendors();
+	const connectionsQ = useVendorCoreConnections();
+	const jobsQ = useVendorCoreJobs();
+	const accountsQ = useVendorCoreAccounts();
+	const filesQ = useVendorCoreInboundFiles();
+
+	const directory = useMemo(() => {
+		if (!useLive) return VENDOR_DIRECTORY;
+		return liveVendorsToDirectoryRows(
+			vendorsQ.data ?? [],
+			connectionsQ.data ?? [],
+			jobsQ.data ?? [],
+			accountsQ.data ?? [],
+			filesQ.data ?? []
+		);
+	}, [
+		useLive,
+		vendorsQ.data,
+		connectionsQ.data,
+		jobsQ.data,
+		accountsQ.data,
+		filesQ.data,
+	]);
+
+	const loading =
+		useLive &&
+		(vendorsQ.isLoading ||
+			connectionsQ.isLoading ||
+			jobsQ.isLoading ||
+			accountsQ.isLoading);
+
+	const liveError = useLive
+		? vendorsQ.error?.message ||
+			connectionsQ.error?.message ||
+			jobsQ.error?.message ||
+			accountsQ.error?.message
+		: null;
+
 	const [search, setSearch] = useState("");
 	const [status, setStatus] = useState("all");
 	const [vendorType, setVendorType] = useState("all");
@@ -127,19 +175,23 @@ export function VendorsPage() {
 	const [activity, setActivity] = useState("all");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
-	const [sortKey, setSortKey] = useState<SortKey>("name");
-	const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+	const [sortKey, setSortKey] = useState<SortKey>(
+		useLive ? "createdAt" : "name"
+	);
+	const [sortDir, setSortDir] = useState<"asc" | "desc">(
+		useLive ? "desc" : "asc"
+	);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
 	const vendorTypes = useMemo(
 		() =>
-			Array.from(new Set(VENDOR_DIRECTORY.map((row) => row.vendorType))).sort(),
-		[]
+			Array.from(new Set(directory.map((row) => row.vendorType))).sort(),
+		[directory]
 	);
 
 	const filtered = useMemo(() => {
 		const q = search.trim().toLowerCase();
-		let rows = VENDOR_DIRECTORY.filter((row) => {
+		let rows = directory.filter((row) => {
 			if (status !== "all" && row.status !== status) return false;
 			if (vendorType !== "all" && row.vendorType !== vendorType) return false;
 			if (health !== "all" && row.health !== health) return false;
@@ -171,7 +223,7 @@ export function VendorsPage() {
 			return sortDir === "asc" ? as.localeCompare(bs) : bs.localeCompare(as);
 		});
 		return rows;
-	}, [activity, health, search, sortDir, sortKey, status, vendorType]);
+	}, [activity, directory, health, search, sortDir, sortKey, status, vendorType]);
 
 	const summary = useMemo(() => summarizeVendorDirectory(filtered), [filtered]);
 
@@ -290,20 +342,37 @@ export function VendorsPage() {
 		},
 	];
 
+	if (loading && !directory.length) {
+		return (
+			<div className="space-y-4">
+				<Skeleton className="h-8 w-64" />
+				<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+					{Array.from({ length: 6 }).map((_, i) => (
+						<Skeleton key={i} className="h-20 rounded-lg" />
+					))}
+				</div>
+				<Skeleton className="h-96 w-full rounded-xl" />
+			</div>
+		);
+	}
+
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
+			{liveError ? (
+				<p className="text-sm text-destructive">{liveError}</p>
+			) : null}
 			{/* Header */}
-			<div className="flex flex-wrap items-start justify-between gap-2">
-				<div>
-					<nav className="mb-0.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+				<div className="min-w-0 space-y-1">
+					<nav className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 						<span>Vendor Management</span>
-						<span>&gt;</span>
+						<span className="text-border">/</span>
 						<span className="text-foreground">Vendors</span>
 					</nav>
-					<h1 className="text-lg font-medium tracking-tight sm:text-xl">
+					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
 						Vendors
 					</h1>
-					<p className="mt-0.5 text-xs text-muted-foreground">
+					<p className="text-sm leading-relaxed text-muted-foreground">
 						Manage trading partners, monitor vendor health, and access
 						vendor-level operations.
 					</p>
@@ -358,7 +427,7 @@ export function VendorsPage() {
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All Status</SelectItem>
-						<SelectItem value="active">Active</SelectItem>
+						<SelectItem value="active">Active / Prospect</SelectItem>
 						<SelectItem value="at_risk">At Risk</SelectItem>
 						<SelectItem value="inactive">Inactive</SelectItem>
 					</SelectContent>
@@ -416,7 +485,18 @@ export function VendorsPage() {
 						<SelectItem value="older">Older</SelectItem>
 					</SelectContent>
 				</Select>
-				<div className="ml-auto">
+				<div className="ml-auto flex gap-2">
+					{useLive ? (
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-9"
+							onClick={() => void invalidate()}
+						>
+							<RefreshCw className="mr-1.5 size-3.5" />
+							Refresh
+						</Button>
+					) : null}
 					<Button
 						variant="outline"
 						size="sm"
@@ -430,50 +510,33 @@ export function VendorsPage() {
 			</div>
 
 			{/* KPIs */}
-			<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-				{kpis.map((k) => {
-					const Icon = k.icon;
-					return (
-						<div key={k.label} className="rounded-lg bg-card p-2.5">
-							<div className="flex items-start justify-between gap-2">
-								<div className="min-w-0">
-									<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-										{k.label}
-									</p>
-									<p className="mt-1 text-lg font-medium tabular-nums tracking-tight">
-										{k.value}
-									</p>
-									<p className={cn("mt-1 text-xs font-medium", k.trendTone)}>
-										{k.trend}
-									</p>
-								</div>
-								<div
-									className={cn(
-										"flex size-8 shrink-0 items-center justify-center rounded-lg",
-										k.tone
-									)}
-								>
-									<Icon className="size-4" />
-								</div>
-							</div>
-						</div>
-					);
-				})}
+			<SummaryCardsGrid>
+				{kpis.map((k) => (
+					<SummaryCard
+						key={k.label}
+						label={k.label}
+						value={k.value}
+						hint={k.trend}
+						icon={k.icon}
+						tone={k.tone}
+						hintClassName={cn("font-medium", k.trendTone)}
+					/>
+				))}
 
-				<div className="rounded-lg bg-card p-2.5">
-					<p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
+					<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
 						Health Distribution
 					</p>
-					<div className="mt-1 flex items-center gap-2">
-						<ul className="min-w-0 flex-1 space-y-1 text-[11px]">
+					<div className="mt-2 flex items-center gap-3">
+						<ul className="min-w-0 flex-1 space-y-1.5 text-xs">
 							{summary.healthPie.map((item) => (
 								<li
 									key={item.name}
 									className="flex items-center justify-between gap-2"
 								>
-									<span className="flex items-center gap-1.5">
+									<span className="flex items-center gap-1.5 font-medium">
 										<span
-											className="size-1.5 rounded-full"
+											className="size-2 rounded-full"
 											style={{ backgroundColor: item.color }}
 										/>
 										{item.name}
@@ -484,15 +547,15 @@ export function VendorsPage() {
 								</li>
 							))}
 						</ul>
-						<div className="h-14 w-14 shrink-0">
+						<div className="h-16 w-16 shrink-0">
 							<ResponsiveContainer width="100%" height="100%">
 								<PieChart>
 									<Pie
 										data={summary.healthPie.filter((d) => d.value > 0)}
 										dataKey="value"
 										nameKey="name"
-										innerRadius={16}
-										outerRadius={26}
+										innerRadius={18}
+										outerRadius={28}
 										paddingAngle={2}
 									>
 										{summary.healthPie
@@ -507,7 +570,7 @@ export function VendorsPage() {
 						</div>
 					</div>
 				</div>
-			</div>
+			</SummaryCardsGrid>
 
 			{/* Vendor List */}
 			<BulkActionsToolbar
@@ -565,8 +628,15 @@ export function VendorsPage() {
 							</TableHeader>
 							<TableBody>
 								{pageRows.map((row) => (
-									<TableRow key={row.id} className="hover:bg-muted/30">
-										<TableCell className="px-2 py-1.5 pl-3">
+									<TableRow
+										key={row.id}
+										className="cursor-pointer hover:bg-muted/30"
+										onClick={() => router.push(detailHref(row))}
+									>
+										<TableCell
+											className="px-2 py-1.5 pl-3"
+											onClick={(e) => e.stopPropagation()}
+										>
 											<Checkbox
 												checked={selectedIds.has(row.id)}
 												onCheckedChange={() => toggleOne(row.id)}
@@ -612,7 +682,10 @@ export function VendorsPage() {
 										<TableCell className="px-2 py-1.5">
 											<HealthDot health={row.health} />
 										</TableCell>
-										<TableCell className="px-2 py-1.5 pr-3 text-right">
+										<TableCell
+											className="px-2 py-1.5 pr-3 text-right"
+											onClick={(e) => e.stopPropagation()}
+										>
 											<div className="inline-flex items-center gap-0.5">
 												<Button
 													variant="link"
@@ -625,8 +698,20 @@ export function VendorsPage() {
 														<ExternalLink className="ml-1 size-3" />
 													</Link>
 												</Button>
-												<DropdownMenu>
-													<DropdownMenuTrigger asChild>
+												<VendorActionsMenu
+													vendor={{
+														id: row.id,
+														name: row.name,
+														legalName: row.name,
+														status:
+															row.status === "inactive"
+																? "suspended"
+																: row.status === "at_risk"
+																	? "onboarding"
+																	: "active",
+													}}
+													redirectOnDelete={undefined}
+													trigger={
 														<Button
 															variant="ghost"
 															size="icon"
@@ -634,23 +719,22 @@ export function VendorsPage() {
 														>
 															<MoreVertical className="size-3.5" />
 														</Button>
-													</DropdownMenuTrigger>
-													<DropdownMenuContent align="end">
-														<DropdownMenuItem asChild>
-															<Link href={detailHref(row)}>Open detail</Link>
-														</DropdownMenuItem>
-														<DropdownMenuItem asChild>
-															<Link href="/admin/file-monitoring">
-																View file activity
-															</Link>
-														</DropdownMenuItem>
-														<DropdownMenuItem asChild>
-															<Link href="/admin/schedules">
-																View schedules
-															</Link>
-														</DropdownMenuItem>
-													</DropdownMenuContent>
-												</DropdownMenu>
+													}
+													extraItems={
+														<>
+															<DropdownMenuItem asChild>
+																<Link href="/admin/file-monitoring">
+																	View file activity
+																</Link>
+															</DropdownMenuItem>
+															<DropdownMenuItem asChild>
+																<Link href="/admin/schedules">
+																	View schedules
+																</Link>
+															</DropdownMenuItem>
+														</>
+													}
+												/>
 											</div>
 										</TableCell>
 									</TableRow>

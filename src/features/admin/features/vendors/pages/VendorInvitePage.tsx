@@ -46,7 +46,7 @@ export function VendorInvitePage() {
 			</div>
 			<form
 				onSubmit={submit}
-				className="space-y-3 rounded-lg border bg-card p-4"
+				className="space-y-3 rounded-xl border border-border bg-card shadow-sm p-4"
 			>
 				<label className="grid gap-2 text-sm font-medium">
 					Legal name

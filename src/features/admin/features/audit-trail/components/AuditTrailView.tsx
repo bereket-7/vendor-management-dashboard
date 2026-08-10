@@ -60,7 +60,7 @@ function ActionBadge({ action }: { action: AuditActionType }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+				"inline-flex items-center rounded-md border border-transparent px-2 py-0.5 text-[11px] font-medium",
 				tone
 			)}
 		>
@@ -179,60 +179,62 @@ export function AuditTrailView({
 				</div>
 			) : null}
 
-			<section className="space-y-3">
-				<h2 className="text-sm font-medium">Audit Summary</h2>
+			<section className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+				<h2 className="text-lg font-semibold tracking-tight text-foreground">
+					Audit Summary
+				</h2>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 					{[
 						{
 							label: "Total Activities",
 							value: summary.total,
 							icon: FileText,
-							tone: "text-sky-700 bg-sky-500/10",
+							tone: "text-sky-700 bg-sky-500/15 ring-sky-500/20",
 						},
 						{
 							label: "Users Involved",
 							value: summary.users,
 							icon: Users,
-							tone: "text-emerald-700 bg-emerald-500/10",
+							tone: "text-emerald-700 bg-emerald-500/15 ring-emerald-500/20",
 						},
 						{
 							label: "Configuration Changes",
 							value: summary.configuration,
 							icon: Pencil,
-							tone: "text-sky-700 bg-sky-500/10",
+							tone: "text-amber-700 bg-amber-500/15 ring-amber-500/20",
 						},
 						{
 							label: "File / Job Activities",
 							value: summary.fileJob,
 							icon: CloudUpload,
-							tone: "text-sky-700 bg-sky-500/10",
+							tone: "text-primary bg-primary/15 ring-primary/20",
 						},
 						{
 							label: "Access / Security",
 							value: summary.access,
 							icon: Shield,
-							tone: "text-violet-700 bg-violet-500/10",
+							tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
 						},
 					].map((item) => {
 						const Icon = item.icon;
 						return (
 							<div
 								key={item.label}
-								className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-4"
+								className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
 							>
 								<div
 									className={cn(
-										"flex size-10 shrink-0 items-center justify-center rounded-lg",
+										"flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset",
 										item.tone
 									)}
 								>
 									<Icon className="size-4" />
 								</div>
 								<div className="min-w-0">
-									<p className="text-2xl font-semibold tabular-nums tracking-tight">
+									<p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
 										{item.value}
 									</p>
-									<p className="mt-0.5 text-xs text-muted-foreground">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
 										{item.label}
 									</p>
 								</div>
@@ -242,10 +244,14 @@ export function AuditTrailView({
 				</div>
 			</section>
 
-			<section className="overflow-hidden rounded-lg border border-border/60 bg-card">
-				<div className="border-b border-border/50 px-4 py-3 sm:px-5">
-					<h2 className="text-sm font-medium">Audit Activities</h2>
-					<div className="mt-3 flex flex-wrap items-center gap-2">
+			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+				<div className="border-b border-border bg-primary/10 px-4 py-3.5 sm:px-5">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						Audit Activities
+					</h2>
+				</div>
+				<div className="border-b border-border px-4 py-3 sm:px-5">
+					<div className="flex flex-wrap items-center gap-2">
 						<Select
 							value={userFilter}
 							onValueChange={(value) => onFilterChange(setUserFilter, value)}
@@ -394,7 +400,7 @@ export function AuditTrailView({
 					</Table>
 				</div>
 
-				<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 px-4 py-3 text-sm text-muted-foreground sm:px-5">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground sm:px-5">
 					<p>
 						Showing{" "}
 						{filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1} to{" "}

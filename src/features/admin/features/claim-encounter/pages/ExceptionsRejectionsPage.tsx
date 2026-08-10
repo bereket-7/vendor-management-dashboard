@@ -44,6 +44,7 @@ import {
 	REJECT_REASON_CATALOG,
 	exceptionsForProgram,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -68,10 +69,7 @@ export function ExceptionsRejectionsPage() {
 		[programFilter]
 	);
 
-	const vendors = useMemo(
-		() => Array.from(new Set(baseRows.map((r) => r.vendor))).sort(),
-		[baseRows]
-	);
+	const vendors = VENDOR_NAMES;
 
 	const filteredRows = useMemo(() => {
 		return baseRows.filter((row) => {
@@ -164,7 +162,7 @@ export function ExceptionsRejectionsPage() {
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<ClaimPageHeader
 				title="Exceptions / Rejections"
 				description={`Claim and encounter exceptions requiring review · Filtered to ${programFilter}`}

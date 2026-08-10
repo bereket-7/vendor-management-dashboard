@@ -66,6 +66,7 @@ import {
 	filesForProgram,
 	formatCount,
 } from "@/features/admin/features/claim-encounter/mock-data";
+import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
@@ -107,10 +108,7 @@ export function InboundVendorFilePage() {
 		[inboundQueue]
 	);
 
-	const vendors = useMemo(
-		() => Array.from(new Set(inboundQueue.map((f) => f.vendor))).sort(),
-		[inboundQueue]
-	);
+	const vendors = VENDOR_NAMES;
 	const fileTypes = useMemo(
 		() => Array.from(new Set(inboundQueue.map((f) => f.fileTypeLabel))).sort(),
 		[inboundQueue]
@@ -325,7 +323,7 @@ export function InboundVendorFilePage() {
 	];
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<ClaimPageHeader
 				title="Inbound Vendor File"
 				description={`Pending review + MFC-rejected (vendor correction) · ${programFilter}`}
