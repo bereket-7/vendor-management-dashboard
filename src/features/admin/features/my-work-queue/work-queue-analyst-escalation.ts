@@ -15,8 +15,26 @@ export const ESCALATION_STATUS_LABEL: Record<EscalationStatus, string> = {
 	resolved: "Resolved",
 };
 
+/** User-settable escalation values (detail + dashboard filters). */
+export const ESCALATION_STATUS_SELECT_OPTIONS = [
+	"escalated",
+	"resolved",
+] as const satisfies readonly EscalationStatus[];
+
+export type SelectableEscalationStatus =
+	(typeof ESCALATION_STATUS_SELECT_OPTIONS)[number];
+
+export function isSelectableEscalationStatus(
+	status: EscalationStatus
+): status is SelectableEscalationStatus {
+	return (ESCALATION_STATUS_SELECT_OPTIONS as readonly EscalationStatus[]).includes(
+		status
+	);
+}
+
 export type AnalystProgressRow = {
 	analyst: string;
+	analystId?: string | null;
 	assigned: number;
 	sftpComplete: number;
 	sftpPct: number;

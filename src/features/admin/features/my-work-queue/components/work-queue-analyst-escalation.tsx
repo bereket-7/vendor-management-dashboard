@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import type { WorkQueueBlockerRowDto } from "@/lib/vendor-core/types";
 
 import type { TpaTpvRow } from "../work-queue-types";
 import {
@@ -27,15 +28,33 @@ import {
 	summarizeEscalations,
 } from "../work-queue-analyst-escalation";
 
+/** Matches work-queue cards (detail page, main table, progress overview). */
 const PANEL =
 	"overflow-hidden rounded-sm border border-border/60 bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
 
-function AnalystAvatar({ name }: { name: string }) {
+const PANEL_HEADER = "border-b border-border/50 px-3 py-2";
+const PANEL_TITLE = "text-xs font-semibold text-foreground";
+const PANEL_SUBTITLE = "text-[11px] leading-snug text-muted-foreground";
+const COMPACT_TABLE =
+	"[&_th]:h-7 [&_th]:px-2 [&_th]:py-0 [&_td]:px-2 [&_td]:py-1.5";
+const TABLE_HEAD =
+	"text-[10px] font-medium text-muted-foreground whitespace-nowrap";
+
+const ESCALATION_CARD = "rounded-md border p-2.5 shadow-none";
+
+export function AnalystAvatar({
+	name,
+	compact = false,
+}: {
+	name: string;
+	compact?: boolean;
+}) {
 	const initials = analystInitials(name);
 	return (
 		<span
 			className={cn(
-				"inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-1",
+				"inline-flex shrink-0 items-center justify-center rounded-full font-bold ring-1",
+				compact ? "size-6 text-[9px]" : "size-7 text-[10px]",
 				analystAvatarTone(name)
 			)}
 		>
@@ -47,7 +66,8 @@ function AnalystAvatar({ name }: { name: string }) {
 function pctCell(
 	value: number,
 	pct: number,
-	tone: "green" | "orange" | "red" | "muted"
+	tone: "green" | "orange" | "red" | "muted",
+	compact = false
 ) {
 	const pctTone = {
 		green: "text-emerald-600 dark:text-emerald-400",
@@ -57,133 +77,189 @@ function pctCell(
 	}[tone];
 
 	return (
-		<span className="tabular-nums">
+		<span className={cn("tabular-nums", compact ? "text-xs" : "text-sm")}>
 			{value}{" "}
 			<span className={cn("font-semibold", pctTone)}>({pct}%)</span>
 		</span>
 	);
 }
 
+function metricCell(
+	value: number,
+	pct: number,
+	tone: "green" | "orange" | "red" | "muted"
+) {
+	const pctTone = {
+		green: "text-emerald-600 dark:text-emerald-400",
+		orange: "text-orange-600 dark:text-orange-400",
+		red: "text-red-600 dark:text-red-400",
+		muted: "text-muted-foreground",
+	}[tone];
+	const barTone = {
+		green: "bg-emerald-500/70",
+		orange: "bg-orange-500/70",
+		red: "bg-red-500/70",
+		muted: "bg-muted-foreground/35",
+	}[tone];
+
+	return (
+		<div className="min-w-[68px]">
+			<div className="flex items-baseline justify-between gap-1 tabular-nums">
+				<span className="text-xs font-medium text-foreground">{value}</span>
+				<span className={cn("text-[10px] font-semibold", pctTone)}>
+					{pct}%
+				</span>
+			</div>
+			<div className="mt-1 h-1 overflow-hidden rounded-full bg-muted/80">
+				<div
+					className={cn("h-full rounded-full transition-[width]", barTone)}
+					style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+				/>
+			</div>
+		</div>
+	);
+}
+
 export function EdiAnalystProgressSection({
 	rows,
+	analysts: analystsProp,
+	loading = false,
 	activeAnalyst,
 	statusEstimated = false,
 	onAnalystSelect,
 }: {
 	rows: TpaTpvRow[];
+	analysts?: AnalystProgressRow[];
+	loading?: boolean;
 	activeAnalyst: string;
 	statusEstimated?: boolean;
 	onAnalystSelect: (analyst: string) => void;
 }) {
-	const analysts: AnalystProgressRow[] = summarizeAnalystProgress(rows);
+	const analysts: AnalystProgressRow[] =
+		analystsProp ?? summarizeAnalystProgress(rows);
 
 	return (
-		<section className={PANEL}>
-			<div className="border-b border-border/50 bg-muted/20 px-4 py-3">
-				<h2 className="text-sm font-semibold text-foreground">
-					EDI Analyst Progress
-				</h2>
-				<p className="mt-0.5 text-xs text-muted-foreground">
-					Assigned workload and completion by analyst.
+		<section className={cn(PANEL, "min-w-0 text-xs")}>
+			<div className={PANEL_HEADER}>
+				<h2 className={PANEL_TITLE}>EDI Analyst Progress</h2>
+				<p className={cn(PANEL_SUBTITLE, "mt-0.5")}>
+					Workload and completion by analyst.
 					{statusEstimated ? (
-						<span className="mt-1 block text-[11px] italic">
-							SFTP/EDI completion estimated from migration status until
-							progress tracking is live.
+						<span className="mt-0.5 block text-[10px] italic text-muted-foreground/90">
+							SFTP/EDI estimated from migration status until progress is
+							live.
 						</span>
 					) : null}
 				</p>
 			</div>
 			<div className="overflow-x-auto">
-				<Table>
-					<TableHeader>
-						<TableRow className="bg-muted/30 hover:bg-muted/30">
-							<TableHead className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-								Analyst
-							</TableHead>
-							<TableHead className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-								Assigned
-							</TableHead>
-							<TableHead className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-								SFTP Complete
-							</TableHead>
-							<TableHead className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-								EDI Complete
-							</TableHead>
-							<TableHead className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-								In Progress
-							</TableHead>
-							<TableHead className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-								Blocked / Escalated
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{analysts.map((row) => {
-							const isUnassigned = row.analyst === "Unassigned";
-							const selected = activeAnalyst === row.analyst;
-							return (
-								<TableRow
-									key={row.analyst}
-									className={cn(
-										"transition-colors",
-										!isUnassigned && "cursor-pointer hover:bg-primary/5",
-										selected && "bg-primary/8"
-									)}
-									onClick={() => {
-										if (isUnassigned) return;
-										onAnalystSelect(
-											selected ? "all" : row.analyst
-										);
-									}}
-								>
-									<TableCell className="text-sm font-medium">
-										<span className="flex items-center gap-2">
-											<AnalystAvatar name={row.analyst} />
-											{row.analyst}
-										</span>
-									</TableCell>
-									<TableCell className="text-sm font-semibold tabular-nums">
-										{isUnassigned ? "—" : row.assigned}
-									</TableCell>
-									<TableCell className="text-sm">
-										{isUnassigned
-											? "—"
-											: pctCell(row.sftpComplete, row.sftpPct, "green")}
-									</TableCell>
-									<TableCell className="text-sm">
-										{isUnassigned
-											? "—"
-											: pctCell(row.ediComplete, row.ediPct, "green")}
-									</TableCell>
-									<TableCell className="text-sm">
-										{isUnassigned
-											? "—"
-											: pctCell(row.inProgress, row.inProgressPct, "orange")}
-									</TableCell>
-									<TableCell className="text-sm">
-										{isUnassigned
-											? "—"
-											: pctCell(
-													row.blockedEscalated,
-													row.blockedPct,
-													row.blockedEscalated > 0 ? "red" : "muted"
-												)}
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
+				{loading ? (
+					<p className="px-3 py-4 text-[11px] text-muted-foreground">
+						Loading analyst stats…
+					</p>
+				) : (
+					<Table className={COMPACT_TABLE}>
+						<TableHeader>
+							<TableRow className="bg-muted/20 hover:bg-muted/20">
+								<TableHead className={cn(TABLE_HEAD, "w-7 text-center")}>
+									#
+								</TableHead>
+								<TableHead className={TABLE_HEAD}>Analyst</TableHead>
+								<TableHead className={cn(TABLE_HEAD, "text-right")}>
+									Asgn
+								</TableHead>
+								<TableHead className={TABLE_HEAD}>SFTP</TableHead>
+								<TableHead className={TABLE_HEAD}>EDI</TableHead>
+								<TableHead className={TABLE_HEAD}>Active</TableHead>
+								<TableHead className={TABLE_HEAD}>Blocked</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{analysts.map((row, index) => {
+								const isUnassigned = row.analyst === "Unassigned";
+								const selected = activeAnalyst === row.analyst;
+								return (
+									<TableRow
+										key={row.analyst}
+										className={cn(
+											"transition-colors",
+											!isUnassigned && "cursor-pointer hover:bg-muted/30",
+											selected &&
+												"border-l-2 border-l-primary bg-primary/5 hover:bg-primary/5"
+										)}
+										onClick={() => {
+											if (isUnassigned) return;
+											onAnalystSelect(
+												selected ? "all" : row.analyst
+											);
+										}}
+									>
+										<TableCell className="text-center text-[11px] font-medium tabular-nums text-muted-foreground">
+											{index + 1}
+										</TableCell>
+										<TableCell>
+											<span className="flex min-w-[120px] items-center gap-1.5">
+												<AnalystAvatar name={row.analyst} compact />
+												<span className="truncate text-xs font-medium">
+													{row.analyst}
+												</span>
+											</span>
+										</TableCell>
+										<TableCell className="text-right text-xs font-semibold tabular-nums">
+											{isUnassigned ? "—" : row.assigned}
+										</TableCell>
+										<TableCell>
+											{isUnassigned
+												? "—"
+												: metricCell(
+														row.sftpComplete,
+														row.sftpPct,
+														"green"
+													)}
+										</TableCell>
+										<TableCell>
+											{isUnassigned
+												? "—"
+												: metricCell(
+														row.ediComplete,
+														row.ediPct,
+														"green"
+													)}
+										</TableCell>
+										<TableCell>
+											{isUnassigned
+												? "—"
+												: metricCell(
+														row.inProgress,
+														row.inProgressPct,
+														"orange"
+													)}
+										</TableCell>
+										<TableCell>
+											{isUnassigned
+												? "—"
+												: pctCell(
+														row.blockedEscalated,
+														row.blockedPct,
+														row.blockedEscalated > 0 ? "red" : "muted",
+														true
+													)}
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				)}
 			</div>
-			<div className="border-t border-border/50 px-4 py-2.5">
-				<button
-					type="button"
-					className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary hover:underline"
-					onClick={() => onAnalystSelect("all")}
+			<div className="border-t border-border/50 px-3 py-2">
+				<Link
+					href="/admin/my-work-queue/analysts"
+					className="inline-flex items-center gap-0.5 text-[11px] font-medium text-primary hover:underline"
 				>
 					View all analysts
-					<ChevronRight className="size-3.5" />
-				</button>
+					<ChevronRight className="size-3" />
+				</Link>
 			</div>
 		</section>
 	);
@@ -195,41 +271,125 @@ const ESCALATION_CARDS: {
 	note: string;
 	border: string;
 	bg: string;
-	count: string;
+	accent: string;
 }[] = [
-	{
-		key: "escalation_required",
-		title: "Escalation Required",
-		note: "No response after second contact.",
-		border: "border-l-red-500",
-		bg: "bg-red-50/80 dark:bg-red-950/20",
-		count: "text-red-700 dark:text-red-300",
-	},
-	{
-		key: "attention",
-		title: "Attention",
-		note: "At risk of escalation (approaching threshold).",
-		border: "border-l-orange-500",
-		bg: "bg-orange-50/80 dark:bg-orange-950/20",
-		count: "text-orange-700 dark:text-orange-300",
-	},
 	{
 		key: "escalated",
 		title: "Escalated",
 		note: "Escalated to senior team / management.",
-		border: "border-l-sky-500",
-		bg: "bg-sky-50/80 dark:bg-sky-950/20",
-		count: "text-sky-700 dark:text-sky-300",
+		border: "border-sky-300 dark:border-sky-600/55",
+		bg: "bg-sky-50/45 dark:bg-sky-950/12",
+		accent: "text-sky-600 dark:text-sky-400",
 	},
 	{
 		key: "resolved",
 		title: "Resolved",
 		note: "Resolved (blocker cleared).",
-		border: "border-l-emerald-500",
-		bg: "bg-emerald-50/80 dark:bg-emerald-950/20",
-		count: "text-emerald-700 dark:text-emerald-300",
+		border: "border-emerald-300 dark:border-emerald-600/55",
+		bg: "bg-emerald-50/45 dark:bg-emerald-950/12",
+		accent: "text-emerald-600 dark:text-emerald-400",
 	},
 ];
+
+function blockerAnalystName(row: WorkQueueBlockerRowDto): string {
+	const user = row.assigned_to;
+	if (!user) return "Unassigned";
+	return (
+		user.full_name?.trim() ||
+		[user.first_name, user.last_name].filter(Boolean).join(" ").trim() ||
+		user.username?.trim() ||
+		user.email?.trim() ||
+		"Unassigned"
+	);
+}
+
+function formatBlockerReason(reason: string | null | undefined): string {
+	if (!reason) return "—";
+	return reason.replace(/_/g, " ");
+}
+
+function BlockerManagementList({
+	rows,
+	filter,
+}: {
+	rows: WorkQueueBlockerRowDto[];
+	filter: EscalationStatus;
+}) {
+	const items = rows.filter(
+		(row) => (row.blocker_status || row.escalation_status) === filter
+	);
+	if (!items.length) {
+		return (
+			<p className="px-4 py-3 text-xs text-muted-foreground">
+				No {ESCALATION_STATUS_LABEL[filter].toLowerCase()} items.
+			</p>
+		);
+	}
+
+	return (
+		<div className="overflow-x-auto border-t border-border/50">
+			<Table>
+				<TableHeader>
+					<TableRow className="bg-muted/20 hover:bg-muted/20">
+						<TableHead className="text-[10px] font-bold uppercase">
+							TPA/TPV
+						</TableHead>
+						<TableHead className="text-[10px] font-bold uppercase">
+							Analyst
+						</TableHead>
+						<TableHead className="text-[10px] font-bold uppercase">
+							Reason
+						</TableHead>
+						<TableHead className="text-[10px] font-bold uppercase">
+							Status
+						</TableHead>
+						<TableHead className="text-[10px] font-bold uppercase">
+							SFTP / EDI
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{items.map((item) => (
+						<TableRow key={item.id}>
+							<TableCell className="text-xs">
+								<Link
+									href={`/admin/my-work-queue/${item.id}`}
+									className="font-medium text-primary hover:underline"
+								>
+									{item.name}
+								</Link>
+								<p className="text-[10px] text-muted-foreground">
+									{item.code}
+								</p>
+							</TableCell>
+							<TableCell className="text-xs">
+								{blockerAnalystName(item)}
+							</TableCell>
+							<TableCell
+								className="max-w-[180px] truncate text-xs text-muted-foreground capitalize"
+								title={item.blocker_reason ?? undefined}
+							>
+								{formatBlockerReason(item.blocker_reason)}
+							</TableCell>
+							<TableCell>
+								<EscalationStatusPill
+									status={
+										(item.blocker_status ||
+											item.escalation_status ||
+											"none") as EscalationStatus
+									}
+								/>
+							</TableCell>
+							<TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+								{item.sftp_percent}% / {item.edi_percent}%
+							</TableCell>
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
+		</div>
+	);
+}
 
 function EscalationManagementList({
 	rows,
@@ -306,66 +466,82 @@ function EscalationManagementList({
 
 export function EscalationSummarySection({
 	rows,
+	summary: summaryProp,
+	blockerRows,
+	loading = false,
 	activeFilter,
 	onFilterChange,
 }: {
 	rows: TpaTpvRow[];
+	summary?: EscalationSummary;
+	blockerRows?: WorkQueueBlockerRowDto[];
+	loading?: boolean;
 	activeFilter: EscalationStatus | "all";
 	onFilterChange: (status: EscalationStatus | "all") => void;
 }) {
-	const summary = summarizeEscalations(rows);
+	const summary = summaryProp ?? summarizeEscalations(rows);
+	const useBlockerList = Boolean(blockerRows?.length);
 
 	return (
-		<section className={PANEL}>
-			<div className="border-b border-border/50 bg-muted/20 px-4 py-3">
-				<h2 className="text-sm font-semibold text-foreground">
-					Escalation Summary
-				</h2>
+		<section className={cn(PANEL, "text-xs")}>
+			<div className={PANEL_HEADER}>
+				<h2 className={PANEL_TITLE}>Escalation Summary</h2>
 			</div>
-			<div className="grid gap-3 p-4 sm:grid-cols-2">
-				{ESCALATION_CARDS.map((card) => {
-					const active = activeFilter === card.key;
-					return (
-						<div
-							key={card.key}
-							className={cn(
-								"rounded-md border border-border/60 border-l-4 p-3 shadow-sm",
-								card.border,
-								card.bg,
-								active && "ring-2 ring-primary/30"
-							)}
-						>
-							<p className="text-[11px] font-bold uppercase tracking-wide text-foreground/80">
-								{card.title}
-							</p>
-							<p
+			<div className="grid grid-cols-1 gap-2 p-2.5">
+				{loading ? (
+					<p className="col-span-full text-[11px] text-muted-foreground">
+						Loading escalation summary…
+					</p>
+				) : (
+					ESCALATION_CARDS.map((card) => {
+						const active = activeFilter === card.key;
+						return (
+							<div
+								key={card.key}
 								className={cn(
-									"mt-1.5 text-3xl font-bold tabular-nums",
-									card.count
+									ESCALATION_CARD,
+									"min-h-0",
+									card.border,
+									card.bg,
+									active && "ring-2 ring-primary/20"
 								)}
 							>
-								{summary[card.key]}
-							</p>
-							<p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-								{card.note}
-							</p>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								className="mt-3 h-7 border-border/80 bg-background/90 text-xs shadow-none"
-								onClick={() =>
-									onFilterChange(active ? "all" : card.key)
-								}
-							>
-								View list
-							</Button>
-						</div>
-					);
-				})}
+								<p className={cn("text-xs font-bold", card.accent)}>
+									{card.title}
+								</p>
+								<p
+									className={cn(
+										"mt-0.5 text-2xl font-bold tabular-nums leading-none",
+										card.accent
+									)}
+								>
+									{summary[card.key]}
+								</p>
+								<p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+									{card.note}
+								</p>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="mt-2 h-6 rounded-sm border-border/70 bg-background px-2 text-[10px] shadow-none"
+									onClick={() =>
+										onFilterChange(active ? "all" : card.key)
+									}
+								>
+									View list
+								</Button>
+							</div>
+						);
+					})
+				)}
 			</div>
 			{activeFilter !== "all" ? (
-				<EscalationManagementList rows={rows} filter={activeFilter} />
+				useBlockerList ? (
+					<BlockerManagementList rows={blockerRows ?? []} filter={activeFilter} />
+				) : (
+					<EscalationManagementList rows={rows} filter={activeFilter} />
+				)
 			) : null}
 		</section>
 	);
