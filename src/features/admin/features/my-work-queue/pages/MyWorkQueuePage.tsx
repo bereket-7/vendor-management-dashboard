@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -14,6 +15,8 @@ import {
 	Plus,
 	RefreshCw,
 	Search,
+	SlidersHorizontal,
+	StickyNote,
 	Truck,
 	Upload,
 	Users,
@@ -36,6 +39,16 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import {
 	Select,
 	SelectContent,
@@ -72,33 +85,40 @@ import {
 	WorkQueueProgressOverview,
 	WorkQueueRowActions,
 } from "../components/work-queue-progress";
-import { kpisToProgressSummary } from "../feature/mappers/workQueueMappers";
+import {
+	CURRENT_STAGE_OPTIONS,
+	kpisToProgressSummary,
+} from "../feature/mappers/workQueueMappers";
 import {
 	useBulkSetMigrationCaseStatusMutation,
 	useImportWorkQueueSpreadsheetMutation,
 	useInvalidateVendorCore,
 	useUpdateMigrationCaseMutation,
 	useUploadMigrationCaseDocumentMutation,
+	useWorkQueueAnalystStatsQuery,
+	useWorkQueueBlockersQuery,
+	useWorkQueueEscalationSummaryQuery,
 	useWorkQueueKpisQuery,
 	useWorkQueueKpisRawQuery,
+	useWorkQueueProgressSummaryQuery,
 	useWorkQueueRowsPageQuery,
-	useWorkQueueRowsQuery,
 } from "../feature/queries/useWorkQueueQuery";
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
-import {
-	emptyProgressSummary,
-	summarizeProgressFromRows,
-} from "../progress-data";
+import { emptyProgressSummary } from "../progress-data";
 import {
 	type EscalationStatus,
-	rowsUseStatusEstimatedProgress,
+	ESCALATION_STATUS_SELECT_OPTIONS,
+	ESCALATION_STATUS_LABEL,
 } from "../work-queue-analyst-escalation";
 import {
 	MIGRATION_STATUS_LABEL,
 	type MigrationStatus,
 	type TpaTpvRow,
 	WORK_QUEUE_KPI,
+	WHITELIST_STATUS_LABEL,
+	type WhitelistStatus,
 } from "../work-queue-types";
+import type { WorkQueueFilterQuery } from "@/lib/vendor-core/types";
 
 type ActionModal = "contacts" | null;
 
@@ -169,6 +189,75 @@ function MigrationStatusPill({ status }: { status: MigrationStatus }) {
 	);
 }
 
+function WhitelistStatusPill({ status }: { status: WhitelistStatus }) {
+	const styles: Record<WhitelistStatus, string> = {
+		complete:
+			"bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/20 dark:text-emerald-300",
+		pending:
+			"bg-amber-500/15 text-amber-900 ring-1 ring-amber-500/20 dark:text-amber-200",
+		not_started: "bg-muted text-muted-foreground ring-1 ring-border/60",
+	};
+
+	return (
+		<span
+			className={cn(
+				"inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+				styles[status]
+			)}
+			title={WHITELIST_STATUS_LABEL[status]}
+		>
+			{WHITELIST_STATUS_LABEL[status]}
+		</span>
+	);
+}
+
+function WorkQueueNotesCell({ notes }: { notes: string }) {
+	const trimmed = notes.trim();
+	if (!trimmed) {
+		return <span className="text-muted-foreground">—</span>;
+	}
+
+	return (
+		<HoverCard openDelay={180} closeDelay={100}>
+			<HoverCardTrigger asChild>
+				<span
+					className={cn(
+						"block w-full max-w-[140px] cursor-help truncate text-left",
+						"text-muted-foreground underline decoration-dotted decoration-border/80 underline-offset-[3px]",
+						"transition-colors hover:text-foreground"
+					)}
+				>
+					{trimmed}
+				</span>
+			</HoverCardTrigger>
+			<HoverCardContent
+				align="start"
+				side="top"
+				className="w-80 overflow-hidden border-border/60 p-0 shadow-lg"
+			>
+				<div className="overflow-hidden rounded-md border-l-[3px] border-l-primary bg-card">
+					<div className="flex items-center gap-2 border-b border-border/50 bg-muted/35 px-3 py-2">
+						<span className="flex size-6 items-center justify-center rounded-sm bg-primary/10 text-primary">
+							<StickyNote className="size-3.5" />
+						</span>
+						<div className="min-w-0">
+							<p className="text-xs font-semibold text-foreground">Notes</p>
+							<p className="text-[10px] text-muted-foreground">
+								Case note preview
+							</p>
+						</div>
+					</div>
+					<div className="max-h-44 overflow-y-auto px-3 py-3">
+						<p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/90">
+							{trimmed}
+						</p>
+					</div>
+				</div>
+			</HoverCardContent>
+		</HoverCard>
+	);
+}
+
 function ModalShell({
 	open,
 	onOpenChange,
@@ -216,6 +305,7 @@ export function MyWorkQueuePage() {
 }
 
 function MyWorkQueueBody() {
+	const searchParams = useSearchParams();
 	const invalidate = useInvalidateVendorCore();
 	const importInputRef = useRef<HTMLInputElement>(null);
 	const feedInputRef = useRef<HTMLInputElement>(null);
@@ -227,6 +317,8 @@ function MyWorkQueueBody() {
 		EscalationStatus | "all"
 	>("all");
 	const [waveFilter, setWaveFilter] = useState("all");
+	const [whitelistFilter, setWhitelistFilter] = useState("all");
+	const [stageFilter, setStageFilter] = useState("all");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -248,6 +340,13 @@ function MyWorkQueueBody() {
 		secondaryPhone: "",
 	});
 	const usersQ = useVendorCoreUsersQuery();
+
+	useEffect(() => {
+		const analyst = searchParams.get("analyst")?.trim();
+		if (analyst) {
+			setAnalystFilter(analyst);
+		}
+	}, [searchParams]);
 
 	const analystIdByName = useMemo(() => {
 		const map = new Map<string, string>();
@@ -275,6 +374,9 @@ function MyWorkQueueBody() {
 					? analystIdByName.get(analystFilter)
 					: undefined,
 			wave: waveFilter !== "all" ? Number(waveFilter) : undefined,
+			whitelist_status:
+				whitelistFilter !== "all" ? whitelistFilter : undefined,
+			current_stage: stageFilter !== "all" ? stageFilter : undefined,
 		};
 	}, [
 		pageSize,
@@ -285,26 +387,51 @@ function MyWorkQueueBody() {
 		analystFilter,
 		analystIdByName,
 		waveFilter,
+		whitelistFilter,
+		stageFilter,
 	]);
 
-	const summaryParams = useMemo(
-		(): MigrationCaseListQuery => ({ limit: 100, offset: 0 }),
-		[]
-	);
+	const aggregateFilterParams = useMemo((): WorkQueueFilterQuery => {
+		return {
+			wave: waveFilter !== "all" ? Number(waveFilter) : undefined,
+			migration_status: statusFilter !== "all" ? statusFilter : undefined,
+			escalation_status:
+				escalationFilter !== "all" ? escalationFilter : undefined,
+			assigned_to_id:
+				analystFilter !== "all"
+					? analystIdByName.get(analystFilter)
+					: undefined,
+			search: search.trim() || undefined,
+		};
+	}, [
+		waveFilter,
+		statusFilter,
+		escalationFilter,
+		analystFilter,
+		analystIdByName,
+		search,
+	]);
 
 	const rowsPageQ = useWorkQueueRowsPageQuery(listParams);
-	const summaryRowsQ = useWorkQueueRowsQuery(summaryParams);
 	const kpisQ = useWorkQueueKpisQuery(true);
-	const kpisRawQ = useWorkQueueKpisRawQuery(true);
+	const kpisRawQ = useWorkQueueKpisRawQuery(aggregateFilterParams);
+	const progressSummaryQ = useWorkQueueProgressSummaryQuery(
+		aggregateFilterParams,
+		waveFilter !== "all"
+	);
+	const analystStatsQ = useWorkQueueAnalystStatsQuery(aggregateFilterParams);
+	const escalationSummaryQ = useWorkQueueEscalationSummaryQuery(
+		aggregateFilterParams
+	);
+	const blockersQ = useWorkQueueBlockersQuery(
+		{ ...aggregateFilterParams, limit: 100, offset: 0 },
+		escalationFilter !== "all"
+	);
 
 	const updateCase = useUpdateMigrationCaseMutation();
 	const setStatus = useBulkSetMigrationCaseStatusMutation();
 	const importCsv = useImportWorkQueueSpreadsheetMutation();
 	const uploadDoc = useUploadMigrationCaseDocumentMutation();
-
-	const allRows = summaryRowsQ.data ?? [];
-
-	const rowsWithProgress = allRows;
 
 	const totalCount = rowsPageQ.data?.count ?? 0;
 	const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -316,43 +443,43 @@ function MyWorkQueueBody() {
 	const kpiCards = kpisQ.data ?? WORK_QUEUE_KPI;
 	const loading =
 		rowsPageQ.isLoading ||
-		summaryRowsQ.isLoading ||
 		kpisQ.isLoading ||
-		kpisRawQ.isLoading;
+		kpisRawQ.isLoading ||
+		analystStatsQ.isLoading ||
+		escalationSummaryQ.isLoading;
 
-	const waves = useMemo(
-		() =>
-			Array.from(new Set(rowsWithProgress.map((r) => String(r.wave)))).sort(
-				(a, b) => Number(a) - Number(b)
-			),
-		[rowsWithProgress]
-	);
-
-	const progressRows = useMemo(() => {
-		if (waveFilter === "all") return rowsWithProgress;
-		return rowsWithProgress.filter((row) => String(row.wave) === waveFilter);
-	}, [rowsWithProgress, waveFilter]);
+	const waves = useMemo(() => {
+		const fromRows = pageRows.map((r) => String(r.wave));
+		return Array.from(new Set([...fromRows, "1", "2", "3", "4"])).sort(
+			(a, b) => Number(a) - Number(b)
+		);
+	}, [pageRows]);
 
 	const progressSummary = useMemo(() => {
 		if (waveFilter === "all" && kpisRawQ.data) {
 			return kpisToProgressSummary(kpisRawQ.data);
 		}
-		if (progressRows.length === 0) {
-			return emptyProgressSummary();
+		if (progressSummaryQ.data) {
+			return progressSummaryQ.data;
 		}
-		return summarizeProgressFromRows(progressRows);
-	}, [waveFilter, kpisRawQ.data, progressRows]);
+		return emptyProgressSummary();
+	}, [waveFilter, kpisRawQ.data, progressSummaryQ.data]);
 
 	const hasFilters =
 		Boolean(search.trim()) ||
 		statusFilter !== "all" ||
 		analystFilter !== "all" ||
 		escalationFilter !== "all" ||
-		waveFilter !== "all";
+		waveFilter !== "all" ||
+		whitelistFilter !== "all" ||
+		stageFilter !== "all";
 
-	const listLoadError = rowsPageQ.error ?? summaryRowsQ.error;
+	const extraFilterCount =
+		(whitelistFilter !== "all" ? 1 : 0) + (stageFilter !== "all" ? 1 : 0);
+
+	const listLoadError = rowsPageQ.error;
 	const waveSummaryUnavailable =
-		waveFilter !== "all" && Boolean(summaryRowsQ.error);
+		waveFilter !== "all" && Boolean(progressSummaryQ.error);
 
 	const tableEmptyMessage = useMemo(() => {
 		if (listLoadError) {
@@ -364,10 +491,7 @@ function MyWorkQueueBody() {
 		return "No TPA/TPV records yet.";
 	}, [listLoadError, hasFilters]);
 
-	const statusEstimatedProgress = useMemo(
-		() => rowsUseStatusEstimatedProgress(progressRows),
-		[progressRows]
-	);
+	const statusEstimatedProgress = false;
 
 	useEffect(() => {
 		setPage(1);
@@ -377,6 +501,8 @@ function MyWorkQueueBody() {
 		analystFilter,
 		escalationFilter,
 		waveFilter,
+		whitelistFilter,
+		stageFilter,
 		pageSize,
 	]);
 
@@ -395,9 +521,11 @@ function MyWorkQueueBody() {
 	const analysts = useMemo(
 		() =>
 			Array.from(
-				new Set(rowsWithProgress.map((r) => r.assignedAnalyst))
+				new Set(
+					(analystStatsQ.data ?? []).map((row) => row.analyst).filter(Boolean)
+				)
 			).sort(),
-		[rowsWithProgress]
+		[analystStatsQ.data]
 	);
 
 	function applyKpiFilter(id: string) {
@@ -409,7 +537,7 @@ function MyWorkQueueBody() {
 		else if (id === "exceptions") setStatusFilter("exception");
 		else if (id === "escalations") {
 			setStatusFilter("all");
-			setEscalationFilter("escalation_required");
+			setEscalationFilter("escalated");
 		} else if (id === "not_started") setStatusFilter("not_started");
 	}
 
@@ -419,6 +547,8 @@ function MyWorkQueueBody() {
 		setAnalystFilter("all");
 		setEscalationFilter("all");
 		setWaveFilter("all");
+		setWhitelistFilter("all");
+		setStageFilter("all");
 		setPage(1);
 	}
 
@@ -428,9 +558,12 @@ function MyWorkQueueBody() {
 			invalidate();
 			await Promise.all([
 				rowsPageQ.refetch(),
-				summaryRowsQ.refetch(),
 				kpisQ.refetch(),
 				kpisRawQ.refetch(),
+				progressSummaryQ.refetch(),
+				analystStatsQ.refetch(),
+				escalationSummaryQ.refetch(),
+				blockersQ.refetch(),
 			]);
 		} finally {
 			setRefreshing(false);
@@ -692,11 +825,7 @@ function MyWorkQueueBody() {
 				</div>
 			) : null}
 
-			{!listLoadError &&
-			!rowsPageQ.isLoading &&
-			!summaryRowsQ.isLoading &&
-			totalCount === 0 &&
-			!hasFilters ? (
+			{!listLoadError && !rowsPageQ.isLoading && totalCount === 0 && !hasFilters ? (
 				<div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
 					No migration cases yet. Use{" "}
 					<span className="font-medium text-foreground">Import</span> or{" "}
@@ -764,9 +893,11 @@ function MyWorkQueueBody() {
 				</div>
 			</section>
 
-			<div className="grid gap-4 xl:grid-cols-2">
+			<div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_min(100%,260px)]">
 				<EdiAnalystProgressSection
-					rows={progressRows}
+					rows={pageRows}
+					analysts={analystStatsQ.data}
+					loading={analystStatsQ.isLoading}
 					activeAnalyst={analystFilter}
 					statusEstimated={statusEstimatedProgress}
 					onAnalystSelect={(analyst) => {
@@ -775,7 +906,10 @@ function MyWorkQueueBody() {
 					}}
 				/>
 				<EscalationSummarySection
-					rows={progressRows}
+					rows={pageRows}
+					summary={escalationSummaryQ.data}
+					blockerRows={blockersQ.data}
+					loading={escalationSummaryQ.isLoading}
 					activeFilter={escalationFilter}
 					onFilterChange={(status) => {
 						setEscalationFilter(status);
@@ -787,7 +921,7 @@ function MyWorkQueueBody() {
 
 			<section className="overflow-hidden rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]">
 				<div className="flex flex-wrap items-center gap-2 border-b border-border/50 px-3 py-2.5">
-					<div className="relative min-w-[180px] flex-1">
+					<div className="relative min-w-[160px] flex-1">
 						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							value={search}
@@ -796,104 +930,198 @@ function MyWorkQueueBody() {
 								setPage(1);
 							}}
 							placeholder="Search name, code, server, email…"
-							className={cn(compactFieldClass, "pl-8")}
+							className={cn(compactFieldClass, "w-full pl-8")}
 						/>
 					</div>
-					<Select
-						value={statusFilter}
-						onValueChange={(v) => {
-							setStatusFilter(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className={cn(compactFieldClass, "w-[160px]")}>
-							<SelectValue placeholder="All status" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All migration status</SelectItem>
-							{(Object.keys(MIGRATION_STATUS_LABEL) as MigrationStatus[]).map(
-								(key) => (
-									<SelectItem key={key} value={key}>
-										{MIGRATION_STATUS_LABEL[key]}
-									</SelectItem>
-								)
-							)}
-						</SelectContent>
-					</Select>
-					<Select
-						value={analystFilter}
-						onValueChange={(v) => {
-							setAnalystFilter(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className={cn(compactFieldClass, "w-[140px]")}>
-							<SelectValue placeholder="All analysts" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All analysts</SelectItem>
-							{analysts.map((name) => (
-								<SelectItem key={name} value={name}>
-									{name}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-					<Select
-						value={escalationFilter}
-						onValueChange={(v) => {
-							setEscalationFilter(v as EscalationStatus | "all");
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className={cn(compactFieldClass, "w-[160px]")}>
-							<SelectValue placeholder="Escalation status" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All escalation status</SelectItem>
-							<SelectItem value="escalation_required">
-								Escalation Required
-							</SelectItem>
-							<SelectItem value="attention">Attention</SelectItem>
-							<SelectItem value="escalated">Escalated</SelectItem>
-							<SelectItem value="resolved">Resolved</SelectItem>
-						</SelectContent>
-					</Select>
-					{hasFilters ? (
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							className="h-8 px-2 text-xs text-primary"
-							onClick={clearFilters}
+					<div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+						<Select
+							value={statusFilter}
+							onValueChange={(v) => {
+								setStatusFilter(v);
+								setPage(1);
+							}}
 						>
-							Clear
-						</Button>
-					) : null}
+							<SelectTrigger className={cn(compactFieldClass, "w-[160px]")}>
+								<SelectValue placeholder="All status" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All migration status</SelectItem>
+								{(Object.keys(MIGRATION_STATUS_LABEL) as MigrationStatus[]).map(
+									(key) => (
+										<SelectItem key={key} value={key}>
+											{MIGRATION_STATUS_LABEL[key]}
+										</SelectItem>
+									)
+								)}
+							</SelectContent>
+						</Select>
+						<Select
+							value={analystFilter}
+							onValueChange={(v) => {
+								setAnalystFilter(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(compactFieldClass, "w-[140px]")}>
+								<SelectValue placeholder="All analysts" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All analysts</SelectItem>
+								{analysts.map((name) => (
+									<SelectItem key={name} value={name}>
+										{name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={escalationFilter}
+							onValueChange={(v) => {
+								setEscalationFilter(v as EscalationStatus | "all");
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(compactFieldClass, "w-[160px]")}>
+								<SelectValue placeholder="Escalation status" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All escalation status</SelectItem>
+								{ESCALATION_STATUS_SELECT_OPTIONS.map((key) => (
+									<SelectItem key={key} value={key}>
+										{ESCALATION_STATUS_LABEL[key]}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Popover>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									className={cn(
+										compactFieldClass,
+										"h-8 gap-1.5 px-2.5 shadow-none",
+										extraFilterCount > 0 && "border-primary/40 bg-primary/5"
+									)}
+								>
+									<SlidersHorizontal className="size-3.5 shrink-0" />
+									More filters
+									{extraFilterCount > 0 ? (
+										<span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+											{extraFilterCount}
+										</span>
+									) : null}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="end" className="w-72 space-y-3 p-3">
+								<div className="space-y-1">
+									<p className="text-xs font-medium text-foreground">
+										Whitelist
+									</p>
+									<Select
+										value={whitelistFilter}
+										onValueChange={(v) => {
+											setWhitelistFilter(v);
+											setPage(1);
+										}}
+									>
+										<SelectTrigger className={cn(compactFieldClass, "w-full")}>
+											<SelectValue placeholder="All whitelist" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="all">All whitelist</SelectItem>
+											{(
+												Object.keys(
+													WHITELIST_STATUS_LABEL
+												) as WhitelistStatus[]
+											).map((key) => (
+												<SelectItem key={key} value={key}>
+													{WHITELIST_STATUS_LABEL[key]}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-1">
+									<p className="text-xs font-medium text-foreground">
+										Current stage
+									</p>
+									<Select
+										value={stageFilter}
+										onValueChange={(v) => {
+											setStageFilter(v);
+											setPage(1);
+										}}
+									>
+										<SelectTrigger className={cn(compactFieldClass, "w-full")}>
+											<SelectValue placeholder="All stages" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="all">All stages</SelectItem>
+											{CURRENT_STAGE_OPTIONS.map((stage) => (
+												<SelectItem key={stage.value} value={stage.value}>
+													{stage.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								{extraFilterCount > 0 ? (
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="h-8 w-full text-xs text-primary"
+										onClick={() => {
+											setWhitelistFilter("all");
+											setStageFilter("all");
+											setPage(1);
+										}}
+									>
+										Reset extra filters
+									</Button>
+								) : null}
+							</PopoverContent>
+						</Popover>
+						{hasFilters ? (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-8 px-2 text-xs text-primary"
+								onClick={clearFilters}
+							>
+								Clear
+							</Button>
+						) : null}
+					</div>
 				</div>
 
-				<div className="w-full overflow-hidden">
-					<Table className="w-full table-fixed">
+				<div className="w-full overflow-x-auto">
+					<Table className="w-full min-w-[1320px] table-fixed">
 						<TableHeader>
 							<TableRow className="border-b border-border bg-muted/50 hover:bg-muted/50">
 								<TableHead className={cn(th, "w-[3%] text-center")}>
 									<span className="sr-only">Select</span>
 								</TableHead>
-								<TableHead className={cn(th, "w-[5%]")}>Wave</TableHead>
-								<TableHead className={cn(th, "w-[14%]")}>TPA/TPV</TableHead>
-								<TableHead className={cn(th, "w-[10%]")}>Server</TableHead>
-								<TableHead className={cn(th, "w-[13%]")}>Email</TableHead>
-								<TableHead className={cn(th, "w-[12%]")}>
+								<TableHead className={cn(th, "w-[4%]")}>Wave</TableHead>
+								<TableHead className={cn(th, "w-[12%]")}>TPA/TPV</TableHead>
+								<TableHead className={cn(th, "w-[8%]")}>Server</TableHead>
+								<TableHead className={cn(th, "w-[10%]")}>Email</TableHead>
+								<TableHead className={cn(th, "w-[8%]")}>IP Whitelist</TableHead>
+								<TableHead className={cn(th, "w-[8%]")}>Last Comm</TableHead>
+								<TableHead className={cn(th, "w-[10%]")}>Notes</TableHead>
+								<TableHead className={cn(th, "w-[9%]")}>
 									SFTP Progress
 								</TableHead>
-								<TableHead className={cn(th, "w-[12%]")}>
+								<TableHead className={cn(th, "w-[9%]")}>
 									EDI Progress
 								</TableHead>
-								<TableHead className={cn(th, "w-[9%]")}>Status</TableHead>
-								<TableHead className={cn(th, "w-[8%]")}>Analyst</TableHead>
-								<TableHead className={cn(th, "w-[8%]")}>Escalation</TableHead>
-								<TableHead className={cn(th, "w-[8%]")}>Updated</TableHead>
-								<TableHead className={cn(th, "w-[6%] text-right")}>
+								<TableHead className={cn(th, "w-[8%]")}>Status</TableHead>
+								<TableHead className={cn(th, "w-[7%]")}>Analyst</TableHead>
+								<TableHead className={cn(th, "w-[7%]")}>Escalation</TableHead>
+								<TableHead className={cn(th, "w-[7%]")}>Updated</TableHead>
+								<TableHead className={cn(th, "w-[5%] text-right")}>
 									Actions
 								</TableHead>
 							</TableRow>
@@ -902,7 +1130,7 @@ function MyWorkQueueBody() {
 							{pageRows.length === 0 ? (
 								<TableRow>
 									<TableCell
-										colSpan={12}
+										colSpan={15}
 										className="h-20 text-center text-sm text-muted-foreground"
 									>
 										{tableEmptyMessage}
@@ -950,6 +1178,21 @@ function MyWorkQueueBody() {
 											title={row.contactEmail}
 										>
 											{row.contactEmail}
+										</TableCell>
+										<TableCell className={td}>
+											<WhitelistStatusPill status={row.whitelistStatus} />
+										</TableCell>
+										<TableCell
+											className={cn(
+												td,
+												"truncate tabular-nums text-muted-foreground"
+											)}
+											title={row.lastCommunication || undefined}
+										>
+											{row.lastCommunication || "—"}
+										</TableCell>
+										<TableCell className={cn(td, "max-w-[140px]")}>
+											<WorkQueueNotesCell notes={row.notes} />
 										</TableCell>
 										<TableCell className={td}>
 											<ProgressTrackCell
