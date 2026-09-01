@@ -2,7 +2,10 @@ import type {
 	MigrationCaseDto,
 	MigrationCaseEventDto,
 	MigrationCaseProgressDto,
+	WorkQueueAnalystStatsRowDto,
+	WorkQueueBlockerRowDto,
 	WorkQueueKpisDto,
+	WorkQueueProgressSummaryDto,
 } from "@/lib/vendor-core/types";
 
 import {
@@ -14,7 +17,9 @@ import {
 	type WhitelistStatus,
 } from "../../work-queue-types";
 import {
+	type AnalystProgressRow,
 	type EscalationStatus,
+	type EscalationSummary,
 } from "../../work-queue-analyst-escalation";
 import {
 	EMPTY_EDI_PROGRESS,
@@ -321,6 +326,77 @@ export function kpisToProgressSummary(kpis: WorkQueueKpisDto) {
 			totalCount: edi?.total_count ?? 0,
 		},
 	};
+}
+
+function analystDisplayName(
+	analyst: WorkQueueAnalystStatsRowDto["analyst"]
+): string {
+	if (!analyst) return "Unassigned";
+	return (
+		analyst.full_name?.trim() ||
+		[analyst.first_name, analyst.last_name].filter(Boolean).join(" ").trim() ||
+		analyst.username?.trim() ||
+		analyst.email?.trim() ||
+		"Unassigned"
+	);
+}
+
+export function analystStatsToProgressRows(
+	rows: WorkQueueAnalystStatsRowDto[]
+): AnalystProgressRow[] {
+	return rows.map((row) => {
+		const analyst = analystDisplayName(row.analyst);
+		const assigned = row.assigned_count;
+		const pct = (n: number) =>
+			assigned ? Math.round((n / assigned) * 100) : 0;
+		return {
+			analyst,
+			analystId: row.analyst?.id ?? null,
+			assigned,
+			sftpComplete: row.sftp_complete_count,
+			sftpPct: pct(row.sftp_complete_count),
+			ediComplete: row.edi_complete_count,
+			ediPct: pct(row.edi_complete_count),
+			inProgress: row.in_progress_count,
+			inProgressPct: pct(row.in_progress_count),
+			blockedEscalated: row.blocked_escalated_count,
+			blockedPct: pct(row.blocked_escalated_count),
+		};
+	});
+}
+
+export function progressSummaryDtoToUi(dto: WorkQueueProgressSummaryDto) {
+	return {
+		sftp: {
+			percent: dto.sftp.percent,
+			completeCount: dto.sftp.complete_count,
+			totalCount: dto.sftp.total_count,
+		},
+		edi: {
+			percent: dto.edi.percent,
+			completeCount: dto.edi.complete_count,
+			totalCount: dto.edi.total_count,
+		},
+	};
+}
+
+export function blockerRowsToEscalationSummary(
+	rows: WorkQueueBlockerRowDto[]
+): EscalationSummary {
+	const summary: EscalationSummary = {
+		escalation_required: 0,
+		attention: 0,
+		escalated: 0,
+		resolved: 0,
+	};
+	for (const row of rows) {
+		const status = (row.blocker_status ||
+			row.escalation_status ||
+			"none") as EscalationStatus;
+		if (status === "none") continue;
+		if (status in summary) summary[status] += 1;
+	}
+	return summary;
 }
 
 export type { ProgressTrack };

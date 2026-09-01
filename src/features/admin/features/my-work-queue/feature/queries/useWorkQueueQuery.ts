@@ -10,6 +10,8 @@ import type {
 	MigrationCaseListQuery,
 	MigrationCaseUpdateInput,
 	MigrationStatusDto,
+	WhitelistStatusDto,
+	WorkQueueFilterQuery,
 	WorkQueueSeedInput,
 } from "@/lib/vendor-core/types";
 
@@ -18,21 +20,31 @@ import {
 	assignMigrationCase,
 	bulkSetMigrationCaseStatus,
 	createMigrationCase,
+	deleteMigrationCase,
 	deleteMigrationCaseDocument,
 	getMigrationCaseDetail,
+	getWorkQueueAnalystStats,
+	getWorkQueueEscalationSummary,
 	getWorkQueueKpiCards,
 	getWorkQueueKpisRaw,
+	getWorkQueueProgressSummary,
 	importWorkQueueSpreadsheet,
 	listMigrationCaseDocuments,
 	listMigrationCaseHistory,
+	listWorkQueueBlockers,
 	listWorkQueueRows,
 	listWorkQueueRowsPage,
+	markMigrationCaseException,
+	markMigrationCaseProductionReady,
 	markMigrationCaseReady,
 	markMigrationCaseTesting,
 	markMigrationCaseWaitingOnVendor,
+	restoreMigrationCase,
 	seedWorkQueue,
 	setMigrationCaseEscalation,
 	setMigrationCaseStatus,
+	setMigrationCaseWhitelist,
+	transitionMigrationCaseBlocker,
 	updateMigrationCase,
 	updateMigrationCaseProgress,
 	uploadMigrationCaseDocument,
@@ -75,12 +87,68 @@ export function useWorkQueueKpisQuery(enabled = true) {
 	);
 }
 
-export function useWorkQueueKpisRawQuery(enabled = true) {
+export function useWorkQueueKpisRawQuery(
+	params?: WorkQueueFilterQuery,
+	enabled = true
+) {
 	return useVendorCoreFeatureQuery(
 		domain,
 		"kpis-raw",
-		() => getWorkQueueKpisRaw(),
-		enabled
+		() => getWorkQueueKpisRaw(params),
+		enabled,
+		[params]
+	);
+}
+
+export function useWorkQueueProgressSummaryQuery(
+	params?: WorkQueueFilterQuery,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"progress-summary",
+		() => getWorkQueueProgressSummary(params),
+		enabled,
+		[params]
+	);
+}
+
+export function useWorkQueueAnalystStatsQuery(
+	params?: WorkQueueFilterQuery,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"analyst-stats",
+		() => getWorkQueueAnalystStats(params),
+		enabled,
+		[params]
+	);
+}
+
+export function useWorkQueueEscalationSummaryQuery(
+	params?: WorkQueueFilterQuery,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"escalation-summary",
+		() => getWorkQueueEscalationSummary(params),
+		enabled,
+		[params]
+	);
+}
+
+export function useWorkQueueBlockersQuery(
+	params?: WorkQueueFilterQuery,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"blockers",
+		() => listWorkQueueBlockers(params),
+		enabled,
+		[params]
 	);
 }
 
@@ -176,6 +244,63 @@ export function useMarkMigrationCaseWaitingOnVendorMutation() {
 		{ id: string }
 	>(domain, {
 		mutationFn: ({ id }) => markMigrationCaseWaitingOnVendor(id),
+	});
+}
+
+export function useMarkMigrationCaseExceptionMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof markMigrationCaseException>>,
+		{ id: string }
+	>(domain, {
+		mutationFn: ({ id }) => markMigrationCaseException(id),
+	});
+}
+
+export function useMarkMigrationCaseProductionReadyMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof markMigrationCaseProductionReady>>,
+		{ id: string }
+	>(domain, {
+		mutationFn: ({ id }) => markMigrationCaseProductionReady(id),
+	});
+}
+
+export function useSetMigrationCaseWhitelistMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof setMigrationCaseWhitelist>>,
+		{ id: string; whitelist_status: WhitelistStatusDto | string }
+	>(domain, {
+		mutationFn: ({ id, whitelist_status }) =>
+			setMigrationCaseWhitelist(id, whitelist_status),
+	});
+}
+
+export function useTransitionMigrationCaseBlockerMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof transitionMigrationCaseBlocker>>,
+		{
+			id: string;
+			blocker_status: string;
+			blocker_reason?: string | null;
+			blocker_notes?: string;
+		}
+	>(domain, {
+		mutationFn: ({ id, ...body }) => transitionMigrationCaseBlocker(id, body),
+	});
+}
+
+export function useDeleteMigrationCaseMutation() {
+	return useVendorCoreFeatureMutation<void, { id: string }>(domain, {
+		mutationFn: ({ id }) => deleteMigrationCase(id),
+	});
+}
+
+export function useRestoreMigrationCaseMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof restoreMigrationCase>>,
+		{ id: string }
+	>(domain, {
+		mutationFn: ({ id }) => restoreMigrationCase(id),
 	});
 }
 
