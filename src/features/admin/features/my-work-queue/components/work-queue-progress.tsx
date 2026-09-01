@@ -31,17 +31,27 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 import type { TpaTpvRow } from "../work-queue-types";
 import {
 	type ConnectionProgress,
+	EDI_MILESTONE_DEFS,
 	type GuideTrack,
 	type MilestoneState,
 	type ProgressTrack,
+	SFTP_MILESTONE_DEFS,
 	WORK_QUEUE_GUIDE_TRACKS,
 	emptyProgressSummary,
 	progressFromMilestones,
 } from "../progress-data";
+import {
+	applyMilestoneDateChange,
+	canSetEdiProgress,
+	percentFromCompletedKeys,
+	toggleMilestoneCompletion,
+	validateEdiMilestoneSave,
+} from "../progress-rules";
 
 type StatCardColor = "blue" | "green";
 
@@ -360,16 +370,19 @@ function MilestoneDateField({
 	id,
 	value,
 	onChange,
+	disabled,
 }: {
 	id: string;
 	value: string;
 	onChange: (value: string) => void;
+	disabled?: boolean;
 }) {
 	return (
 		<div className="relative">
 			<Input
 				id={id}
 				value={value}
+				disabled={disabled}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder="MM/DD/YYYY"
 				className="h-9 rounded-sm border-border bg-background pr-9 pl-2 text-center text-xs tabular-nums shadow-none"
@@ -385,15 +398,23 @@ function MilestoneDateField({
 function MilestoneCompleteToggle({
 	complete,
 	onToggle,
+	disabled,
 }: {
 	complete: boolean;
 	onToggle: () => void;
+	disabled?: boolean;
 }) {
 	return (
 		<button
 			type="button"
+			disabled={disabled}
 			onClick={onToggle}
-			className="flex size-6 shrink-0 items-center justify-center rounded-full transition-colors"
+			className={cn(
+				"flex size-6 shrink-0 items-center justify-center rounded-full transition-colors",
+				disabled
+					? "cursor-not-allowed opacity-40"
+					: "hover:bg-muted/60"
+			)}
 			aria-label={complete ? "Mark incomplete" : "Mark complete"}
 		>
 			{complete ? (
@@ -425,6 +446,10 @@ export function WorkQueueProgressEditor({
 	variant = "panel",
 }: WorkQueueProgressEditorProps) {
 	const progress = track === "sftp" ? row.sftpProgress : row.ediProgress;
+	const milestoneDefs =
+		track === "sftp" ? SFTP_MILESTONE_DEFS : EDI_MILESTONE_DEFS;
+	const ediBlocked =
+		track === "edi" && !canSetEdiProgress(row.sftpProgress.percent);
 
 	const [milestones, setMilestones] = useState<MilestoneState[]>([]);
 	const [notes, setNotes] = useState("");
@@ -434,31 +459,71 @@ export function WorkQueueProgressEditor({
 		setNotes(progress.notes);
 	}, [progress, row.id, track]);
 
-	function toggleMilestone(key: string, checked: boolean) {
-		const today = new Date().toLocaleDateString("en-US", {
+	function defaultMilestoneDate() {
+		return new Date().toLocaleDateString("en-US", {
 			month: "2-digit",
 			day: "2-digit",
 			year: "numeric",
 		});
+	}
+
+	function applyCompletionRows(
+		prev: MilestoneState[],
+		rows: Array<{ key: string; completedAt: string | null }>
+	): MilestoneState[] {
+		const byKey = new Map(rows.map((row) => [row.key, row.completedAt]));
+		return prev.map((m) => ({
+			...m,
+			completedAt: byKey.get(m.key) ?? null,
+		}));
+	}
+
+	function toggleMilestone(key: string, checked: boolean) {
+		if (ediBlocked) return;
+		const today = defaultMilestoneDate();
 		setMilestones((prev) =>
-			prev.map((m) =>
-				m.key === key
-					? { ...m, completedAt: checked ? m.completedAt || today : null }
-					: m
+			applyCompletionRows(
+				prev,
+				toggleMilestoneCompletion(
+					milestoneDefs,
+					prev.map((m) => ({ key: m.key, completedAt: m.completedAt })),
+					key,
+					checked,
+					today
+				)
 			)
 		);
 	}
 
 	function handleDateChange(key: string, date: string) {
-		const trimmed = date.trim();
+		if (ediBlocked) return;
+		const today = defaultMilestoneDate();
 		setMilestones((prev) =>
-			prev.map((m) =>
-				m.key === key ? { ...m, completedAt: trimmed || null } : m
+			applyCompletionRows(
+				prev,
+				applyMilestoneDateChange(
+					milestoneDefs,
+					prev.map((m) => ({ key: m.key, completedAt: m.completedAt })),
+					key,
+					date,
+					today
+				)
 			)
 		);
 	}
 
 	function handleSave() {
+		if (track === "edi") {
+			const err = validateEdiMilestoneSave(
+				row.sftpProgress.percent,
+				milestones
+			);
+			if (err) {
+				toast.error(err);
+				return;
+			}
+		}
+
 		const next = progressFromMilestones(milestones, {
 			updatedBy: progress.updatedBy || row.assignedAnalyst,
 			updatedAt: new Date().toLocaleString("en-US", {
@@ -476,8 +541,27 @@ export function WorkQueueProgressEditor({
 	const title =
 		track === "sftp" ? "Update SFTP Progress" : "Update EDI Progress";
 
+	const livePercent = percentFromCompletedKeys(
+		milestoneDefs,
+		milestones.filter((m) => m.completedAt).map((m) => m.key)
+	);
+
 	const editorBody = (
 		<>
+			{ediBlocked ? (
+				<p className="mb-3 rounded-sm border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+					EDI milestones require SFTP at 100% (currently{" "}
+					{row.sftpProgress.percent}%). Complete SFTP first.
+				</p>
+			) : (
+				<p className="mb-3 text-xs text-muted-foreground">
+					Current progress:{" "}
+					<span className="font-medium tabular-nums text-foreground">
+						{livePercent}%
+					</span>
+				</p>
+			)}
+
 			<div className="space-y-2">
 				{milestones.map((m) => {
 					const complete = Boolean(m.completedAt);
@@ -495,10 +579,12 @@ export function WorkQueueProgressEditor({
 							<MilestoneDateField
 								id={`${row.id}-${m.key}`}
 								value={m.completedAt ?? ""}
+								disabled={ediBlocked}
 								onChange={(date) => handleDateChange(m.key, date)}
 							/>
 							<MilestoneCompleteToggle
 								complete={complete}
+								disabled={ediBlocked}
 								onToggle={() => toggleMilestone(m.key, !complete)}
 							/>
 						</div>
@@ -546,7 +632,7 @@ export function WorkQueueProgressEditor({
 				<Button
 					size="sm"
 					className="h-9 min-w-[92px] rounded-sm shadow-none"
-					disabled={saving}
+					disabled={saving || ediBlocked}
 					onClick={handleSave}
 				>
 					Save progress

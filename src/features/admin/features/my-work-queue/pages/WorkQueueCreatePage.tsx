@@ -28,10 +28,25 @@ import {
 	useCreateMigrationCaseMutation,
 	useInvalidateVendorCore,
 	useSetMigrationCaseStatusMutation,
-	useWorkQueueRowsQuery,
+	useUpdateMigrationCaseProgressMutation,
 } from "../feature/queries/useWorkQueueQuery";
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
-import { SFTP_MILESTONE_DEFS } from "../progress-data";
+import {
+	EDI_MILESTONE_DEFS,
+	SFTP_MILESTONE_DEFS,
+	buildMilestones,
+	progressFromMilestones,
+} from "../progress-data";
+import {
+	applyEdiMilestoneStatusChange,
+	applyEdiPercentChange,
+	applySftpMilestoneStatusChange,
+	applySftpPercentChange,
+	canSetEdiProgress,
+	completedKeysForPercent,
+	completedKeysFromStatuses,
+	type MilestoneUiStatus,
+} from "../progress-rules";
 import {
 	MIGRATION_STATUS_LABEL,
 	type MigrationStatus,
@@ -46,14 +61,15 @@ const WAVE_OPTIONS = ["1", "2", "3", "4"] as const;
 
 const SERVER_OPTIONS = ["New SFTP", "Legacy SFTP", "API Feed"] as const;
 
-const REGISTRATION_MILESTONES = [
-	...SFTP_MILESTONE_DEFS.map((m) => ({ key: m.key, label: m.label })),
-	{ key: "edi_complete", label: "EDI Complete" },
-] as const;
+function emptyTrackStatuses(
+	defs: typeof SFTP_MILESTONE_DEFS
+): Record<string, MilestoneUiStatus> {
+	return Object.fromEntries(
+		defs.map((m) => [m.key, "not_started" as MilestoneUiStatus])
+	);
+}
 
-type MilestoneStatus = "not_started" | "in_progress" | "complete";
-
-const MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
+const MILESTONE_STATUS_LABEL: Record<MilestoneUiStatus, string> = {
 	not_started: "Not Started",
 	in_progress: "In Progress",
 	complete: "Complete",
@@ -70,7 +86,8 @@ type RegistrationForm = {
 	status: MigrationStatus;
 	analystId: string;
 	notes: string;
-	milestones: Record<string, MilestoneStatus>;
+	sftpMilestones: Record<string, MilestoneUiStatus>;
+	ediMilestones: Record<string, MilestoneUiStatus>;
 };
 
 const EMPTY_FORM: RegistrationForm = {
@@ -84,12 +101,8 @@ const EMPTY_FORM: RegistrationForm = {
 	status: "not_started",
 	analystId: "",
 	notes: "",
-	milestones: Object.fromEntries(
-		REGISTRATION_MILESTONES.map((m) => [
-			m.key,
-			"not_started" as MilestoneStatus,
-		])
-	),
+	sftpMilestones: emptyTrackStatuses(SFTP_MILESTONE_DEFS),
+	ediMilestones: emptyTrackStatuses(EDI_MILESTONE_DEFS),
 };
 
 const fieldClass =
@@ -115,14 +128,18 @@ function ProgressSliderField({
 	value,
 	onChange,
 	required,
+	disabled,
+	helperText,
 }: {
 	label: string;
 	value: number;
 	onChange: (value: number) => void;
 	required?: boolean;
+	disabled?: boolean;
+	helperText?: string;
 }) {
 	return (
-		<div>
+		<div className={disabled ? "opacity-60" : undefined}>
 			<FieldLabel required={required}>{label}</FieldLabel>
 			<div className="flex items-center gap-3 pt-1">
 				<Slider
@@ -130,6 +147,7 @@ function ProgressSliderField({
 					min={0}
 					max={100}
 					step={1}
+					disabled={disabled}
 					onValueChange={(v) => onChange(v[0] ?? 0)}
 					className="flex-1"
 				/>
@@ -139,6 +157,7 @@ function ProgressSliderField({
 						min={0}
 						max={100}
 						value={value}
+						disabled={disabled}
 						onChange={(e) => {
 							const n = Number(e.target.value);
 							onChange(Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0);
@@ -148,6 +167,9 @@ function ProgressSliderField({
 					<span className="text-xs text-muted-foreground">%</span>
 				</div>
 			</div>
+			{helperText ? (
+				<p className="mt-1.5 text-[11px] text-muted-foreground">{helperText}</p>
+			) : null}
 		</div>
 	);
 }
@@ -159,7 +181,7 @@ function WorkQueueCreateBody() {
 	const createCase = useCreateMigrationCaseMutation();
 	const assignCase = useAssignMigrationCaseMutation();
 	const setStatus = useSetMigrationCaseStatusMutation();
-	const rowsQ = useWorkQueueRowsQuery({ limit: 100, offset: 0 }, useLive);
+	const updateProgress = useUpdateMigrationCaseProgressMutation();
 	const usersQ = useVendorCoreUsersQuery();
 
 	const [form, setForm] = useState<RegistrationForm>(EMPTY_FORM);
@@ -179,22 +201,36 @@ function WorkQueueCreateBody() {
 			.sort((a, b) => a.label.localeCompare(b.label));
 	}, [usersQ.data]);
 
-	const analystLabelsFromRows = useMemo(() => {
-		const fromRows = (rowsQ.data ?? [])
-			.map((r) => r.assignedAnalyst)
-			.filter((name) => name && name !== "Unassigned");
-		return Array.from(new Set(fromRows)).sort();
-	}, [rowsQ.data]);
-
 	useEffect(() => {
 		try {
 			const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
 			if (!raw) return;
-			const parsed = JSON.parse(raw) as Partial<RegistrationForm>;
+			const parsed = JSON.parse(raw) as Partial<RegistrationForm> & {
+				milestones?: Record<string, MilestoneUiStatus>;
+			};
 			setForm((prev) => ({
 				...prev,
 				...parsed,
-				milestones: { ...prev.milestones, ...parsed.milestones },
+				sftpMilestones: {
+					...prev.sftpMilestones,
+					...parsed.sftpMilestones,
+					...(parsed.milestones
+						? (Object.fromEntries(
+								SFTP_MILESTONE_DEFS.filter((m) => {
+									const status = parsed.milestones?.[m.key];
+									return (
+										status === "complete" ||
+										status === "in_progress" ||
+										status === "not_started"
+									);
+								}).map((m) => [m.key, parsed.milestones![m.key]!])
+							) as Record<string, MilestoneUiStatus>)
+						: {}),
+				},
+				ediMilestones: {
+					...prev.ediMilestones,
+					...parsed.ediMilestones,
+				},
 			}));
 		} catch {
 			/* ignore corrupt draft */
@@ -205,11 +241,53 @@ function WorkQueueCreateBody() {
 		setForm((prev) => ({ ...prev, ...next }));
 	}
 
-	function patchMilestone(key: string, status: MilestoneStatus) {
+	function setSftpPercent(rawPercent: number) {
 		setForm((prev) => ({
 			...prev,
-			milestones: { ...prev.milestones, [key]: status },
+			...applySftpPercentChange(prev, rawPercent),
 		}));
+	}
+
+	function setEdiPercent(rawPercent: number) {
+		setForm((prev) => {
+			const next = applyEdiPercentChange(
+				prev.sftpProgress,
+				prev.ediMilestones,
+				rawPercent
+			);
+			if (!next) {
+				toast.error(
+					"EDI progress requires SFTP at 100% before any EDI milestone is set."
+				);
+				return prev;
+			}
+			return { ...prev, ...next };
+		});
+	}
+
+	function patchSftpMilestone(key: string, status: MilestoneUiStatus) {
+		setForm((prev) => ({
+			...prev,
+			...applySftpMilestoneStatusChange(prev.sftpMilestones, key, status),
+		}));
+	}
+
+	function patchEdiMilestone(key: string, status: MilestoneUiStatus) {
+		setForm((prev) => {
+			const next = applyEdiMilestoneStatusChange(
+				prev.sftpProgress,
+				prev.ediMilestones,
+				key,
+				status
+			);
+			if (!next) {
+				toast.error(
+					"EDI milestones require SFTP at 100% before any EDI milestone is set."
+				);
+				return prev;
+			}
+			return { ...prev, ...next };
+		});
 	}
 
 	function validate(): string | null {
@@ -218,6 +296,27 @@ function WorkQueueCreateBody() {
 		if (!form.serverType) return "Select a server type.";
 		if (!form.status) return "Select a migration status.";
 		return null;
+	}
+
+	function buildInitialProgress(
+		defs: typeof SFTP_MILESTONE_DEFS,
+		statuses: Record<string, MilestoneUiStatus>,
+		percent: number
+	) {
+		let completedKeys = Array.from(
+			completedKeysFromStatuses(defs, statuses)
+		);
+		if (!completedKeys.length && percent > 0) {
+			completedKeys = completedKeysForPercent(defs, percent);
+		}
+		if (!completedKeys.length) return null;
+		const today = new Date().toISOString().slice(0, 10);
+		const dates = Object.fromEntries(completedKeys.map((k) => [k, today]));
+		const milestones = buildMilestones(defs, completedKeys, dates);
+		return progressFromMilestones(milestones, {
+			updatedBy: "",
+			updatedAt: today,
+		});
 	}
 
 	function buildPayload() {
@@ -232,11 +331,6 @@ function WorkQueueCreateBody() {
 			primary_email: form.email.trim(),
 			notes: form.notes.trim(),
 			assigned_to_id: form.analystId || null,
-			metadata: {
-				sftp_progress_percent: form.sftpProgress,
-				edi_progress_percent: form.ediProgress,
-				milestone_status: form.milestones,
-			},
 		};
 	}
 
@@ -282,6 +376,32 @@ function WorkQueueCreateBody() {
 				});
 			}
 
+			const sftpProgress = buildInitialProgress(
+				SFTP_MILESTONE_DEFS,
+				form.sftpMilestones,
+				form.sftpProgress
+			);
+			if (sftpProgress && created.id) {
+				await updateProgress.mutateAsync({
+					id: created.id,
+					track: "sftp",
+					progress: sftpProgress,
+				});
+			}
+
+			const ediProgress = buildInitialProgress(
+				EDI_MILESTONE_DEFS,
+				form.ediMilestones,
+				form.ediProgress
+			);
+			if (ediProgress && created.id) {
+				await updateProgress.mutateAsync({
+					id: created.id,
+					track: "edi",
+					progress: ediProgress,
+				});
+			}
+
 			localStorage.removeItem(DRAFT_STORAGE_KEY);
 			invalidate();
 			toast.success(`${created.name} registered`);
@@ -294,7 +414,11 @@ function WorkQueueCreateBody() {
 	}
 
 	const pending =
-		busy || createCase.isPending || assignCase.isPending || setStatus.isPending;
+		busy ||
+		createCase.isPending ||
+		assignCase.isPending ||
+		setStatus.isPending ||
+		updateProgress.isPending;
 
 	return (
 		<div className="mx-auto w-full max-w-6xl space-y-5 pb-10">
@@ -404,7 +528,7 @@ function WorkQueueCreateBody() {
 								<ProgressSliderField
 									label="SFTP Progress"
 									value={form.sftpProgress}
-									onChange={(v) => patch({ sftpProgress: v })}
+									onChange={setSftpPercent}
 									required
 								/>
 							</div>
@@ -412,7 +536,13 @@ function WorkQueueCreateBody() {
 								<ProgressSliderField
 									label="EDI Progress"
 									value={form.ediProgress}
-									onChange={(v) => patch({ ediProgress: v })}
+									onChange={setEdiPercent}
+									disabled={!canSetEdiProgress(form.sftpProgress)}
+									helperText={
+										canSetEdiProgress(form.sftpProgress)
+											? undefined
+											: "Complete SFTP (100%) before setting EDI milestones."
+									}
 									required
 								/>
 							</div>
@@ -456,12 +586,6 @@ function WorkQueueCreateBody() {
 										))}
 									</SelectContent>
 								</Select>
-								{analystLabelsFromRows.length > 0 ? (
-									<p className="mt-1 text-[11px] text-muted-foreground">
-										Recently assigned:{" "}
-										{analystLabelsFromRows.slice(0, 3).join(", ")}
-									</p>
-								) : null}
 							</div>
 							<div className="sm:col-span-2 lg:col-span-1">
 								<FieldLabel>Notes</FieldLabel>
@@ -478,22 +602,22 @@ function WorkQueueCreateBody() {
 
 					<section className="border-t border-border/50 pt-6">
 						<h2 className="text-sm font-semibold text-foreground">
-							Milestone Status{" "}
+							SFTP Milestones{" "}
 							<span className="font-normal text-muted-foreground">
 								(Optional)
 							</span>
 						</h2>
 						<p className="mt-1 text-xs text-muted-foreground">
-							Set initial milestone status for this TPV/TPA registration.
+							Milestones must be completed in order.
 						</p>
-						<div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-							{REGISTRATION_MILESTONES.map((milestone) => (
+						<div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+							{SFTP_MILESTONE_DEFS.map((milestone) => (
 								<div key={milestone.key} className="min-w-0">
 									<FieldLabel>{milestone.label}</FieldLabel>
 									<Select
-										value={form.milestones[milestone.key] ?? "not_started"}
+										value={form.sftpMilestones[milestone.key] ?? "not_started"}
 										onValueChange={(v) =>
-											patchMilestone(milestone.key, v as MilestoneStatus)
+											patchSftpMilestone(milestone.key, v as MilestoneUiStatus)
 										}
 									>
 										<SelectTrigger className={cn(fieldClass, "text-xs")}>
@@ -501,7 +625,46 @@ function WorkQueueCreateBody() {
 										</SelectTrigger>
 										<SelectContent>
 											{(
-												Object.keys(MILESTONE_STATUS_LABEL) as MilestoneStatus[]
+												Object.keys(MILESTONE_STATUS_LABEL) as MilestoneUiStatus[]
+											).map((key) => (
+												<SelectItem key={key} value={key}>
+													{MILESTONE_STATUS_LABEL[key]}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+							))}
+						</div>
+					</section>
+
+					<section className="border-t border-border/50 pt-6">
+						<h2 className="text-sm font-semibold text-foreground">
+							EDI Milestones{" "}
+							<span className="font-normal text-muted-foreground">
+								(Optional)
+							</span>
+						</h2>
+						<p className="mt-1 text-xs text-muted-foreground">
+							Available only after SFTP is 100%.
+						</p>
+						<div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+							{EDI_MILESTONE_DEFS.map((milestone) => (
+								<div key={milestone.key} className="min-w-0">
+									<FieldLabel>{milestone.label}</FieldLabel>
+									<Select
+										value={form.ediMilestones[milestone.key] ?? "not_started"}
+										onValueChange={(v) =>
+											patchEdiMilestone(milestone.key, v as MilestoneUiStatus)
+										}
+										disabled={!canSetEdiProgress(form.sftpProgress)}
+									>
+										<SelectTrigger className={cn(fieldClass, "text-xs")}>
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											{(
+												Object.keys(MILESTONE_STATUS_LABEL) as MilestoneUiStatus[]
 											).map((key) => (
 												<SelectItem key={key} value={key}>
 													{MILESTONE_STATUS_LABEL[key]}
