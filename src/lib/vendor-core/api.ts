@@ -45,6 +45,7 @@ import type {
 	MemberWriteBody,
 	MigrationCaseBulkStatusInput,
 	MigrationCaseBulkStatusResultDto,
+	MigrationCaseBlockerTransitionInput,
 	MigrationCaseCreateInput,
 	MigrationCaseDocumentDto,
 	MigrationCaseDto,
@@ -102,7 +103,11 @@ import type {
 	VendorNoteUpdateInput,
 	VendorTeamMemberDto,
 	WhitelistStatusDto,
+	WorkQueueAnalystStatsRowDto,
+	WorkQueueBlockerRowDto,
+	WorkQueueFilterQuery,
 	WorkQueueImportResultDto,
+	WorkQueueProgressSummaryDto,
 	WorkQueueSeedInput,
 	WorkQueueSeedResultDto,
 } from "@/lib/vendor-core/types";
@@ -123,7 +128,10 @@ import {
 	normalizeProviderRoster,
 	normalizeValidationResult,
 	normalizeVendor,
+	normalizeWorkQueueAnalystStatsRow,
+	normalizeWorkQueueBlockerRow,
 	normalizeWorkQueueKpis,
+	normalizeWorkQueueProgressSummary,
 } from "@/lib/vendor-core/types";
 
 /**
@@ -333,6 +341,8 @@ export const vendorCoreEndpoints = {
 		`/api/v1/migration-cases/${id}/mark-exception/`,
 	migrationCaseMarkProductionReady: (id: string) =>
 		`/api/v1/migration-cases/${id}/mark-production-ready/`,
+	migrationCaseBlockerTransition: (id: string) =>
+		`/api/v1/migration-cases/${id}/blocker/transition/`,
 	migrationCaseEvents: (id: string) => `/api/v1/migration-cases/${id}/events/`,
 	migrationCaseDocumentsUpload: (id: string) =>
 		`/api/v1/migration-cases/${id}/documents/upload/`,
@@ -341,6 +351,9 @@ export const vendorCoreEndpoints = {
 	migrationCaseDocumentDelete: (caseId: string, docId: string) =>
 		`/api/v1/migration-cases/${caseId}/documents/${docId}/delete/`,
 	workQueueKpis: "/api/v1/work-queue/kpis/",
+	workQueueProgressSummary: "/api/v1/work-queue/progress-summary/",
+	workQueueAnalystStats: "/api/v1/work-queue/analyst-stats/",
+	workQueueBlockersList: "/api/v1/work-queue/blockers/list/",
 	workQueueImport: "/api/v1/work-queue/import/",
 	workQueueSeed: "/api/v1/work-queue/seed/",
 	claimLinesList: "/api/v1/claim-lines/list/",
@@ -2348,6 +2361,17 @@ export const vendorCoreApi = {
 		return normalizeMigrationCase(raw);
 	},
 
+	transitionMigrationCaseBlocker: async (
+		id: string,
+		body: MigrationCaseBlockerTransitionInput
+	) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.migrationCaseBlockerTransition(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		);
+		return normalizeMigrationCase(raw);
+	},
+
 	bulkSetMigrationCaseStatus: (body: MigrationCaseBulkStatusInput) =>
 		vendorCoreFetch<MigrationCaseBulkStatusResultDto>(
 			vendorCoreEndpoints.migrationCasesBulkStatus,
@@ -2401,11 +2425,39 @@ export const vendorCoreApi = {
 		});
 	},
 
-	getWorkQueueKpis: async () => {
+	getWorkQueueKpis: async (params?: WorkQueueFilterQuery) => {
 		const raw = await vendorCoreFetch<Record<string, unknown>>(
-			vendorCoreEndpoints.workQueueKpis
+			vendorCoreEndpoints.workQueueKpis,
+			{ params: params as Record<string, string | number | undefined> }
 		);
 		return normalizeWorkQueueKpis(raw);
+	},
+
+	getWorkQueueProgressSummary: async (params?: WorkQueueFilterQuery) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.workQueueProgressSummary,
+			{ params: params as Record<string, string | number | undefined> }
+		);
+		return normalizeWorkQueueProgressSummary(raw);
+	},
+
+	getWorkQueueAnalystStats: async (params?: WorkQueueFilterQuery) => {
+		const raw = await vendorCoreFetch<unknown>(
+			vendorCoreEndpoints.workQueueAnalystStats,
+			{ params: params as Record<string, string | number | undefined> }
+		);
+		const rows = Array.isArray(raw) ? raw : [];
+		return rows
+			.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+			.map(normalizeWorkQueueAnalystStatsRow);
+	},
+
+	listWorkQueueBlockers: async (params?: WorkQueueFilterQuery) => {
+		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.workQueueBlockersList,
+			{ params: pageParams(params) }
+		);
+		return mapPage(page, normalizeWorkQueueBlockerRow);
 	},
 
 	importWorkQueueSpreadsheet: async (file: File) => {

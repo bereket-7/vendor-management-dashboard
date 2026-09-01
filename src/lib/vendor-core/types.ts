@@ -1396,6 +1396,11 @@ export type MigrationCaseDto = {
 	assigned_to?: MigrationCaseUserCompactDto | null;
 	vendor?: MigrationCaseVendorCompactDto | null;
 	escalation_status?: string;
+	blocker_status?: string;
+	blocker_reason?: string | null;
+	blocker_notes?: string;
+	blocker_updated_at?: string | null;
+	escalated_at?: string | null;
 	sftp_progress?: MigrationCaseProgressDto;
 	edi_progress?: MigrationCaseProgressDto;
 	events?: MigrationCaseEventDto[];
@@ -1423,6 +1428,7 @@ export type MigrationCaseListQuery = {
 	assigned_to_id?: string;
 	vendor_id?: string;
 	escalation_status?: string;
+	blocker_status?: string;
 	search?: string;
 	order_by?: string;
 	limit?: number;
@@ -1470,6 +1476,24 @@ export type MigrationCaseEscalationInput = {
 	escalation_status: string;
 };
 
+export type MigrationCaseBlockerTransitionInput = {
+	blocker_status: string;
+	blocker_reason?: string | null;
+	blocker_notes?: string;
+};
+
+export type WorkQueueFilterQuery = {
+	assigned_to_id?: string;
+	wave?: number;
+	migration_status?: string;
+	vendor_type?: string;
+	escalation_status?: string;
+	blocker_status?: string;
+	search?: string;
+	limit?: number;
+	offset?: number;
+};
+
 export type WorkQueueCompletionSummaryDto = {
 	percent: number;
 	complete_count: number;
@@ -1486,6 +1510,38 @@ export type WorkQueueKpisDto = {
 	escalations?: number;
 	sftp_completion?: WorkQueueCompletionSummaryDto;
 	edi_completion?: WorkQueueCompletionSummaryDto;
+};
+
+export type WorkQueueProgressSummaryDto = {
+	sftp: WorkQueueCompletionSummaryDto;
+	edi: WorkQueueCompletionSummaryDto;
+	in_progress_count: number;
+	blocked_escalated_count: number;
+};
+
+export type WorkQueueAnalystStatsRowDto = {
+	analyst?: MigrationCaseUserCompactDto | null;
+	assigned_count: number;
+	sftp_complete_count: number;
+	edi_complete_count: number;
+	in_progress_count: number;
+	blocked_escalated_count: number;
+};
+
+export type WorkQueueBlockerRowDto = {
+	id: string;
+	code: string;
+	name: string;
+	assigned_to?: MigrationCaseUserCompactDto | null;
+	blocker_status: string;
+	blocker_reason?: string | null;
+	blocker_notes?: string;
+	blocker_updated_at?: string | null;
+	escalated_at?: string | null;
+	escalation_status?: string;
+	sftp_percent: number;
+	edi_percent: number;
+	migration_status: string;
 };
 
 export type WorkQueueImportResultDto = {
@@ -2453,6 +2509,11 @@ export function normalizeMigrationCase(
 		secondary_phone: pickString(raw, "secondary_phone") || "",
 		assigned_to: normalizeMigrationUser(raw.assigned_to),
 		escalation_status: pickString(raw, "escalation_status") || "none",
+		blocker_status: pickString(raw, "blocker_status") || "none",
+		blocker_reason: pickString(raw, "blocker_reason") || null,
+		blocker_notes: pickString(raw, "blocker_notes") || "",
+		blocker_updated_at: pickString(raw, "blocker_updated_at") || null,
+		escalated_at: pickString(raw, "escalated_at") || null,
 		sftp_progress: normalizeMigrationProgress(raw.sftp_progress),
 		edi_progress: normalizeMigrationProgress(raw.edi_progress),
 		vendor: vendorObj
@@ -2515,6 +2576,20 @@ function normalizeMigrationProgress(
 	};
 }
 
+function normalizeWorkQueueCompletionSummary(
+	value: unknown
+): WorkQueueCompletionSummaryDto {
+	if (!value || typeof value !== "object") {
+		return { percent: 0, complete_count: 0, total_count: 0 };
+	}
+	const obj = value as Record<string, unknown>;
+	return {
+		percent: Number(obj.percent ?? 0) || 0,
+		complete_count: Number(obj.complete_count ?? 0) || 0,
+		total_count: Number(obj.total_count ?? 0) || 0,
+	};
+}
+
 export function normalizeWorkQueueKpis(
 	raw: Record<string, unknown>
 ): WorkQueueKpisDto {
@@ -2524,12 +2599,7 @@ export function normalizeWorkQueueKpis(
 		value: unknown
 	): WorkQueueCompletionSummaryDto | undefined => {
 		if (!value || typeof value !== "object") return undefined;
-		const obj = value as Record<string, unknown>;
-		return {
-			percent: Number(obj.percent ?? 0) || 0,
-			complete_count: Number(obj.complete_count ?? 0) || 0,
-			total_count: Number(obj.total_count ?? 0) || 0,
-		};
+		return normalizeWorkQueueCompletionSummary(value);
 	};
 
 	return {
@@ -2542,5 +2612,49 @@ export function normalizeWorkQueueKpis(
 		escalations: Number(raw.escalations ?? 0) || 0,
 		sftp_completion: normalizeSummary(sftpRaw),
 		edi_completion: normalizeSummary(ediRaw),
+	};
+}
+
+export function normalizeWorkQueueProgressSummary(
+	raw: Record<string, unknown>
+): WorkQueueProgressSummaryDto {
+	return {
+		sftp: normalizeWorkQueueCompletionSummary(raw.sftp),
+		edi: normalizeWorkQueueCompletionSummary(raw.edi),
+		in_progress_count: Number(raw.in_progress_count ?? 0) || 0,
+		blocked_escalated_count: Number(raw.blocked_escalated_count ?? 0) || 0,
+	};
+}
+
+export function normalizeWorkQueueAnalystStatsRow(
+	raw: Record<string, unknown>
+): WorkQueueAnalystStatsRowDto {
+	return {
+		analyst: normalizeMigrationUser(raw.analyst),
+		assigned_count: Number(raw.assigned_count ?? 0) || 0,
+		sftp_complete_count: Number(raw.sftp_complete_count ?? 0) || 0,
+		edi_complete_count: Number(raw.edi_complete_count ?? 0) || 0,
+		in_progress_count: Number(raw.in_progress_count ?? 0) || 0,
+		blocked_escalated_count: Number(raw.blocked_escalated_count ?? 0) || 0,
+	};
+}
+
+export function normalizeWorkQueueBlockerRow(
+	raw: Record<string, unknown>
+): WorkQueueBlockerRowDto {
+	return {
+		id: String(raw.id ?? ""),
+		code: pickString(raw, "code") || "",
+		name: pickString(raw, "name") || "",
+		assigned_to: normalizeMigrationUser(raw.assigned_to),
+		blocker_status: pickString(raw, "blocker_status") || "none",
+		blocker_reason: pickString(raw, "blocker_reason") || null,
+		blocker_notes: pickString(raw, "blocker_notes") || "",
+		blocker_updated_at: pickString(raw, "blocker_updated_at") || null,
+		escalated_at: pickString(raw, "escalated_at") || null,
+		escalation_status: pickString(raw, "escalation_status") || undefined,
+		sftp_percent: Number(raw.sftp_percent ?? 0) || 0,
+		edi_percent: Number(raw.edi_percent ?? 0) || 0,
+		migration_status: pickString(raw, "migration_status") || "",
 	};
 }
