@@ -8,6 +8,7 @@ import {
 	ArrowLeft,
 	Calendar,
 	Clock3,
+	ChevronRight,
 	ExternalLink,
 	FileText,
 	History,
@@ -25,6 +26,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,7 +44,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 import { useVendorCoreUsersQuery } from "@/features/admin/features/users/feature/queries/useUsersQuery";
@@ -48,6 +55,8 @@ import {
 } from "../components/work-queue-analyst-escalation";
 import {
 	ESCALATION_STATUS_LABEL,
+	ESCALATION_STATUS_SELECT_OPTIONS,
+	isSelectableEscalationStatus,
 	type EscalationStatus,
 } from "../work-queue-analyst-escalation";
 import {
@@ -59,12 +68,19 @@ import {
 import {
 	useAssignMigrationCaseMutation,
 	useDeleteMigrationCaseDocumentMutation,
+	useDeleteMigrationCaseMutation,
 	useInvalidateVendorCore,
+	useMarkMigrationCaseExceptionMutation,
+	useMarkMigrationCaseProductionReadyMutation,
+	useMarkMigrationCaseReadyMutation,
+	useMarkMigrationCaseTestingMutation,
+	useMarkMigrationCaseWaitingOnVendorMutation,
 	useMigrationCaseDetailQuery,
 	useMigrationCaseDocumentsQuery,
 	useMigrationCaseHistoryQuery,
 	useSetMigrationCaseEscalationMutation,
 	useSetMigrationCaseStatusMutation,
+	useSetMigrationCaseWhitelistMutation,
 	useUpdateMigrationCaseMutation,
 	useUpdateMigrationCaseProgressMutation,
 	useUploadMigrationCaseDocumentMutation,
@@ -75,6 +91,7 @@ import {
 	type MigrationStatus,
 	type TpaTpvRow,
 	WHITELIST_STATUS_LABEL,
+	type WhitelistStatus,
 } from "../work-queue-types";
 import type { ConnectionProgress, ProgressTrack } from "../progress-data";
 
@@ -116,7 +133,7 @@ const TABS: { id: DetailTab; label: string; icon: typeof UserRound }[] = [
 	{ id: "contacts", label: "Contacts", icon: Link2 },
 	{ id: "sftp", label: "SFTP Progress", icon: Server },
 	{ id: "edi", label: "EDI Progress", icon: Server },
-	{ id: "migration", label: "Migration", icon: Truck },
+	{ id: "migration", label: "Migration/Escalation", icon: Truck },
 	{ id: "documents", label: "Documents", icon: FileText },
 	{ id: "history", label: "History", icon: History },
 ];
@@ -366,6 +383,7 @@ export function WorkQueueDetailPage({ caseId }: { caseId: string }) {
 
 function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 	const searchParams = useSearchParams();
+	const router = useRouter();
 	const invalidate = useInvalidateVendorCore();
 	const documentInputRef = useRef<HTMLInputElement>(null);
 	const detailQ = useMigrationCaseDetailQuery(caseId, true);
@@ -377,6 +395,13 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 	const updateProgress = useUpdateMigrationCaseProgressMutation();
 	const setStatus = useSetMigrationCaseStatusMutation();
 	const setEscalation = useSetMigrationCaseEscalationMutation();
+	const setWhitelist = useSetMigrationCaseWhitelistMutation();
+	const markTesting = useMarkMigrationCaseTestingMutation();
+	const markReady = useMarkMigrationCaseReadyMutation();
+	const markWaiting = useMarkMigrationCaseWaitingOnVendorMutation();
+	const markException = useMarkMigrationCaseExceptionMutation();
+	const markProductionReady = useMarkMigrationCaseProductionReadyMutation();
+	const deleteCase = useDeleteMigrationCaseMutation();
 	const uploadDoc = useUploadMigrationCaseDocumentMutation();
 	const deleteDoc = useDeleteMigrationCaseDocumentMutation();
 
@@ -421,6 +446,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 		secondaryContact: "",
 		secondaryEmail: "",
 		secondaryPhone: "",
+		lastCommunicationAt: "",
 	});
 	const [migrationForm, setMigrationForm] = useState({
 		status: "not_started" as MigrationStatus,
@@ -430,6 +456,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 		nextStep: "",
 		assignedToId: "",
 		escalationStatus: "none" as EscalationStatus,
+		whitelistStatus: "not_started" as WhitelistStatus,
 	});
 
 	useEffect(() => {
@@ -449,6 +476,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 			secondaryContact: row.secondaryContact,
 			secondaryEmail: row.secondaryEmail,
 			secondaryPhone: row.secondaryPhone,
+			lastCommunicationAt: row.lastCommunication,
 		});
 		setMigrationForm({
 			status: row.status,
@@ -458,6 +486,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 			nextStep: row.nextStep,
 			assignedToId: row.assignedToId ?? "",
 			escalationStatus: row.escalationStatus ?? "none",
+			whitelistStatus: row.whitelistStatus,
 		});
 	}, [row]);
 
@@ -530,6 +559,10 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 					secondary_contact: contactsForm.secondaryContact,
 					secondary_email: contactsForm.secondaryEmail,
 					secondary_phone: contactsForm.secondaryPhone,
+					last_communication_at: (() => {
+						const d = dateToApi(contactsForm.lastCommunicationAt);
+						return d ? `${d}T12:00:00Z` : null;
+					})(),
 				},
 			});
 			await invalidate();
@@ -576,11 +609,57 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 					escalation_status: nextEscalation,
 				});
 			}
+			if (migrationForm.whitelistStatus !== row.whitelistStatus) {
+				await setWhitelist.mutateAsync({
+					id: row.id,
+					whitelist_status: migrationForm.whitelistStatus,
+				});
+			}
 			await invalidate();
 			await detailQ.refetch();
 			toast.success("Migration details saved");
 		} catch (err) {
 			toast.error(workQueueErrorMessage(err, "Failed to save migration"));
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	async function runQuickMark(
+		label: string,
+		action: () => Promise<unknown>
+	) {
+		if (!row) return;
+		setSaving(true);
+		try {
+			await action();
+			await invalidate();
+			await detailQ.refetch();
+			toast.success(label);
+		} catch (err) {
+			toast.error(workQueueErrorMessage(err, `${label} failed`));
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	async function handleDeleteCase() {
+		if (!row) return;
+		if (
+			!window.confirm(
+				`Remove "${row.name}" from the work queue? This soft-deletes the case.`
+			)
+		) {
+			return;
+		}
+		setSaving(true);
+		try {
+			await deleteCase.mutateAsync({ id: row.id });
+			invalidate();
+			toast.success("Case removed");
+			router.push("/admin/my-work-queue");
+		} catch (err) {
+			toast.error(workQueueErrorMessage(err, "Failed to remove case"));
 		} finally {
 			setSaving(false);
 		}
@@ -689,6 +768,66 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 							</p>
 						</div>
 						<div className="flex flex-wrap items-center gap-1.5">
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-9 gap-1.5 rounded-sm border-border/50 bg-background px-3 text-xs font-medium shadow-none"
+										disabled={saving}
+									>
+										Quick status
+										<ChevronRight className="size-3.5 rotate-90" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									<DropdownMenuItem
+										onClick={() =>
+											void runQuickMark("Marked testing", () =>
+												markTesting.mutateAsync({ id: row.id })
+											)
+										}
+									>
+										Mark testing
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() =>
+											void runQuickMark("Marked ready", () =>
+												markReady.mutateAsync({ id: row.id })
+											)
+										}
+									>
+										Mark ready
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() =>
+											void runQuickMark("Marked waiting on vendor", () =>
+												markWaiting.mutateAsync({ id: row.id })
+											)
+										}
+									>
+										Mark waiting on vendor
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() =>
+											void runQuickMark("Marked exception", () =>
+												markException.mutateAsync({ id: row.id })
+											)
+										}
+									>
+										Mark exception
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() =>
+											void runQuickMark("Marked production ready", () =>
+												markProductionReady.mutateAsync({ id: row.id })
+											)
+										}
+									>
+										Mark production ready
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
 							<Button
 								variant="outline"
 								size="sm"
@@ -704,6 +843,16 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 								onClick={() => changeTab("info")}
 							>
 								Edit details
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-9 gap-1.5 rounded-sm border-destructive/40 px-3 text-xs font-medium text-destructive shadow-none hover:bg-destructive/5"
+								disabled={saving || deleteCase.isPending}
+								onClick={() => void handleDeleteCase()}
+							>
+								<Trash2 className="size-3.5" />
+								Remove
 							</Button>
 						</div>
 					</div>
@@ -1135,6 +1284,20 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 									className={fieldClass}
 								/>
 							</div>
+							<div className="sm:col-span-2 border-t border-border pt-4">
+								<FieldLabel>Last communication</FieldLabel>
+								<Input
+									value={contactsForm.lastCommunicationAt}
+									onChange={(e) =>
+										setContactsForm((f) => ({
+											...f,
+											lastCommunicationAt: e.target.value,
+										}))
+									}
+									placeholder="MM/DD/YYYY"
+									className={fieldClass}
+								/>
+							</div>
 						</div>
 					</SectionCard>
 				) : null}
@@ -1177,8 +1340,8 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 
 				{tab === "migration" ? (
 					<SectionCard
-						title="Migration"
-						description="Status, stage, and timeline"
+						title="Migration/Escalation"
+						description="Status, stage, escalation, and timeline"
 						action={
 							<Button
 								size="sm"
@@ -1225,7 +1388,13 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 							<div>
 								<FieldLabel>Escalation Status</FieldLabel>
 								<Select
-									value={migrationForm.escalationStatus}
+									value={
+										isSelectableEscalationStatus(
+											migrationForm.escalationStatus
+										)
+											? migrationForm.escalationStatus
+											: undefined
+									}
 									onValueChange={(v) =>
 										setMigrationForm((f) => ({
 											...f,
@@ -1234,18 +1403,39 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 									}
 								>
 									<SelectTrigger className={fieldClass}>
-										<SelectValue />
+										<SelectValue placeholder="Select escalation status" />
 									</SelectTrigger>
 									<SelectContent>
-										{(
-											Object.keys(
-												ESCALATION_STATUS_LABEL
-											) as EscalationStatus[]
-										).map((key) => (
+										{ESCALATION_STATUS_SELECT_OPTIONS.map((key) => (
 											<SelectItem key={key} value={key}>
 												{ESCALATION_STATUS_LABEL[key]}
 											</SelectItem>
 										))}
+									</SelectContent>
+								</Select>
+							</div>
+							<div>
+								<FieldLabel>Whitelist Status</FieldLabel>
+								<Select
+									value={migrationForm.whitelistStatus}
+									onValueChange={(v) =>
+										setMigrationForm((f) => ({
+											...f,
+											whitelistStatus: v as WhitelistStatus,
+										}))
+									}
+								>
+									<SelectTrigger className={fieldClass}>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{(Object.keys(WHITELIST_STATUS_LABEL) as WhitelistStatus[]).map(
+											(key) => (
+												<SelectItem key={key} value={key}>
+													{WHITELIST_STATUS_LABEL[key]}
+												</SelectItem>
+											)
+										)}
 									</SelectContent>
 								</Select>
 							</div>
