@@ -1,4 +1,7 @@
-import type { ContractModel, ContractStatus } from "@/features/shared/vms/types";
+import type {
+	ContractModel,
+	ContractStatus,
+} from "@/features/shared/vms/types";
 import type { ContractDto } from "@/lib/vendor-core/types";
 
 const CONTRACT_STATUSES = new Set<ContractStatus>([

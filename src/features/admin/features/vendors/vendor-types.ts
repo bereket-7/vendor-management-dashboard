@@ -155,7 +155,9 @@ export function runBucket(status: FileRun["status"]) {
 
 export function summarizeRuns(runs: FileRun[]) {
 	const total = runs.length;
-	const successful = runs.filter((r) => runBucket(r.status) === "success").length;
+	const successful = runs.filter(
+		(r) => runBucket(r.status) === "success"
+	).length;
 	const warnings = runs.filter((r) => runBucket(r.status) === "warning").length;
 	const failed = runs.filter((r) => runBucket(r.status) === "failed").length;
 	const inProgress = runs.filter(

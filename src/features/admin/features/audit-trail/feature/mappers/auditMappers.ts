@@ -1,10 +1,9 @@
-import type { AuditRecordDto } from "@/lib/vendor-core/types";
-
 import type {
 	AuditActionType,
 	AuditActivity,
 	AuditModule,
 } from "@/features/admin/features/audit-trail/mock-data";
+import type { AuditRecordDto } from "@/lib/vendor-core/types";
 
 function formatAuditWhen(iso?: string): string {
 	if (!iso) return "—";
@@ -37,9 +36,7 @@ function mapModule(resourceType?: string): AuditModule {
 	return "Configuration";
 }
 
-function actorLabel(
-	actor?: AuditRecordDto["actor"]
-): string {
+function actorLabel(actor?: AuditRecordDto["actor"]): string {
 	if (!actor) return "System";
 	if (typeof actor === "string") return actor;
 	return actor.name ?? actor.email ?? "System";

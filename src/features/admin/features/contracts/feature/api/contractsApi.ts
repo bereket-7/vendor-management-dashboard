@@ -1,20 +1,22 @@
-import { vendorCoreApi } from "@/lib/vendor-core/api";
-import { isLiveIntegrationEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { vmsApi } from "@/features/shared/vms/api";
 import type { ContractModel } from "@/features/shared/vms/types";
+import { isLiveIntegrationEnabled, isMockEnabled } from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 
-import { contractDtoToModel } from "../mappers/contractCoreMappers";
 import type {
 	ContractsCreateDto,
 	ContractsUpdateDto,
 } from "../dto/contractsDto";
+import { contractDtoToModel } from "../mappers/contractCoreMappers";
 
 function requireRecord<T>(record: T | null): T {
 	if (!record) throw new Error("VMS record was not found");
 	return record;
 }
 
-export async function listContracts(vendorId?: string): Promise<ContractModel[]> {
+export async function listContracts(
+	vendorId?: string
+): Promise<ContractModel[]> {
 	if (isMockEnabled()) return vmsApi.listContracts(vendorId);
 	if (isLiveIntegrationEnabled()) {
 		const page = await vendorCoreApi.listContracts(

@@ -97,7 +97,9 @@ export function createVendorInvite(
 }
 
 /** Persist an invite record (server-issued or client-generated). */
-export function persistVendorInvite(invite: VendorInviteRecord): VendorInviteRecord {
+export function persistVendorInvite(
+	invite: VendorInviteRecord
+): VendorInviteRecord {
 	const others = readAll().filter(
 		(item) =>
 			!(

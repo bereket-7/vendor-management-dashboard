@@ -15,7 +15,10 @@ import {
 	getStoredAccessToken,
 	isVendorCoreLive,
 } from "@/lib/vendor-core/client";
-import type { VendorCategoryDto, VendorTeamMemberDto } from "@/lib/vendor-core/types";
+import type {
+	VendorCategoryDto,
+	VendorTeamMemberDto,
+} from "@/lib/vendor-core/types";
 
 import { vendorDtoToModel } from "./map-vendor-core";
 import { CURRENT_VENDOR_ID, vmsStore } from "./mock-store";
@@ -687,7 +690,8 @@ export const vmsApi = {
 		);
 	},
 	async getCurrentVendor() {
-		if (isMockEnabled()) return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
+		if (isMockEnabled())
+			return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
 		if (isVendorCoreLive()) {
 			const dto = await vendorCoreApi.getVendorMe();
 			return vendorDtoToModel(dto);

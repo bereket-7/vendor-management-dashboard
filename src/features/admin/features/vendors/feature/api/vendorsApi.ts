@@ -11,7 +11,9 @@ import type {
 	VendorNoteDto,
 } from "@/lib/vendor-core/types";
 
-export async function listVendors(): Promise<import("@/lib/vendor-core/types").VendorDto[]> {
+export async function listVendors(): Promise<
+	import("@/lib/vendor-core/types").VendorDto[]
+> {
 	const page = await vendorCoreApi.listVendors();
 	return page.results ?? [];
 }
@@ -126,7 +128,9 @@ export async function reprocessInboundFile(id: string) {
 	return vendorCoreApi.reprocessInboundFile(id);
 }
 
-export async function listVendorNotes(vendorId: string): Promise<VendorNoteDto[]> {
+export async function listVendorNotes(
+	vendorId: string
+): Promise<VendorNoteDto[]> {
 	const page = await vendorCoreApi.listVendorNotes({ vendor_id: vendorId });
 	return page.results ?? [];
 }

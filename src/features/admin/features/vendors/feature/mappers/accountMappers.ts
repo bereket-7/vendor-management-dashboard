@@ -39,9 +39,7 @@ function mapStatus(
 	return "healthy";
 }
 
-function mapFeedStatus(
-	raw?: string | null
-): VendorAccountRow["eligibility"] {
+function mapFeedStatus(raw?: string | null): VendorAccountRow["eligibility"] {
 	const value = (raw ?? "none").toLowerCase();
 	if (value === "success" || value === "warning" || value === "error") {
 		return value;

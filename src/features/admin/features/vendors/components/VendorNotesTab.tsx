@@ -44,15 +44,15 @@ import {
 import { cn } from "@/lib/utils";
 
 import {
+	type VendorNoteUi,
+	vendorNoteDtoToUi,
+} from "../feature/mappers/noteMappers";
+import {
 	useCreateVendorNoteMutation,
 	useDeleteVendorNoteMutation,
 	useUpdateVendorNoteMutation,
 	useVendorNotesQuery,
 } from "../feature/queries/useVendorsQuery";
-import {
-	type VendorNoteUi,
-	vendorNoteDtoToUi,
-} from "../feature/mappers/noteMappers";
 
 type NoteCategory =
 	| "Configuration"
@@ -302,10 +302,7 @@ function buildNotes(
 	return expanded;
 }
 
-export function VendorNotesTab({
-	vendorId,
-	vendorName,
-}: VendorNotesTabProps) {
+export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 	const notesQuery = useVendorNotesQuery(vendorId);
 	const createNoteMutation = useCreateVendorNoteMutation(vendorId);
 	const updateNoteMutation = useUpdateVendorNoteMutation();

@@ -1,4 +1,7 @@
-import type { FileRun, ProcessStatus } from "@/features/admin/features/file-management/mock-data";
+import type {
+	FileRun,
+	ProcessStatus,
+} from "@/features/admin/features/file-management/mock-data";
 import type { VendorModel } from "@/features/shared/vms/types";
 import type {
 	ConnectionDto,
@@ -44,7 +47,9 @@ function mapFileType(raw?: string | null): string {
 	return FILE_TYPE_LABELS[raw] ?? raw;
 }
 
-function mapCronToFrequency(cron?: string | null): VendorConfigJob["frequency"] {
+function mapCronToFrequency(
+	cron?: string | null
+): VendorConfigJob["frequency"] {
 	const value = (cron ?? "").trim();
 	if (!value) return "Daily";
 	if (value.includes("* * *")) return "Hourly";
@@ -64,13 +69,12 @@ function mapInboundStageToRunStatus(stage: string): ProcessStatus {
 	if (value.includes("warn")) return "warning";
 	if (value.includes("process") || value.includes("pars")) return "processing";
 	if (value.includes("complete") || value.includes("loaded")) return "success";
-	if (value.includes("pending") || value.includes("received")) return "processing";
+	if (value.includes("pending") || value.includes("received"))
+		return "processing";
 	return "processing";
 }
 
-function connectionHealth(
-	connections: ConnectionDto[]
-): VendorHealth {
+function connectionHealth(connections: ConnectionDto[]): VendorHealth {
 	const failed = connections.some(
 		(c) =>
 			c.status === "failed" ||
@@ -92,10 +96,9 @@ export function buildVendorIntegrationProfile(
 	jobs: IntakeJobDto[],
 	accountsCount: number
 ): VendorIntegrationProfile {
-	const meta = (vendor.description ? { notes: vendor.description } : {}) as Record<
-		string,
-		unknown
-	>;
+	const meta = (
+		vendor.description ? { notes: vendor.description } : {}
+	) as Record<string, unknown>;
 	const primary = connections[0];
 	const health = connectionHealth(connections);
 	const host =
@@ -173,12 +176,15 @@ export function connectionToSftp(
 	};
 }
 
-export function intakeJobsToConfigJobs(jobs: IntakeJobDto[]): VendorConfigJob[] {
+export function intakeJobsToConfigJobs(
+	jobs: IntakeJobDto[]
+): VendorConfigJob[] {
 	return jobs.map((job) => ({
 		id: job.id,
 		name: job.name,
 		fileType: mapFileType(job.file_type),
-		direction: job.direction?.toLowerCase() === "outbound" ? "Outgoing" : "Incoming",
+		direction:
+			job.direction?.toLowerCase() === "outbound" ? "Outgoing" : "Incoming",
 		frequency: mapCronToFrequency(job.schedule_cron),
 		status: mapJobStatus(job.status),
 		lastRun: formatWhen(job.updated_at),

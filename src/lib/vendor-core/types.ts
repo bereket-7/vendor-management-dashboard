@@ -2465,8 +2465,7 @@ export function normalizeMigrationCaseDocument(
 		migration_case_id: pickString(raw, "migration_case_id") || undefined,
 		name: pickString(raw, "name") || "Document",
 		mime_type: pickString(raw, "mime_type") || undefined,
-		size_bytes:
-			raw.size_bytes != null ? Number(raw.size_bytes) : undefined,
+		size_bytes: raw.size_bytes != null ? Number(raw.size_bytes) : undefined,
 		web_url: pickString(raw, "web_url") || undefined,
 		created_at: pickString(raw, "created_at") || undefined,
 		updated_at: pickString(raw, "updated_at") || undefined,

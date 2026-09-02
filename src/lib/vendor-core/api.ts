@@ -43,9 +43,9 @@ import type {
 	MemberListDto,
 	MemberListQuery,
 	MemberWriteBody,
+	MigrationCaseBlockerTransitionInput,
 	MigrationCaseBulkStatusInput,
 	MigrationCaseBulkStatusResultDto,
-	MigrationCaseBlockerTransitionInput,
 	MigrationCaseCreateInput,
 	MigrationCaseDocumentDto,
 	MigrationCaseDto,
@@ -2448,15 +2448,19 @@ export const vendorCoreApi = {
 		);
 		const rows = Array.isArray(raw) ? raw : [];
 		return rows
-			.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+			.filter(
+				(row): row is Record<string, unknown> =>
+					!!row && typeof row === "object"
+			)
 			.map(normalizeWorkQueueAnalystStatsRow);
 	},
 
 	listWorkQueueBlockers: async (params?: WorkQueueFilterQuery) => {
-		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.workQueueBlockersList,
-			{ params: pageParams(params) }
-		);
+		const page = await vendorCoreFetch<
+			PaginatedResult<Record<string, unknown>>
+		>(vendorCoreEndpoints.workQueueBlockersList, {
+			params: pageParams(params),
+		});
 		return mapPage(page, normalizeWorkQueueBlockerRow);
 	},
 

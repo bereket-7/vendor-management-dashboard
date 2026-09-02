@@ -67,9 +67,9 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
-import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import { AuditTrailView } from "@/features/admin/features/audit-trail/components/AuditTrailView";
 import { useContractsList } from "@/features/admin/features/contracts/feature/queries/useContractsQuery";
+import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import {
 	useUpdateVendorMutation,
@@ -83,10 +83,28 @@ import {
 	getPendingInviteByVendorId,
 } from "@/lib/auth/vendor-invites";
 import { cn } from "@/lib/utils";
+import type {
+	ConnectionDto,
+	InboundFileDto,
+	IntakeJobDto,
+} from "@/lib/vendor-core/types";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 import { VendorAccountsTab } from "../components/VendorAccountsTab";
 import {
+	VendorActionsMenu,
+	vendorModelToActionsTarget,
+} from "../components/VendorActionsMenu";
+import { VendorConfigurationTab } from "../components/VendorConfigurationTab";
+import { VendorContractsTab } from "../components/VendorContractsTab";
+import { VendorNotesTab } from "../components/VendorNotesTab";
+import { VendorOperationsTab } from "../components/VendorOperationsTab";
+import {
+	accountDtoToRow,
+	mergeAccountOpsSummary,
+} from "../feature/mappers/accountMappers";
+import {
+	listInboundFileEvents,
 	useCreateIntakeJobMutation,
 	useCreateVendorAccountMutation,
 	useCreateVendorNoteMutation,
@@ -103,35 +121,16 @@ import {
 	useVendorConnectionsQuery,
 	useVendorInboundFilesQuery,
 	useVendorJobsQuery,
-	listInboundFileEvents,
 } from "../feature/queries/useVendorsQuery";
 import {
-	accountDtoToRow,
-	mergeAccountOpsSummary,
-} from "../feature/mappers/accountMappers";
-import {
-	buildVendorAlerts,
 	buildTrendFromRuns,
+	buildVendorAlerts,
 	buildVendorIntegrationProfile,
 	connectionToSftp,
 	inboundFilesToRuns,
 	intakeJobsToConfigJobs,
 } from "../live-vendor-detail";
-import type {
-	ConnectionDto,
-	InboundFileDto,
-	IntakeJobDto,
-} from "@/lib/vendor-core/types";
-
 import { runBucket } from "../vendor-types";
-import {
-	VendorActionsMenu,
-	vendorModelToActionsTarget,
-} from "../components/VendorActionsMenu";
-import { VendorConfigurationTab } from "../components/VendorConfigurationTab";
-import { VendorContractsTab } from "../components/VendorContractsTab";
-import { VendorNotesTab } from "../components/VendorNotesTab";
-import { VendorOperationsTab } from "../components/VendorOperationsTab";
 
 const TABS = [
 	"Overview",
@@ -339,7 +338,9 @@ function VendorDetailView() {
 	const accountsQuery = useVendorAccountsQuery(vendorId, Boolean(vendorId));
 	const accountOpsQuery = useVendorAccountOpsQuery(vendorId, Boolean(vendorId));
 	const updateAccountMutation = useUpdateVendorAccountMutation();
-	const createAccountMutation = useCreateVendorAccountMutation(String(vendorId));
+	const createAccountMutation = useCreateVendorAccountMutation(
+		String(vendorId)
+	);
 	const deleteAccountMutation = useDeleteVendorAccountMutation();
 	const runJobMutation = useRunIntakeJobMutation();
 	const updateJobMutation = useUpdateIntakeJobMutation();
@@ -420,7 +421,9 @@ function VendorDetailView() {
 		const top = files.slice(0, 8);
 		Promise.all(
 			top.map((file) =>
-				listInboundFileEvents(file.id).then((events) => [file.id, events] as const)
+				listInboundFileEvents(file.id).then(
+					(events) => [file.id, events] as const
+				)
 			)
 		)
 			.then((entries) => {
@@ -443,7 +446,8 @@ function VendorDetailView() {
 					const rawLevel = (event.level ?? "info").toLowerCase();
 					let level: "error" | "info" | "warn" | "debug" = "info";
 					if (rawLevel === "error") level = "error";
-					else if (rawLevel === "warn" || rawLevel === "warning") level = "warn";
+					else if (rawLevel === "warn" || rawLevel === "warning")
+						level = "warn";
 					else if (rawLevel === "debug") level = "debug";
 					return {
 						id: `${run.id}-log-${index}`,

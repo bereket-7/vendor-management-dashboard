@@ -61,9 +61,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import {
-	accountRowLobToApi,
-} from "@/features/admin/features/vendors/feature/mappers/accountMappers";
+import { accountRowLobToApi } from "@/features/admin/features/vendors/feature/mappers/accountMappers";
 import {
 	type AccountFileStatus,
 	type VendorAccountRow,
@@ -355,7 +353,9 @@ export function VendorAccountsTab({
 			: "inactive";
 		const finish = () => {
 			toast.success(
-				nextActive ? `${account.name} activated.` : `${account.name} deactivated.`
+				nextActive
+					? `${account.name} activated.`
+					: `${account.name} deactivated.`
 			);
 		};
 		setSaving(true);
@@ -701,7 +701,9 @@ export function VendorAccountsTab({
 																					toast.success("Account deleted.")
 																				)
 																				.catch(() =>
-																					toast.error("Could not delete account.")
+																					toast.error(
+																						"Could not delete account."
+																					)
 																				);
 																		}}
 																	>
