@@ -38,6 +38,7 @@ import {
 	progressFromMilestones,
 } from "../progress-data";
 import {
+	type MilestoneUiStatus,
 	applyEdiMilestoneStatusChange,
 	applyEdiPercentChange,
 	applySftpMilestoneStatusChange,
@@ -45,7 +46,6 @@ import {
 	canSetEdiProgress,
 	completedKeysForPercent,
 	completedKeysFromStatuses,
-	type MilestoneUiStatus,
 } from "../progress-rules";
 import {
 	MIGRATION_STATUS_LABEL,
@@ -303,9 +303,7 @@ function WorkQueueCreateBody() {
 		statuses: Record<string, MilestoneUiStatus>,
 		percent: number
 	) {
-		let completedKeys = Array.from(
-			completedKeysFromStatuses(defs, statuses)
-		);
+		let completedKeys = Array.from(completedKeysFromStatuses(defs, statuses));
 		if (!completedKeys.length && percent > 0) {
 			completedKeys = completedKeysForPercent(defs, percent);
 		}
@@ -625,7 +623,9 @@ function WorkQueueCreateBody() {
 										</SelectTrigger>
 										<SelectContent>
 											{(
-												Object.keys(MILESTONE_STATUS_LABEL) as MilestoneUiStatus[]
+												Object.keys(
+													MILESTONE_STATUS_LABEL
+												) as MilestoneUiStatus[]
 											).map((key) => (
 												<SelectItem key={key} value={key}>
 													{MILESTONE_STATUS_LABEL[key]}
@@ -664,7 +664,9 @@ function WorkQueueCreateBody() {
 										</SelectTrigger>
 										<SelectContent>
 											{(
-												Object.keys(MILESTONE_STATUS_LABEL) as MilestoneUiStatus[]
+												Object.keys(
+													MILESTONE_STATUS_LABEL
+												) as MilestoneUiStatus[]
 											).map((key) => (
 												<SelectItem key={key} value={key}>
 													{MILESTONE_STATUS_LABEL[key]}

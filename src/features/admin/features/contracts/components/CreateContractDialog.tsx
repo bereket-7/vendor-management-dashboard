@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useVendorsList } from "@/features/shared/vms/queries";
-import { VendorCoreApiError } from "@/lib/vendor-core/client";
 import { useRouter } from "@/i18n/navigation";
+import { VendorCoreApiError } from "@/lib/vendor-core/client";
 
 import { CONTRACT_TYPE_OPTIONS } from "../feature/mappers/contractCoreMappers";
 import { useCreateContractMutation } from "../feature/queries/useContractsQuery";

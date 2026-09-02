@@ -36,7 +36,11 @@ import {
 } from "@/features/admin/features/members/member-change-events-mock";
 import { cn } from "@/lib/utils";
 
-function ChangeTypePill({ type }: { type: MemberChangeEventRow["changeType"] }) {
+function ChangeTypePill({
+	type,
+}: {
+	type: MemberChangeEventRow["changeType"];
+}) {
 	const styles = {
 		Update: "bg-sky-500/15 text-sky-900 dark:text-sky-200",
 		Add: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
@@ -54,13 +58,7 @@ function ChangeTypePill({ type }: { type: MemberChangeEventRow["changeType"] }) 
 	);
 }
 
-function ValuePill({
-	value,
-	tone,
-}: {
-	value: string;
-	tone: "old" | "new";
-}) {
+function ValuePill({ value, tone }: { value: string; tone: "old" | "new" }) {
 	return (
 		<span
 			className={cn(
@@ -85,9 +83,7 @@ export function MemberChangeEventsPanel({ memberId }: { memberId: string }) {
 	const [sourceFilter, setSourceFilter] = useState("all");
 	const [typeFilter, setTypeFilter] = useState("all");
 	const [search, setSearch] = useState("");
-	const [detailRow, setDetailRow] = useState<MemberChangeEventRow | null>(
-		null
-	);
+	const [detailRow, setDetailRow] = useState<MemberChangeEventRow | null>(null);
 
 	const summary = useMemo(() => summarizeChangeEvents(rows), [rows]);
 

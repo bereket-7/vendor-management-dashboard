@@ -285,7 +285,10 @@ export async function listProviderRosterProviders(
 	rosterId: string,
 	params?: ProviderListQuery
 ) {
-	const page = await vendorCoreApi.listProviderRosterProviders(rosterId, params);
+	const page = await vendorCoreApi.listProviderRosterProviders(
+		rosterId,
+		params
+	);
 	return page.results ?? [];
 }
 

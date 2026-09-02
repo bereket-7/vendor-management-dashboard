@@ -39,6 +39,9 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCoreErrorBanner } from "@/components/vendor-core/VendorCoreLiveChrome";
+import { listAuditRecords } from "@/features/admin/features/audit-trail/feature/api/auditTrailApi";
+import { auditRecordToActivity } from "@/features/admin/features/audit-trail/feature/mappers/auditMappers";
 import {
 	type AuditActionType,
 	type AuditActivity,
@@ -46,11 +49,6 @@ import {
 	buildAuditActivities,
 	summarizeAuditActivities,
 } from "@/features/admin/features/audit-trail/mock-data";
-import { listAuditRecords } from "@/features/admin/features/audit-trail/feature/api/auditTrailApi";
-import {
-	auditRecordToActivity,
-} from "@/features/admin/features/audit-trail/feature/mappers/auditMappers";
-import { VendorCoreErrorBanner } from "@/components/vendor-core/VendorCoreLiveChrome";
 import { cn } from "@/lib/utils";
 
 function ActionBadge({ action }: { action: AuditActionType }) {

@@ -1,6 +1,6 @@
 import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import type { ContractModel } from "@/features/shared/vms/types";
-import type { VendorModel, VendorContact } from "@/features/shared/vms/types";
+import type { VendorContact, VendorModel } from "@/features/shared/vms/types";
 import type {
 	ConnectionDto,
 	InboundFileDto,

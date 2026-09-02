@@ -158,7 +158,9 @@ export async function getWorkQueueKpisRaw(params?: WorkQueueFilterQuery) {
 	return vendorCoreApi.getWorkQueueKpis(params);
 }
 
-export async function getWorkQueueProgressSummary(params?: WorkQueueFilterQuery) {
+export async function getWorkQueueProgressSummary(
+	params?: WorkQueueFilterQuery
+) {
 	const dto = await vendorCoreApi.getWorkQueueProgressSummary(params);
 	return progressSummaryDtoToUi(dto);
 }
@@ -173,8 +175,14 @@ export async function listWorkQueueBlockers(params?: WorkQueueFilterQuery) {
 	return page.results ?? [];
 }
 
-export async function getWorkQueueEscalationSummary(params?: WorkQueueFilterQuery) {
-	const rows = await listWorkQueueBlockers({ ...params, limit: 100, offset: 0 });
+export async function getWorkQueueEscalationSummary(
+	params?: WorkQueueFilterQuery
+) {
+	const rows = await listWorkQueueBlockers({
+		...params,
+		limit: 100,
+		offset: 0,
+	});
 	return blockerRowsToEscalationSummary(rows);
 }
 

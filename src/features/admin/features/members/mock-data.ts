@@ -905,7 +905,7 @@ function detailFor(summary: MemberSummary): MemberDetail {
 		...summary,
 		eligibilityStatus: summary.status === "termed" ? "termed" : "eligible",
 		coverageStart: isDemoPrimary
-			? summary.coverageEffectiveDate ?? summary.memberSince
+			? (summary.coverageEffectiveDate ?? summary.memberSince)
 			: `${summary.memberSince.slice(0, 4)}-01-01`,
 		coverageEnd: summary.status === "termed" ? "2026-06-30" : null,
 		planId: isAbebe
@@ -923,7 +923,11 @@ function detailFor(summary: MemberSummary): MemberDetail {
 		enrollmentDate: isDemoPrimary ? summary.memberSince : summary.memberSince,
 		disenrollmentDate: summary.status === "termed" ? "2026-06-30" : null,
 		lastEligibilityUpdate: "01/28/2026 08:45 AM",
-		groupId: isAbebe ? "GRP-100" : isTigist ? "GRP-100" : `${summary.program} GROUP 00${idx}`,
+		groupId: isAbebe
+			? "GRP-100"
+			: isTigist
+				? "GRP-100"
+				: `${summary.program} GROUP 00${idx}`,
 		groupName: summary.accountGroup ?? `${summary.program} GROUP`,
 		clientId: isDemoPrimary ? "CL-1" : `${summary.program}${pad(idx, 3)}`,
 		accountType: "Employer Group",
@@ -945,7 +949,9 @@ function detailFor(summary: MemberSummary): MemberDetail {
 		recordStatus: "Processed",
 		changeDetected: isDemoPrimary ? "New Member" : "Eligibility Refresh",
 		preferredName: isDemoPrimary ? summary.firstName : null,
-		preferredLanguage: isDemoPrimary ? "English" : languages[idx % languages.length]!,
+		preferredLanguage: isDemoPrimary
+			? "English"
+			: languages[idx % languages.length]!,
 		race: isDemoPrimary ? "Ethiopian" : races[idx % races.length]!,
 		ethnicity: isDemoPrimary
 			? "Ethiopian"
@@ -1339,7 +1345,11 @@ function detailFor(summary: MemberSummary): MemberDetail {
 			accountGroup:
 				summary.accountGroup ??
 				(isJohn ? "NIH GROUP 001" : `${summary.program} GROUP`),
-			memberId: isAbebe ? "099898779" : isTigist ? "099876543" : summary.memberId,
+			memberId: isAbebe
+				? "099898779"
+				: isTigist
+					? "099876543"
+					: summary.memberId,
 			familyId: isJohn ? "FAM00012345" : `FAM${pad(idx, 8)}`,
 			coverageStart: isJohn
 				? "2026-01-01"

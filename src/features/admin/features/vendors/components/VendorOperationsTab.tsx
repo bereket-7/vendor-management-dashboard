@@ -588,11 +588,14 @@ export function VendorOperationsTab({
 																			Processing logs
 																		</Link>
 																	</DropdownMenuItem>
-																	{runBucket(run.status) === "failed" && onReprocessRun ? (
+																	{runBucket(run.status) === "failed" &&
+																	onReprocessRun ? (
 																		<DropdownMenuItem
 																			onSelect={() => {
 																				void onReprocessRun(run.id).catch(() =>
-																					toast.error("Could not reprocess file.")
+																					toast.error(
+																						"Could not reprocess file."
+																					)
 																				);
 																			}}
 																		>

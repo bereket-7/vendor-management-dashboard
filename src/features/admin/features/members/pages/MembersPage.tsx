@@ -195,7 +195,6 @@ function buildMemberStatsQuery(
 	return rest;
 }
 
-
 function filterLiveNewTechRows(
 	members: MemberSummary[],
 	filters: MemberSearchFilters

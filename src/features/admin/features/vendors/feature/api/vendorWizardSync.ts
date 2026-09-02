@@ -54,12 +54,12 @@ function hasIntegrationPatch(values: VendorWizardValues): boolean {
 	const profile = values.integration;
 	return Boolean(
 		profile.timezone.trim() ||
-			profile.transmission_method.trim() ||
-			profile.encryption.trim() ||
-			profile.file_formats.trim() ||
-			profile.trading_partner_id.trim() ||
-			profile.protocol.trim() ||
-			profile.notes.trim()
+		profile.transmission_method.trim() ||
+		profile.encryption.trim() ||
+		profile.file_formats.trim() ||
+		profile.trading_partner_id.trim() ||
+		profile.protocol.trim() ||
+		profile.notes.trim()
 	);
 }
 
@@ -110,9 +110,7 @@ export async function syncVendorWizardExtras(
 
 	if (values.category_ids.length > 0) {
 		const primaryId =
-			values.primary_category_id.trim() ||
-			values.category_ids[0] ||
-			"";
+			values.primary_category_id.trim() || values.category_ids[0] || "";
 		const results = await Promise.allSettled(
 			values.category_ids.map((categoryId) =>
 				createVendorCategoryAssignment({
@@ -127,7 +125,10 @@ export async function syncVendorWizardExtras(
 				failures.push({
 					section: "categories",
 					label: values.category_ids[index] ?? "category",
-					message: rejectionMessage(result.reason, "Category assignment failed"),
+					message: rejectionMessage(
+						result.reason,
+						"Category assignment failed"
+					),
 				});
 			}
 		});
@@ -151,7 +152,10 @@ export async function syncVendorWizardExtras(
 			if (result.status === "rejected") {
 				failures.push({
 					section: "contacts",
-					label: contacts[index]?.name.trim() || contacts[index]?.email.trim() || "contact",
+					label:
+						contacts[index]?.name.trim() ||
+						contacts[index]?.email.trim() ||
+						"contact",
 					message: rejectionMessage(result.reason, "Contact create failed"),
 				});
 			}
@@ -294,7 +298,9 @@ export async function syncVendorWizardExtras(
 	return { failures };
 }
 
-export function formatWizardSyncFailures(failures: WizardSyncFailure[]): string {
+export function formatWizardSyncFailures(
+	failures: WizardSyncFailure[]
+): string {
 	if (failures.length === 0) return "";
 	const grouped = failures.reduce<Record<string, number>>((acc, row) => {
 		acc[row.section] = (acc[row.section] ?? 0) + 1;

@@ -6,7 +6,11 @@ import type {
 	ContractTermPeriod,
 	ContractTermStatus,
 } from "@/features/shared/vms/types";
-import type { ContractDto, ContractDetailDto, ProcurementDocumentDto } from "@/lib/vendor-core/types";
+import type {
+	ContractDetailDto,
+	ContractDto,
+	ProcurementDocumentDto,
+} from "@/lib/vendor-core/types";
 
 const CONTRACT_STATUSES = new Set<ContractStatus>([
 	"draft",
@@ -46,7 +50,10 @@ const API_STATUS_ALIASES: Record<string, string> = {
 
 /** Map UI/mock contract type labels → procurement API `contract_type` choices. */
 export function toApiContractType(raw?: string | null): string {
-	const key = (raw ?? "msa").trim().toLowerCase().replace(/[\s-]+/g, "_");
+	const key = (raw ?? "msa")
+		.trim()
+		.toLowerCase()
+		.replace(/[\s-]+/g, "_");
 	if (API_CONTRACT_TYPES.has(key)) return key;
 	return CONTRACT_TYPE_ALIASES[key] ?? "msa";
 }
@@ -138,13 +145,17 @@ function deriveRateSchedule(dto: ContractDto): ContractModel["rateSchedule"] {
 	];
 }
 
-function mapApiRateSchedule(dto: ContractDetailDto): ContractModel["rateSchedule"] {
+function mapApiRateSchedule(
+	dto: ContractDetailDto
+): ContractModel["rateSchedule"] {
 	if (dto.rate_schedule?.length) {
 		return dto.rate_schedule.map((line, index) => ({
 			id: String(line.id ?? `${dto.id}-rate-${index}`),
 			serviceCode: String(line.service_code ?? line.serviceCode ?? "—"),
 			description: String(line.description ?? line.name ?? "Rate line"),
-			contractedRate: Number(line.contracted_rate ?? line.contractedRate ?? line.rate ?? 0),
+			contractedRate: Number(
+				line.contracted_rate ?? line.contractedRate ?? line.rate ?? 0
+			),
 			unit: String(line.unit ?? "each"),
 		}));
 	}
@@ -188,7 +199,9 @@ function mapApiDocuments(dto: ContractDetailDto): ContractDocumentItem[] {
 	}));
 }
 
-export function contractDtoToModel(dto: ContractDto | ContractDetailDto): ContractModel {
+export function contractDtoToModel(
+	dto: ContractDto | ContractDetailDto
+): ContractModel {
 	const detail = dto as ContractDetailDto;
 	const value = dto.total_contract_value;
 	const paymentTerms =

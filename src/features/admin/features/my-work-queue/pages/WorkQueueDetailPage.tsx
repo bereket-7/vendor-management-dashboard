@@ -7,8 +7,8 @@ import {
 	AlertTriangle,
 	ArrowLeft,
 	Calendar,
-	Clock3,
 	ChevronRight,
+	Clock3,
 	ExternalLink,
 	FileText,
 	History,
@@ -26,13 +26,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -44,21 +44,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
+import { useVendorCoreUsersQuery } from "@/features/admin/features/users/feature/queries/useUsersQuery";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-import { useVendorCoreUsersQuery } from "@/features/admin/features/users/feature/queries/useUsersQuery";
-
+import { EscalationStatusPill } from "../components/work-queue-analyst-escalation";
 import { WorkQueueProgressEditor } from "../components/work-queue-progress";
-import {
-	EscalationStatusPill,
-} from "../components/work-queue-analyst-escalation";
-import {
-	ESCALATION_STATUS_LABEL,
-	ESCALATION_STATUS_SELECT_OPTIONS,
-	isSelectableEscalationStatus,
-	type EscalationStatus,
-} from "../work-queue-analyst-escalation";
 import {
 	CURRENT_STAGE_OPTIONS,
 	dateToApi,
@@ -86,6 +77,13 @@ import {
 	useUploadMigrationCaseDocumentMutation,
 } from "../feature/queries/useWorkQueueQuery";
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
+import type { ConnectionProgress, ProgressTrack } from "../progress-data";
+import {
+	ESCALATION_STATUS_LABEL,
+	ESCALATION_STATUS_SELECT_OPTIONS,
+	type EscalationStatus,
+	isSelectableEscalationStatus,
+} from "../work-queue-analyst-escalation";
 import {
 	MIGRATION_STATUS_LABEL,
 	type MigrationStatus,
@@ -93,7 +91,6 @@ import {
 	WHITELIST_STATUS_LABEL,
 	type WhitelistStatus,
 } from "../work-queue-types";
-import type { ConnectionProgress, ProgressTrack } from "../progress-data";
 
 type DetailTab =
 	| "overview"
@@ -510,9 +507,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 				delete next[track];
 				return next;
 			});
-			toast.success(
-				`${track === "sftp" ? "SFTP" : "EDI"} progress saved`
-			);
+			toast.success(`${track === "sftp" ? "SFTP" : "EDI"} progress saved`);
 		} catch (err) {
 			toast.error(workQueueErrorMessage(err, "Failed to save progress"));
 		} finally {
@@ -625,10 +620,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 		}
 	}
 
-	async function runQuickMark(
-		label: string,
-		action: () => Promise<unknown>
-	) {
+	async function runQuickMark(label: string, action: () => Promise<unknown>) {
 		if (!row) return;
 		setSaving(true);
 		try {
@@ -1389,9 +1381,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 								<FieldLabel>Escalation Status</FieldLabel>
 								<Select
 									value={
-										isSelectableEscalationStatus(
-											migrationForm.escalationStatus
-										)
+										isSelectableEscalationStatus(migrationForm.escalationStatus)
 											? migrationForm.escalationStatus
 											: undefined
 									}
@@ -1429,13 +1419,13 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{(Object.keys(WHITELIST_STATUS_LABEL) as WhitelistStatus[]).map(
-											(key) => (
-												<SelectItem key={key} value={key}>
-													{WHITELIST_STATUS_LABEL[key]}
-												</SelectItem>
-											)
-										)}
+										{(
+											Object.keys(WHITELIST_STATUS_LABEL) as WhitelistStatus[]
+										).map((key) => (
+											<SelectItem key={key} value={key}>
+												{WHITELIST_STATUS_LABEL[key]}
+											</SelectItem>
+										))}
 									</SelectContent>
 								</Select>
 							</div>
@@ -1564,7 +1554,9 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 						}
 					>
 						{documentsQ.isLoading ? (
-							<p className="text-xs text-muted-foreground">Loading documents…</p>
+							<p className="text-xs text-muted-foreground">
+								Loading documents…
+							</p>
 						) : (documentsQ.data ?? []).length === 0 ? (
 							<div className="rounded-sm border border-dashed border-border/60 bg-muted/10 px-4 py-8 text-center">
 								<FileText className="mx-auto size-8 text-muted-foreground/40" />

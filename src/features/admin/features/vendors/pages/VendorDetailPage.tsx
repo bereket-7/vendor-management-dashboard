@@ -68,13 +68,12 @@ import {
 } from "@/components/ui/table";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { VendorCoreErrorBanner } from "@/components/vendor-core/VendorCoreLiveChrome";
-import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import { AuditTrailView } from "@/features/admin/features/audit-trail/components/AuditTrailView";
+import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
-import {
-	useUpdateVendorMutation,
-} from "@/features/shared/vms/queries";
+import { useUpdateVendorMutation } from "@/features/shared/vms/queries";
 import type { VendorStatus } from "@/features/shared/vms/types";
+import type { VendorContact } from "@/features/shared/vms/types";
 import { formatDate } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 import {
@@ -82,9 +81,32 @@ import {
 	getPendingInviteByVendorId,
 } from "@/lib/auth/vendor-invites";
 import { cn } from "@/lib/utils";
+import type {
+	ConnectionDto,
+	InboundFileDto,
+	VendorIntegrationProfileUpdateInput,
+} from "@/lib/vendor-core/types";
 
 import { VendorAccountsTab } from "../components/VendorAccountsTab";
 import {
+	VendorActionsMenu,
+	vendorModelToActionsTarget,
+} from "../components/VendorActionsMenu";
+import { VendorConfigurationTab } from "../components/VendorConfigurationTab";
+import { VendorContactsTab } from "../components/VendorContactsTab";
+import { VendorContractsTab } from "../components/VendorContractsTab";
+import { VendorNotesTab } from "../components/VendorNotesTab";
+import { VendorOperationsTab } from "../components/VendorOperationsTab";
+import {
+	findVendorAccountByCode,
+	getVendorAccount,
+	listVendorAccounts,
+	restoreVendorAccount,
+	updateVendorAccount,
+} from "../feature/api/vendorsApi";
+import { accountDtoToRow } from "../feature/mappers/accountMappers";
+import {
+	listInboundFileEvents,
 	useCreateIntakeJobMutation,
 	useCreateVendorAccountMutation,
 	useCreateVendorNoteMutation,
@@ -98,39 +120,9 @@ import {
 	useUpdateVendorAccountMutation,
 	useUpdateVendorIntegrationProfileMutation,
 	useVendorDetailBundleQuery,
-	listInboundFileEvents,
 } from "../feature/queries/useVendorsQuery";
-import {
-	connectionToSftp,
-	inboundFilesToRuns,
-} from "../live-vendor-detail";
-import type {
-	ConnectionDto,
-	InboundFileDto,
-	VendorIntegrationProfileUpdateInput,
-} from "@/lib/vendor-core/types";
-import type { VendorContact } from "@/features/shared/vms/types";
-
-import {
-	accountDtoToRow,
-} from "../feature/mappers/accountMappers";
-import {
-	findVendorAccountByCode,
-	getVendorAccount,
-	listVendorAccounts,
-	restoreVendorAccount,
-	updateVendorAccount,
-} from "../feature/api/vendorsApi";
+import { connectionToSftp, inboundFilesToRuns } from "../live-vendor-detail";
 import { runBucket } from "../vendor-types";
-import {
-	VendorActionsMenu,
-	vendorModelToActionsTarget,
-} from "../components/VendorActionsMenu";
-import { VendorConfigurationTab } from "../components/VendorConfigurationTab";
-import { VendorContactsTab } from "../components/VendorContactsTab";
-import { VendorContractsTab } from "../components/VendorContractsTab";
-import { VendorNotesTab } from "../components/VendorNotesTab";
-import { VendorOperationsTab } from "../components/VendorOperationsTab";
 
 const TABS = [
 	"Overview",
@@ -406,7 +398,9 @@ function VendorDetailView() {
 		const top = inboundFiles.slice(0, 8);
 		Promise.all(
 			top.map((file) =>
-				listInboundFileEvents(file.id).then((events) => [file.id, events] as const)
+				listInboundFileEvents(file.id).then(
+					(events) => [file.id, events] as const
+				)
 			)
 		)
 			.then((entries) => {
@@ -422,11 +416,9 @@ function VendorDetailView() {
 
 	const runs = useMemo((): FileRun[] => {
 		if (!vendor) return [];
-		const baseRuns = bundle?.operations.runs ?? inboundFilesToRuns(
-			inboundFiles,
-			vendor.id,
-			displayName
-		);
+		const baseRuns =
+			bundle?.operations.runs ??
+			inboundFilesToRuns(inboundFiles, vendor.id, displayName);
 		return baseRuns.map((run) => ({
 			...run,
 			logs: (runLogs[run.id] ?? []).map((event, index) => {
@@ -449,8 +441,7 @@ function VendorDetailView() {
 	const subQueryErrors = useMemo(
 		() =>
 			(bundle?.errors ?? []).map(
-				(entry) =>
-					`${entry.resource.replace(/_/g, " ")}: ${entry.message}`
+				(entry) => `${entry.resource.replace(/_/g, " ")}: ${entry.message}`
 			),
 		[bundle?.errors]
 	);
@@ -1257,32 +1248,28 @@ function VendorDetailView() {
 								);
 							}
 							let full = await getVendorAccount(created.id);
-							if (
-								full.vendor_id &&
-								full.vendor_id !== resolvedVendorId
-							) {
+							if (full.vendor_id && full.vendor_id !== resolvedVendorId) {
 								throw new Error(
 									`Account was created under vendor ${full.vendor_id}, not this vendor (${resolvedVendorId}).`
 								);
 							}
-							const rawVisible = (full as { is_visible?: boolean })
-								.is_visible;
+							const rawVisible = (full as { is_visible?: boolean }).is_visible;
 							if (rawVisible === false) {
 								full = await updateVendorAccount(full.id, {
 									is_visible: true,
 								});
 							}
 							// #region agent log
-							const listedAfterCreate = await listVendorAccounts(
-								resolvedVendorId
-							);
-							const listedVendorOnly = (
-								await import("@/lib/vendor-core/api").then((m) =>
-									m.vendorCoreApi.listAccounts({
-										vendor_id: resolvedVendorId,
-									})
-								)
-							).results ?? [];
+							const listedAfterCreate =
+								await listVendorAccounts(resolvedVendorId);
+							const listedVendorOnly =
+								(
+									await import("@/lib/vendor-core/api").then((m) =>
+										m.vendorCoreApi.listAccounts({
+											vendor_id: resolvedVendorId,
+										})
+									)
+								).results ?? [];
 							fetch(
 								"http://127.0.0.1:7619/ingest/2f252828-01b8-43ea-88bb-1263f3c1d386",
 								{
@@ -1304,10 +1291,8 @@ function VendorDetailView() {
 											createdId: created.id,
 											accountCode,
 											fullVendorId: full.vendor_id,
-											is_visible: (full as { is_visible?: boolean })
-												.is_visible,
-											is_deleted: (full as { is_deleted?: boolean })
-												.is_deleted,
+											is_visible: (full as { is_visible?: boolean }).is_visible,
+											is_deleted: (full as { is_deleted?: boolean }).is_deleted,
 											inDefaultList: listedAfterCreate.some(
 												(r) => r.id === created.id
 											),
@@ -1344,24 +1329,17 @@ function VendorDetailView() {
 									is_visible: true,
 								});
 								await bundleQuery.refetch();
-								return accountDtoToRow(
-									await getVendorAccount(updated.id)
-								);
+								return accountDtoToRow(await getVendorAccount(updated.id));
 							}
 							if (existing?.state === "hidden") {
-								const updated = await updateVendorAccount(
-									existing.account.id,
-									{
-										name: input.name.trim(),
-										line_of_business: input.line_of_business,
-										active: input.active ?? true,
-										is_visible: true,
-									}
-								);
+								const updated = await updateVendorAccount(existing.account.id, {
+									name: input.name.trim(),
+									line_of_business: input.line_of_business,
+									active: input.active ?? true,
+									is_visible: true,
+								});
 								await bundleQuery.refetch();
-								return accountDtoToRow(
-									await getVendorAccount(updated.id)
-								);
+								return accountDtoToRow(await getVendorAccount(updated.id));
 							}
 							if (existing?.state === "active") {
 								throw new Error(

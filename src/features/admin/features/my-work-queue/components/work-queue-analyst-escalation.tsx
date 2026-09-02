@@ -15,18 +15,18 @@ import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { WorkQueueBlockerRowDto } from "@/lib/vendor-core/types";
 
-import type { TpaTpvRow } from "../work-queue-types";
 import {
-	analystAvatarTone,
-	analystInitials,
 	type AnalystProgressRow,
+	ESCALATION_STATUS_LABEL,
 	type EscalationStatus,
 	type EscalationSummary,
-	ESCALATION_STATUS_LABEL,
+	analystAvatarTone,
+	analystInitials,
 	listEscalationItems,
 	summarizeAnalystProgress,
 	summarizeEscalations,
 } from "../work-queue-analyst-escalation";
+import type { TpaTpvRow } from "../work-queue-types";
 
 /** Matches work-queue cards (detail page, main table, progress overview). */
 const PANEL =
@@ -78,8 +78,7 @@ function pctCell(
 
 	return (
 		<span className={cn("tabular-nums", compact ? "text-xs" : "text-sm")}>
-			{value}{" "}
-			<span className={cn("font-semibold", pctTone)}>({pct}%)</span>
+			{value} <span className={cn("font-semibold", pctTone)}>({pct}%)</span>
 		</span>
 	);
 }
@@ -106,9 +105,7 @@ function metricCell(
 		<div className="min-w-[68px]">
 			<div className="flex items-baseline justify-between gap-1 tabular-nums">
 				<span className="text-xs font-medium text-foreground">{value}</span>
-				<span className={cn("text-[10px] font-semibold", pctTone)}>
-					{pct}%
-				</span>
+				<span className={cn("text-[10px] font-semibold", pctTone)}>{pct}%</span>
 			</div>
 			<div className="mt-1 h-1 overflow-hidden rounded-full bg-muted/80">
 				<div
@@ -146,8 +143,7 @@ export function EdiAnalystProgressSection({
 					Workload and completion by analyst.
 					{statusEstimated ? (
 						<span className="mt-0.5 block text-[10px] italic text-muted-foreground/90">
-							SFTP/EDI estimated from migration status until progress is
-							live.
+							SFTP/EDI estimated from migration status until progress is live.
 						</span>
 					) : null}
 				</p>
@@ -189,9 +185,7 @@ export function EdiAnalystProgressSection({
 										)}
 										onClick={() => {
 											if (isUnassigned) return;
-											onAnalystSelect(
-												selected ? "all" : row.analyst
-											);
+											onAnalystSelect(selected ? "all" : row.analyst);
 										}}
 									>
 										<TableCell className="text-center text-[11px] font-medium tabular-nums text-muted-foreground">
@@ -211,20 +205,12 @@ export function EdiAnalystProgressSection({
 										<TableCell>
 											{isUnassigned
 												? "—"
-												: metricCell(
-														row.sftpComplete,
-														row.sftpPct,
-														"green"
-													)}
+												: metricCell(row.sftpComplete, row.sftpPct, "green")}
 										</TableCell>
 										<TableCell>
 											{isUnassigned
 												? "—"
-												: metricCell(
-														row.ediComplete,
-														row.ediPct,
-														"green"
-													)}
+												: metricCell(row.ediComplete, row.ediPct, "green")}
 										</TableCell>
 										<TableCell>
 											{isUnassigned
@@ -358,9 +344,7 @@ function BlockerManagementList({
 								>
 									{item.name}
 								</Link>
-								<p className="text-[10px] text-muted-foreground">
-									{item.code}
-								</p>
+								<p className="text-[10px] text-muted-foreground">{item.code}</p>
 							</TableCell>
 							<TableCell className="text-xs">
 								{blockerAnalystName(item)}
@@ -439,9 +423,7 @@ function EscalationManagementList({
 								>
 									{item.name}
 								</Link>
-								<p className="text-[10px] text-muted-foreground">
-									{item.code}
-								</p>
+								<p className="text-[10px] text-muted-foreground">{item.code}</p>
 							</TableCell>
 							<TableCell className="text-xs">{item.assignedAnalyst}</TableCell>
 							<TableCell
@@ -525,9 +507,7 @@ export function EscalationSummarySection({
 									variant="outline"
 									size="sm"
 									className="mt-2 h-6 rounded-sm border-border/70 bg-background px-2 text-[10px] shadow-none"
-									onClick={() =>
-										onFilterChange(active ? "all" : card.key)
-									}
+									onClick={() => onFilterChange(active ? "all" : card.key)}
 								>
 									View list
 								</Button>
@@ -538,7 +518,10 @@ export function EscalationSummarySection({
 			</div>
 			{activeFilter !== "all" ? (
 				useBlockerList ? (
-					<BlockerManagementList rows={blockerRows ?? []} filter={activeFilter} />
+					<BlockerManagementList
+						rows={blockerRows ?? []}
+						filter={activeFilter}
+					/>
 				) : (
 					<EscalationManagementList rows={rows} filter={activeFilter} />
 				)
@@ -547,11 +530,7 @@ export function EscalationSummarySection({
 	);
 }
 
-export function EscalationStatusPill({
-	status,
-}: {
-	status: EscalationStatus;
-}) {
+export function EscalationStatusPill({ status }: { status: EscalationStatus }) {
 	if (status === "none") {
 		return <span className="text-muted-foreground">—</span>;
 	}

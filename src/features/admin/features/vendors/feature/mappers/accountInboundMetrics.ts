@@ -50,7 +50,11 @@ export function mapInboundStageStatus(
 	stage?: string | null
 ): "success" | "warning" | "error" | "processing" {
 	const value = (stage ?? "").toLowerCase();
-	if (value.includes("fail") || value.includes("error") || value.includes("exception")) {
+	if (
+		value.includes("fail") ||
+		value.includes("error") ||
+		value.includes("exception")
+	) {
 		return "error";
 	}
 	if (value.includes("warn")) return "warning";
@@ -149,11 +153,8 @@ export function listAccountInboundFiles(
 	return files
 		.filter(
 			(file) =>
-				resolveInboundFileAccountId(
-					file,
-					jobAccounts,
-					connectionAccounts
-				) === accountId
+				resolveInboundFileAccountId(file, jobAccounts, connectionAccounts) ===
+				accountId
 		)
 		.sort((a, b) => {
 			const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -207,11 +208,7 @@ export function buildAccountActivityRows(
 		fileType: type,
 		direction: "Incoming",
 		status:
-			status === "none"
-				? "no_data"
-				: status === "success"
-					? "success"
-					: status,
+			status === "none" ? "no_data" : status === "success" ? "success" : status,
 		timestamp:
 			status === "none" || !fileTypeLabelMatches(lastFileType, type)
 				? "—"

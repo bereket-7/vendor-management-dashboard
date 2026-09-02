@@ -9,6 +9,18 @@ import type {
 } from "@/lib/vendor-core/types";
 
 import {
+	type ConnectionProgress,
+	EMPTY_EDI_PROGRESS,
+	EMPTY_SFTP_PROGRESS,
+	type ProgressTrack,
+	progressFromMilestones,
+} from "../../progress-data";
+import {
+	type AnalystProgressRow,
+	type EscalationStatus,
+	type EscalationSummary,
+} from "../../work-queue-analyst-escalation";
+import {
 	type HistoryEvent,
 	type MigrationStatus,
 	type TpaTpvRow,
@@ -16,18 +28,6 @@ import {
 	WORK_QUEUE_KPI,
 	type WhitelistStatus,
 } from "../../work-queue-types";
-import {
-	type AnalystProgressRow,
-	type EscalationStatus,
-	type EscalationSummary,
-} from "../../work-queue-analyst-escalation";
-import {
-	EMPTY_EDI_PROGRESS,
-	EMPTY_SFTP_PROGRESS,
-	type ConnectionProgress,
-	type ProgressTrack,
-	progressFromMilestones,
-} from "../../progress-data";
 
 const STAGE_LABEL: Record<string, string> = {
 	not_started: "Not Started",
@@ -155,7 +155,9 @@ function progressDtoToConnection(
 					key: m.key,
 					label: m.label,
 					weightPercent: m.weight_percent,
-					completedAt: m.completed_at ? formatDisplayDate(m.completed_at) : null,
+					completedAt: m.completed_at
+						? formatDisplayDate(m.completed_at)
+						: null,
 				}))
 			: fallback.milestones;
 

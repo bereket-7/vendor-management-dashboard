@@ -5,10 +5,16 @@ import {
 	useVendorCoreFeatureMutation,
 	useVendorCoreFeatureQuery,
 } from "@/features/admin/shared/vendor-core-feature-query";
+import type {
+	AccountCreateInput,
+	AccountUpdateInput,
+	VendorContactCreateInput,
+	VendorContactUpdateInput,
+	VendorIntegrationProfileUpdateInput,
+} from "@/lib/vendor-core/types";
 
-import {
-	accountRowLobToApi,
-} from "../mappers/accountMappers";
+import type { VendorAccountRow } from "../../vendor-types";
+import { getVendorDetailBundle } from "../api/vendorDetailApi";
 import {
 	createIntakeJob,
 	createVendorAccount,
@@ -21,8 +27,8 @@ import {
 	getVendorIntegrationProfile,
 	hardDeleteVendorAccount,
 	listInboundFileEvents,
-	listVendorAccounts,
 	listVendorAccountOpsSummaries,
+	listVendorAccounts,
 	listVendorCategories,
 	listVendorConnections,
 	listVendorContacts,
@@ -41,15 +47,7 @@ import {
 	updateVendorIntegrationProfile,
 	updateVendorNote,
 } from "../api/vendorsApi";
-import { getVendorDetailBundle } from "../api/vendorDetailApi";
-import type {
-	AccountCreateInput,
-	AccountUpdateInput,
-	VendorContactCreateInput,
-	VendorContactUpdateInput,
-	VendorIntegrationProfileUpdateInput,
-} from "@/lib/vendor-core/types";
-import type { VendorAccountRow } from "../../vendor-types";
+import { accountRowLobToApi } from "../mappers/accountMappers";
 
 const domain = "vendors";
 
@@ -99,10 +97,7 @@ export function useVendorContactsQuery(vendorId?: string, enabled = true) {
 	);
 }
 
-export function useVendorDetailBundleQuery(
-	vendorId?: string,
-	enabled = true
-) {
+export function useVendorDetailBundleQuery(vendorId?: string, enabled = true) {
 	return useVendorCoreFeatureQuery(
 		domain,
 		"detail-bundle",

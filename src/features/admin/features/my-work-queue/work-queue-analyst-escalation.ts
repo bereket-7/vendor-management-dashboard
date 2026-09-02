@@ -27,9 +27,9 @@ export type SelectableEscalationStatus =
 export function isSelectableEscalationStatus(
 	status: EscalationStatus
 ): status is SelectableEscalationStatus {
-	return (ESCALATION_STATUS_SELECT_OPTIONS as readonly EscalationStatus[]).includes(
-		status
-	);
+	return (
+		ESCALATION_STATUS_SELECT_OPTIONS as readonly EscalationStatus[]
+	).includes(status);
 }
 
 export type AnalystProgressRow = {
@@ -125,7 +125,9 @@ export function deriveEscalationStatus(row: TpaTpvRow): EscalationStatus {
 	return "none";
 }
 
-export function summarizeAnalystProgress(rows: TpaTpvRow[]): AnalystProgressRow[] {
+export function summarizeAnalystProgress(
+	rows: TpaTpvRow[]
+): AnalystProgressRow[] {
 	const byAnalyst = new Map<string, TpaTpvRow[]>();
 
 	for (const row of rows) {
@@ -307,5 +309,7 @@ const ANALYST_AVATAR_TONE: Record<string, string> = {
 };
 
 export function analystAvatarTone(name: string): string {
-	return ANALYST_AVATAR_TONE[name] ?? "bg-slate-100 text-slate-800 ring-slate-200";
+	return (
+		ANALYST_AVATAR_TONE[name] ?? "bg-slate-100 text-slate-800 ring-slate-200"
+	);
 }

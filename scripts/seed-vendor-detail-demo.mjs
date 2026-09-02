@@ -12,8 +12,8 @@
  *   VENDOR_CORE_USER=… VENDOR_CORE_PASSWORD=… VENDOR_ID=<uuid> pnpm seed:vendor-detail
  */
 import { Blob } from "node:buffer";
-import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -124,7 +124,9 @@ async function resolveVendor(token) {
 	}
 	const vendors = await listAll(token, "/api/v1/vendors/list/");
 	const byCode = vendors.find(
-		(v) => (v.vendor_code || v.code || "").toLowerCase() === VENDOR_CODE.toLowerCase()
+		(v) =>
+			(v.vendor_code || v.code || "").toLowerCase() ===
+			VENDOR_CODE.toLowerCase()
 	);
 	if (byCode) return byCode;
 	if (vendors.length === 1) return vendors[0];
@@ -178,7 +180,10 @@ async function seedContacts(token, vendor) {
 async function seedNotes(token, vendor) {
 	const specs = [
 		{ body: "Primary onboarding contact confirmed.", is_pinned: true },
-		{ body: "Eligibility feed validated in test environment.", is_pinned: false },
+		{
+			body: "Eligibility feed validated in test environment.",
+			is_pinned: false,
+		},
 		{ body: "Contract renewal review scheduled for Q4.", is_pinned: false },
 	];
 	const existing = await listAll(
@@ -200,7 +205,9 @@ async function seedNotes(token, vendor) {
 		created += 1;
 	}
 	console.log(
-		created ? `✓ ${created} note(s)` : `· notes already seeded (${existing.length})`
+		created
+			? `✓ ${created} note(s)`
+			: `· notes already seeded (${existing.length})`
 	);
 }
 
@@ -385,11 +392,7 @@ async function upsertAccount(token, vendor, spec) {
 		return null;
 	}
 
-	const existing = await findAccountByCode(
-		token,
-		vendor.id,
-		spec.account_code
-	);
+	const existing = await findAccountByCode(token, vendor.id, spec.account_code);
 	if (existing) {
 		const updated = await request(
 			"PATCH",
@@ -469,7 +472,9 @@ async function seedAccounts(token, vendor) {
 			accumulator_feed_status: "none",
 		},
 	];
-	const before = await listVendorAccounts(token, vendor.id, { isVisible: true });
+	const before = await listVendorAccounts(token, vendor.id, {
+		isVisible: true,
+	});
 	let created = 0;
 	let updated = 0;
 	const accountsByCode = new Map(before.map((row) => [row.account_code, row]));
@@ -484,7 +489,9 @@ async function seedAccounts(token, vendor) {
 	}
 
 	const accounts = [...accountsByCode.values()];
-	const visible = await listVendorAccounts(token, vendor.id, { isVisible: true });
+	const visible = await listVendorAccounts(token, vendor.id, {
+		isVisible: true,
+	});
 
 	const primary =
 		visible.find(
@@ -555,14 +562,18 @@ async function seedIntegrationProfile(token, vendor) {
 			console.log("[dry] integration profile patch");
 			return;
 		}
-		await request("PATCH", `/api/v1/vendors/${vendor.id}/integration-profile/update/`, {
-			token,
-			json: {
-				health: "healthy",
-				timezone: profile.timezone || "UTC",
-				transmission_method: profile.transmission_method || "sftp",
-			},
-		});
+		await request(
+			"PATCH",
+			`/api/v1/vendors/${vendor.id}/integration-profile/update/`,
+			{
+				token,
+				json: {
+					health: "healthy",
+					timezone: profile.timezone || "UTC",
+					transmission_method: profile.transmission_method || "sftp",
+				},
+			}
+		);
 		console.log("✓ integration profile health → healthy");
 	} catch (err) {
 		console.warn(`! integration profile skipped: ${err.message}`);

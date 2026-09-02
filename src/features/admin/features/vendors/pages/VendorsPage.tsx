@@ -141,13 +141,7 @@ function VendorsDirectoryPage() {
 				accountsQ.data ?? [],
 				filesQ.data ?? []
 			),
-		[
-			vendorsQ.data,
-			connectionsQ.data,
-			jobsQ.data,
-			accountsQ.data,
-			filesQ.data,
-		]
+		[vendorsQ.data, connectionsQ.data, jobsQ.data, accountsQ.data, filesQ.data]
 	);
 
 	const loading =

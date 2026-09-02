@@ -92,8 +92,8 @@ export function UploadProcurementDocumentDialog({
 				<DialogHeader>
 					<DialogTitle>Upload document</DialogTitle>
 					<DialogDescription>
-						Register contract document metadata for this vendor. Files are stored
-						in object storage using the generated storage key.
+						Register contract document metadata for this vendor. Files are
+						stored in object storage using the generated storage key.
 					</DialogDescription>
 				</DialogHeader>
 				<form onSubmit={submit} className="grid gap-4 py-1">

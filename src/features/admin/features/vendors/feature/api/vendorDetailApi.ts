@@ -1,7 +1,6 @@
+import { listAuditRecords } from "@/features/admin/features/audit-trail/feature/api/auditTrailApi";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
 import type { AccountDto } from "@/lib/vendor-core/types";
-
-import { listAuditRecords } from "@/features/admin/features/audit-trail/feature/api/auditTrailApi";
 
 import type { VendorDetailRawBundleDto } from "../dto/vendorDetailDto";
 import { mapVendorDetailBundle } from "../mappers/vendorDetailMappers";
@@ -12,8 +11,8 @@ import type {
 import {
 	getVendor,
 	getVendorIntegrationProfile,
-	listVendorAccounts,
 	listVendorAccountOpsSummaries,
+	listVendorAccounts,
 	listVendorConnections,
 	listVendorContacts,
 	listVendorInboundFiles,
@@ -81,8 +80,9 @@ export async function getVendorDetailBundle(
 		notes,
 		auditRecords,
 	] = await Promise.all([
-		tryLoad("integration_profile", () =>
-			getVendorIntegrationProfile(vendorId),
+		tryLoad(
+			"integration_profile",
+			() => getVendorIntegrationProfile(vendorId),
 			errors
 		),
 		tryLoad("connections", () => listVendorConnections(vendorId), errors),
@@ -93,7 +93,11 @@ export async function getVendorDetailBundle(
 			errors
 		),
 		tryLoad("accounts", () => listVendorAccounts(vendorId), errors),
-		tryLoad("account_ops", () => listVendorAccountOpsSummaries(vendorId), errors),
+		tryLoad(
+			"account_ops",
+			() => listVendorAccountOpsSummaries(vendorId),
+			errors
+		),
 		tryLoad("contacts", () => listVendorContacts(vendorId), errors),
 		tryLoad(
 			"contracts",

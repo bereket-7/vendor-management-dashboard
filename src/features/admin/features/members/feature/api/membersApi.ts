@@ -251,7 +251,8 @@ function matchProviderForMember(
 export async function listMemberEligibilityHistory(
 	memberId: string
 ): Promise<EligibilityHistoryRow[]> {
-	if (isMembersMockEnabled()) return getMember(memberId)?.eligibilityHistory ?? [];
+	if (isMembersMockEnabled())
+		return getMember(memberId)?.eligibilityHistory ?? [];
 	const page = await vendorCoreApi.listMemberEligibilityHistory(memberId);
 	return mapEligibilityHistory(page.results as Record<string, unknown>[]);
 }

@@ -45,14 +45,14 @@ import {
 import { cn } from "@/lib/utils";
 
 import {
+	type VendorNoteUi,
+	vendorNoteDtoToUi,
+} from "../feature/mappers/noteMappers";
+import {
 	useDeleteVendorNoteMutation,
 	useUpdateVendorNoteMutation,
 	useVendorNotesQuery,
 } from "../feature/queries/useVendorsQuery";
-import {
-	type VendorNoteUi,
-	vendorNoteDtoToUi,
-} from "../feature/mappers/noteMappers";
 
 type NoteCategory =
 	| "Configuration"
@@ -101,18 +101,12 @@ function statusTone(status: NoteStatus) {
 function formatDisplayUser(value: string) {
 	if (!value.includes("@")) return value;
 	const [local, domain] = value.split("@");
-	if (!domain) return value;
+	if (!domain || local == null) return value;
 	if (local.length <= 14) return value;
 	return `${local.slice(0, 12)}…@${domain}`;
 }
 
-function NoteBadge({
-	label,
-	className,
-}: {
-	label: string;
-	className: string;
-}) {
+function NoteBadge({ label, className }: { label: string; className: string }) {
 	return (
 		<span
 			className={cn(
@@ -372,10 +366,7 @@ export function VendorNotesTab({
 								return (
 									<TableRow
 										key={note.id}
-										className={cn(
-											"cursor-pointer",
-											active && "bg-primary/5"
-										)}
+										className={cn("cursor-pointer", active && "bg-primary/5")}
 										onClick={() => setSelectedId(note.id)}
 									>
 										<TableCell className="max-w-0 pl-4">
@@ -442,9 +433,7 @@ export function VendorNotesTab({
 													>
 														{note.starred ? "Unstar note" : "Star note"}
 													</DropdownMenuItem>
-													<DropdownMenuItem
-														onSelect={() => closeNote(note.id)}
-													>
+													<DropdownMenuItem onSelect={() => closeNote(note.id)}>
 														Mark closed
 													</DropdownMenuItem>
 													<DropdownMenuSeparator />

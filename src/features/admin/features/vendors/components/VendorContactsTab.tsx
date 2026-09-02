@@ -36,6 +36,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import type { VendorContact } from "@/features/shared/vms/types";
+
 import {
 	useCreateVendorContactMutation,
 	useDeleteVendorContactMutation,
@@ -390,9 +391,7 @@ export function VendorContactsTab({
 									checked={contactDraft.is_primary}
 									onCheckedChange={(checked) =>
 										setContactDraft((prev) =>
-											prev
-												? { ...prev, is_primary: checked === true }
-												: prev
+											prev ? { ...prev, is_primary: checked === true } : prev
 										)
 									}
 								/>

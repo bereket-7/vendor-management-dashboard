@@ -34,32 +34,32 @@ flowchart LR
 
 These use endpoints already on remote `vendor-management-core` `main`.
 
-| Area | Remote endpoint | Frontend |
-|------|-----------------|----------|
-| Core provider + embedded profile | `GET /api/v1/providers/<id>/` | `getProviderDto` |
-| Full profile | `GET …/profile/` | `vendorCoreApi.getProviderProfile` |
-| KPI summary + trend % | `GET …/summary/` | `vendorCoreApi.getProviderSummary` → `claimsTrendPct`, etc. |
-| Monthly volume chart | `GET …/claims/monthly-volume/list/` | `listProviderMonthlyVolume` |
-| Rejection reasons | `GET …/claims/rejection-reasons/list/` | `listProviderRejectionReasons` |
-| Recent claims / encounters | `GET …/claims/recent/list/?kind=…` | `listProviderRecentActivity` |
-| Locations, identifiers, networks, credentials, exceptions | `GET …/<resource>/list/` | Tab list fetches in `getProviderDetail` |
-| Vendor roster feeds | `GET …/vendor-sources/list/` | `mapVendorSources()` (`data_sent`, `frequency`, `status`) |
-| Status change | `POST …/status/` | `handleSetStatus` on detail |
-| Soft archive | `DELETE …/delete/` | `handleArchiveProvider` on detail |
+| Area                                                      | Remote endpoint                        | Frontend                                                    |
+| --------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
+| Core provider + embedded profile                          | `GET /api/v1/providers/<id>/`          | `getProviderDto`                                            |
+| Full profile                                              | `GET …/profile/`                       | `vendorCoreApi.getProviderProfile`                          |
+| KPI summary + trend %                                     | `GET …/summary/`                       | `vendorCoreApi.getProviderSummary` → `claimsTrendPct`, etc. |
+| Monthly volume chart                                      | `GET …/claims/monthly-volume/list/`    | `listProviderMonthlyVolume`                                 |
+| Rejection reasons                                         | `GET …/claims/rejection-reasons/list/` | `listProviderRejectionReasons`                              |
+| Recent claims / encounters                                | `GET …/claims/recent/list/?kind=…`     | `listProviderRecentActivity`                                |
+| Locations, identifiers, networks, credentials, exceptions | `GET …/<resource>/list/`               | Tab list fetches in `getProviderDetail`                     |
+| Vendor roster feeds                                       | `GET …/vendor-sources/list/`           | `mapVendorSources()` (`data_sent`, `frequency`, `status`)   |
+| Status change                                             | `POST …/status/`                       | `handleSetStatus` on detail                                 |
+| Soft archive                                              | `DELETE …/delete/`                     | `handleArchiveProvider` on detail                           |
 
 ---
 
 ## Frontend gaps (fix in `vendor-management` only)
 
-| Gap | Root cause | Suggested fix |
-|-----|------------|---------------|
-| **Demographics show `—`** | `providerDtoToDetail()` hardcodes `preferredName: null`, `preferredLanguage/race/ethnicity: "—"` even though profile API returns `preferred_name`, `preferred_language`, `race`, `ethnicity` | Add fields to `ProviderProfileCompactDto` / `ProviderProfileDto` in [`types.ts`](../../../../lib/vendor-core/types.ts); map from `profile` in [`live-providers.ts`](./live-providers.ts) |
-| **Tab sub-resources read-only** | Client CRUD exists; detail tabs have no create/edit/delete UI | Wire [`vendorCoreApi`](../../../../lib/vendor-core/api.ts) `create/update/delete*` methods; add modals or drawers per tab (locations, networks, credentials, exceptions, identifier delete) |
-| **Hard delete** | `hardDeleteProvider` in client + [`providersApi`](./feature/api/providersApi.ts); no detail action | Optional admin-only destructive action with confirm dialog |
-| **Restore on detail** | `restoreProvider` only on [`ProvidersPage`](./pages/ProvidersPage.tsx) | Show restore CTA in detail header when `is_deleted` |
-| **Roster drill-down** | `listProviderRosterProviders` client exists | Drawer from roster chip → paginated providers in roster |
-| **Claims empty vs failed** | `getProviderDetail()` uses `.catch(() => [])` on claims fetches | Partial-failure banner or per-section error state when API fails vs truly empty |
-| **List `claims12m` / `paid12m`** (out of detail scope) | List serializer has no KPI embed on remote backend; `providersToSummaries()` falls back to `0` | Accept zeros on list, or wait for remote backend list embed — do **not** add local backend changes |
+| Gap                                                    | Root cause                                                                                                                                                                                   | Suggested fix                                                                                                                                                                               |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Demographics show `—`**                              | `providerDtoToDetail()` hardcodes `preferredName: null`, `preferredLanguage/race/ethnicity: "—"` even though profile API returns `preferred_name`, `preferred_language`, `race`, `ethnicity` | Add fields to `ProviderProfileCompactDto` / `ProviderProfileDto` in [`types.ts`](../../../../lib/vendor-core/types.ts); map from `profile` in [`live-providers.ts`](./live-providers.ts)    |
+| **Tab sub-resources read-only**                        | Client CRUD exists; detail tabs have no create/edit/delete UI                                                                                                                                | Wire [`vendorCoreApi`](../../../../lib/vendor-core/api.ts) `create/update/delete*` methods; add modals or drawers per tab (locations, networks, credentials, exceptions, identifier delete) |
+| **Hard delete**                                        | `hardDeleteProvider` in client + [`providersApi`](./feature/api/providersApi.ts); no detail action                                                                                           | Optional admin-only destructive action with confirm dialog                                                                                                                                  |
+| **Restore on detail**                                  | `restoreProvider` only on [`ProvidersPage`](./pages/ProvidersPage.tsx)                                                                                                                       | Show restore CTA in detail header when `is_deleted`                                                                                                                                         |
+| **Roster drill-down**                                  | `listProviderRosterProviders` client exists                                                                                                                                                  | Drawer from roster chip → paginated providers in roster                                                                                                                                     |
+| **Claims empty vs failed**                             | `getProviderDetail()` uses `.catch(() => [])` on claims fetches                                                                                                                              | Partial-failure banner or per-section error state when API fails vs truly empty                                                                                                             |
+| **List `claims12m` / `paid12m`** (out of detail scope) | List serializer has no KPI embed on remote backend; `providersToSummaries()` falls back to `0`                                                                                               | Accept zeros on list, or wait for remote backend list embed — do **not** add local backend changes                                                                                          |
 
 ---
 
@@ -73,13 +73,13 @@ These use endpoints already on remote `vendor-management-core` `main`.
 
 ## Files to touch when implementing gaps
 
-| File | Change |
-|------|--------|
-| [`live-providers.ts`](./live-providers.ts) | Map demographics from profile |
-| [`types.ts`](../../../../lib/vendor-core/types.ts) | Profile demographic fields on DTOs |
-| [`ProviderDetailPage.tsx`](./pages/ProviderDetailPage.tsx) | Tab CRUD UI, restore/hard-delete, error states |
-| [`useProvidersQuery.ts`](./feature/queries/useProvidersQuery.ts) | Mutations for tab CRUD if not already present |
-| [`providersApi.ts`](./feature/api/providersApi.ts) | Thin wrappers for new mutations if needed |
+| File                                                             | Change                                         |
+| ---------------------------------------------------------------- | ---------------------------------------------- |
+| [`live-providers.ts`](./live-providers.ts)                       | Map demographics from profile                  |
+| [`types.ts`](../../../../lib/vendor-core/types.ts)               | Profile demographic fields on DTOs             |
+| [`ProviderDetailPage.tsx`](./pages/ProviderDetailPage.tsx)       | Tab CRUD UI, restore/hard-delete, error states |
+| [`useProvidersQuery.ts`](./feature/queries/useProvidersQuery.ts) | Mutations for tab CRUD if not already present  |
+| [`providersApi.ts`](./feature/api/providersApi.ts)               | Thin wrappers for new mutations if needed      |
 
 ---
 

@@ -1,4 +1,12 @@
 import type {
+	ClaimActivityStatus,
+	FeedStatus,
+	ProviderClaimRow,
+	ProviderDetail,
+	ProviderStatus,
+	ProviderSummary,
+} from "@/features/admin/features/providers/mock-data";
+import type {
 	ProviderCredentialDto,
 	ProviderDto,
 	ProviderExceptionDto,
@@ -13,14 +21,6 @@ import type {
 	ProviderSummaryDto,
 	ProviderVendorSourceDto,
 } from "@/lib/vendor-core/types";
-import type {
-	ClaimActivityStatus,
-	FeedStatus,
-	ProviderClaimRow,
-	ProviderDetail,
-	ProviderStatus,
-	ProviderSummary,
-} from "@/features/admin/features/providers/mock-data";
 
 export const TAXONOMY_LABELS: Record<string, string> = {
 	"207R00000X": "Internal Medicine",
@@ -163,7 +163,8 @@ function mapVendorSources(
 			id: row.id,
 			vendor: dash(row.vendor_name),
 			fileType: dash(row.file_type) || "provider_roster",
-			dataSent: dash(row.data_sent) !== "—" ? row.data_sent!.trim() : "Provider roster",
+			dataSent:
+				dash(row.data_sent) !== "—" ? row.data_sent!.trim() : "Provider roster",
 			frequency: dash(row.frequency),
 			lastReceived: row.received_at?.slice(0, 10) ?? "—",
 			status,
@@ -203,9 +204,7 @@ function parseActivityStatus(raw: string): ClaimActivityStatus {
 	return "pending";
 }
 
-function parseActivityType(
-	raw: string
-): ProviderClaimRow["type"] {
+function parseActivityType(raw: string): ProviderClaimRow["type"] {
 	const value = raw.toLowerCase();
 	if (value.includes("institutional")) return "Institutional";
 	if (value.includes("encounter")) return "Encounter";

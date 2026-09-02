@@ -49,9 +49,7 @@ function mapStatus(
 	return "healthy";
 }
 
-function mapFeedStatus(
-	raw?: string | null
-): VendorAccountRow["eligibility"] {
+function mapFeedStatus(raw?: string | null): VendorAccountRow["eligibility"] {
 	const value = (raw ?? "none").toLowerCase();
 	if (value === "success" || value === "warning" || value === "error") {
 		return value;
@@ -123,7 +121,9 @@ export function mergeAccountOpsSummary(
 		eligibility: mapFeedStatus(
 			summary.eligibility_status ?? summary.eligibility_feed_status
 		),
-		medical: mapFeedStatus(summary.medical_status ?? summary.medical_feed_status),
+		medical: mapFeedStatus(
+			summary.medical_status ?? summary.medical_feed_status
+		),
 		pharmacy: mapFeedStatus(
 			summary.pharmacy_status ?? summary.pharmacy_feed_status
 		),

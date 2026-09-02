@@ -49,12 +49,12 @@ import { formatDate, formatMoney } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
+import { UploadProcurementDocumentDialog } from "../components/UploadProcurementDocumentDialog";
 import {
 	useContract,
 	useProcurementDocumentsList,
 	useUpdateContractMutation,
 } from "../feature/queries/useContractsQuery";
-import { UploadProcurementDocumentDialog } from "../components/UploadProcurementDocumentDialog";
 
 const TABS = [
 	"Contract Details",

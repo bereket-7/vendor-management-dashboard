@@ -38,17 +38,17 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-	HoverCard,
-	HoverCardContent,
-	HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import {
 	Select,
 	SelectContent,
@@ -73,6 +73,7 @@ import type {
 	MigrationCaseListQuery,
 	WorkQueueImportResultDto,
 } from "@/lib/vendor-core/types";
+import type { WorkQueueFilterQuery } from "@/lib/vendor-core/types";
 
 import { WorkQueueImportResultDialog } from "../components/WorkQueueImportResultDialog";
 import {
@@ -106,19 +107,18 @@ import {
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
 import { emptyProgressSummary } from "../progress-data";
 import {
-	type EscalationStatus,
-	ESCALATION_STATUS_SELECT_OPTIONS,
 	ESCALATION_STATUS_LABEL,
+	ESCALATION_STATUS_SELECT_OPTIONS,
+	type EscalationStatus,
 } from "../work-queue-analyst-escalation";
 import {
 	MIGRATION_STATUS_LABEL,
 	type MigrationStatus,
 	type TpaTpvRow,
-	WORK_QUEUE_KPI,
 	WHITELIST_STATUS_LABEL,
+	WORK_QUEUE_KPI,
 	type WhitelistStatus,
 } from "../work-queue-types";
-import type { WorkQueueFilterQuery } from "@/lib/vendor-core/types";
 
 type ActionModal = "contacts" | null;
 
@@ -374,8 +374,7 @@ function MyWorkQueueBody() {
 					? analystIdByName.get(analystFilter)
 					: undefined,
 			wave: waveFilter !== "all" ? Number(waveFilter) : undefined,
-			whitelist_status:
-				whitelistFilter !== "all" ? whitelistFilter : undefined,
+			whitelist_status: whitelistFilter !== "all" ? whitelistFilter : undefined,
 			current_stage: stageFilter !== "all" ? stageFilter : undefined,
 		};
 	}, [
@@ -825,7 +824,10 @@ function MyWorkQueueBody() {
 				</div>
 			) : null}
 
-			{!listLoadError && !rowsPageQ.isLoading && totalCount === 0 && !hasFilters ? (
+			{!listLoadError &&
+			!rowsPageQ.isLoading &&
+			totalCount === 0 &&
+			!hasFilters ? (
 				<div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
 					No migration cases yet. Use{" "}
 					<span className="font-medium text-foreground">Import</span> or{" "}
@@ -1031,9 +1033,7 @@ function MyWorkQueueBody() {
 										<SelectContent>
 											<SelectItem value="all">All whitelist</SelectItem>
 											{(
-												Object.keys(
-													WHITELIST_STATUS_LABEL
-												) as WhitelistStatus[]
+												Object.keys(WHITELIST_STATUS_LABEL) as WhitelistStatus[]
 											).map((key) => (
 												<SelectItem key={key} value={key}>
 													{WHITELIST_STATUS_LABEL[key]}
@@ -1114,9 +1114,7 @@ function MyWorkQueueBody() {
 								<TableHead className={cn(th, "w-[9%]")}>
 									SFTP Progress
 								</TableHead>
-								<TableHead className={cn(th, "w-[9%]")}>
-									EDI Progress
-								</TableHead>
+								<TableHead className={cn(th, "w-[9%]")}>EDI Progress</TableHead>
 								<TableHead className={cn(th, "w-[8%]")}>Status</TableHead>
 								<TableHead className={cn(th, "w-[7%]")}>Analyst</TableHead>
 								<TableHead className={cn(th, "w-[7%]")}>Escalation</TableHead>

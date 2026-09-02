@@ -1,13 +1,17 @@
-import { vendorCoreApi } from "@/lib/vendor-core/api";
-import { isLiveIntegrationEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { vmsApi } from "@/features/shared/vms/api";
 import type { ContractModel } from "@/features/shared/vms/types";
+import { isLiveIntegrationEnabled, isMockEnabled } from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 
-import { contractDtoToModel, toApiContractStatus, toApiContractType } from "../mappers/contractCoreMappers";
 import type {
 	ContractsCreateDto,
 	ContractsUpdateDto,
 } from "../dto/contractsDto";
+import {
+	contractDtoToModel,
+	toApiContractStatus,
+	toApiContractType,
+} from "../mappers/contractCoreMappers";
 
 function requireRecord<T>(record: T | null): T {
 	if (!record) throw new Error("VMS record was not found");
@@ -42,7 +46,9 @@ async function enrichContractVendorNames(
 	);
 }
 
-export async function listContracts(vendorId?: string): Promise<ContractModel[]> {
+export async function listContracts(
+	vendorId?: string
+): Promise<ContractModel[]> {
 	if (isMockEnabled()) return vmsApi.listContracts(vendorId);
 	if (isLiveIntegrationEnabled()) {
 		const page = await vendorCoreApi.listContracts(
@@ -57,7 +63,9 @@ export async function listContracts(vendorId?: string): Promise<ContractModel[]>
 export async function getContracts(id: string): Promise<ContractModel> {
 	if (isLiveIntegrationEnabled() && !isMockEnabled()) {
 		const dto = await vendorCoreApi.getContract(id);
-		const [contract] = await enrichContractVendorNames([contractDtoToModel(dto)]);
+		const [contract] = await enrichContractVendorNames([
+			contractDtoToModel(dto),
+		]);
 		return requireRecord(contract ?? null);
 	}
 	return requireRecord(await vmsApi.getContract(id));
@@ -102,7 +110,9 @@ export async function updateContracts(
 				: {}),
 			...(patch.startDate != null ? { effective_date: patch.startDate } : {}),
 			...(patch.endDate != null ? { expiration_date: patch.endDate } : {}),
-			...(patch.status != null ? { status: toApiContractStatus(patch.status) } : {}),
+			...(patch.status != null
+				? { status: toApiContractStatus(patch.status) }
+				: {}),
 			...(patch.value != null ? { total_contract_value: patch.value } : {}),
 			...(patch.currency != null ? { currency: patch.currency } : {}),
 		});

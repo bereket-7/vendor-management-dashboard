@@ -23,8 +23,11 @@ import { formatDate, formatMoney } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-import { useContractsList, useProcurementDocumentsList } from "../feature/queries/useContractsQuery";
 import { UploadProcurementDocumentDialog } from "../components/UploadProcurementDocumentDialog";
+import {
+	useContractsList,
+	useProcurementDocumentsList,
+} from "../feature/queries/useContractsQuery";
 
 const TERM_STATUS_CLASS: Record<ContractTermStatus, string> = {
 	completed:

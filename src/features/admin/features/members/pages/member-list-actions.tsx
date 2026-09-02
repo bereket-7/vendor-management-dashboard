@@ -41,7 +41,9 @@ export function MemberDirectoryActions() {
 											: "Seed complete"
 									),
 								onError: (err) =>
-									toast.error(err instanceof Error ? err.message : "Seed failed"),
+									toast.error(
+										err instanceof Error ? err.message : "Seed failed"
+									),
 							}
 						)
 					}

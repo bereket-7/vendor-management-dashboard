@@ -481,7 +481,9 @@ export function useMemberVendorsQuery() {
 
 export function useMemberSummariesList(filters?: MemberListQuery) {
 	const query = useMemberSummariesQuery(filters);
-	const members = isMembersMockEnabled() ? getMemberSummaries() : (query.data ?? []);
+	const members = isMembersMockEnabled()
+		? getMemberSummaries()
+		: (query.data ?? []);
 	return { ...query, members };
 }
 

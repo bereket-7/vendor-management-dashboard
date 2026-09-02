@@ -11,9 +11,9 @@ import {
 	updateContracts,
 } from "../api/contractsApi";
 import {
+	type CreateProcurementDocumentInput,
 	createProcurementDocument,
 	listProcurementDocuments,
-	type CreateProcurementDocumentInput,
 } from "../api/documentsApi";
 import type {
 	ContractsCreateDto,
@@ -50,11 +50,7 @@ export function useCreateContractsMutation() {
 			queryClient.invalidateQueries({ queryKey: featureQueryKey("vendors") });
 			if (input.vendorId) {
 				queryClient.invalidateQueries({
-					queryKey: featureQueryKey(
-						"vendors",
-						"detail-bundle",
-						input.vendorId
-					),
+					queryKey: featureQueryKey("vendors", "detail-bundle", input.vendorId),
 				});
 			}
 		},
@@ -95,10 +91,7 @@ export function useProcurementDocumentsQuery(
 	});
 }
 
-export function useProcurementDocumentsList(
-	vendorId?: string,
-	enabled = true
-) {
+export function useProcurementDocumentsList(vendorId?: string, enabled = true) {
 	const query = useProcurementDocumentsQuery(vendorId, enabled);
 	return { ...query, documents: query.data ?? [] };
 }

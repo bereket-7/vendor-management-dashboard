@@ -52,7 +52,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { accountRowLobToApi } from "@/features/admin/features/vendors/feature/mappers/accountMappers";
 import {
 	buildAccountActivityRows,
 	countVendorInboundFilesOnDay,
@@ -61,17 +60,18 @@ import {
 	latestVendorInboundFile,
 	mapInboundFileTypeLabel,
 } from "@/features/admin/features/vendors/feature/mappers/accountInboundMetrics";
+import { accountRowLobToApi } from "@/features/admin/features/vendors/feature/mappers/accountMappers";
 import {
 	type AccountFileStatus,
 	type VendorAccountRow,
 } from "@/features/admin/features/vendors/vendor-types";
+import { cn } from "@/lib/utils";
+import { VendorCoreApiError } from "@/lib/vendor-core/client";
 import type {
 	ConnectionDto,
 	InboundFileDto,
 	IntakeJobDto,
 } from "@/lib/vendor-core/types";
-import { VendorCoreApiError } from "@/lib/vendor-core/client";
-import { cn } from "@/lib/utils";
 
 function AccountStatusPill({ status }: { status: VendorAccountRow["status"] }) {
 	if (status === "healthy") {
@@ -410,7 +410,9 @@ export function VendorAccountsTab({
 			: "inactive";
 		const finish = () => {
 			toast.success(
-				nextActive ? `${account.name} activated.` : `${account.name} deactivated.`
+				nextActive
+					? `${account.name} activated.`
+					: `${account.name} deactivated.`
 			);
 		};
 		setSaving(true);
@@ -433,8 +435,9 @@ export function VendorAccountsTab({
 		<section className="min-w-0 space-y-4">
 			{accountsLoadError ? (
 				<div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-					Could not load accounts from vendor-core: {accountsLoadError}. The table
-					below may be empty until you sign in again or fix the API connection.
+					Could not load accounts from vendor-core: {accountsLoadError}. The
+					table below may be empty until you sign in again or fix the API
+					connection.
 				</div>
 			) : null}
 			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -972,7 +975,9 @@ export function VendorAccountsTab({
 																						<TableCell className="pl-3 font-medium">
 																							{row.fileType}
 																						</TableCell>
-																						<TableCell>{row.direction}</TableCell>
+																						<TableCell>
+																							{row.direction}
+																						</TableCell>
 																						<TableCell>
 																							{row.status === "success" ? (
 																								<span className="inline-flex items-center gap-1 text-emerald-700">
@@ -988,7 +993,8 @@ export function VendorAccountsTab({
 																									<AlertTriangle className="size-3.5" />
 																									Warning
 																								</span>
-																							) : row.status === "processing" ? (
+																							) : row.status ===
+																							  "processing" ? (
 																								<span className="text-muted-foreground">
 																									Processing
 																								</span>
@@ -1078,9 +1084,8 @@ export function VendorAccountsTab({
 													No linked accounts yet
 												</p>
 												<p className="text-xs text-muted-foreground">
-													Use{" "}
-													<span className="font-medium">Add account</span> above
-													to link the first account for this vendor.
+													Use <span className="font-medium">Add account</span>{" "}
+													above to link the first account for this vendor.
 												</p>
 											</div>
 										) : (
@@ -1322,20 +1327,20 @@ export function VendorAccountsTab({
 									line_of_business: createDraft.line_of_business,
 									active: true,
 								})
-								.then((created) => {
-									if (!created?.id) {
-										toast.error(
-											"Account may have been created but the response was incomplete. Refresh to verify."
-										);
-										return;
-									}
-									setRows((prev) => {
-										if (prev.some((row) => row.id === created.id)) {
-											return prev;
+									.then((created) => {
+										if (!created?.id) {
+											toast.error(
+												"Account may have been created but the response was incomplete. Refresh to verify."
+											);
+											return;
 										}
-										return [...prev, created];
-									});
-									toast.success("Account saved.");
+										setRows((prev) => {
+											if (prev.some((row) => row.id === created.id)) {
+												return prev;
+											}
+											return [...prev, created];
+										});
+										toast.success("Account saved.");
 										setCreateOpen(false);
 										setCreateDraft({
 											account_code: "",

@@ -24,9 +24,6 @@ import type {
 	ContractDto,
 	ContractListQuery,
 	ContractUpdateInput,
-	ProcurementDocumentCreateInput,
-	ProcurementDocumentDto,
-	ProcurementDocumentListQuery,
 	CoreUserDto,
 	CredentialDto,
 	EligibilityFileDto,
@@ -47,9 +44,9 @@ import type {
 	MemberListDto,
 	MemberListQuery,
 	MemberWriteBody,
+	MigrationCaseBlockerTransitionInput,
 	MigrationCaseBulkStatusInput,
 	MigrationCaseBulkStatusResultDto,
-	MigrationCaseBlockerTransitionInput,
 	MigrationCaseCreateInput,
 	MigrationCaseDocumentDto,
 	MigrationCaseDto,
@@ -66,6 +63,9 @@ import type {
 	PharmacyClaimRowListDto,
 	PharmacyClaimRowListQuery,
 	PharmacyClaimRowUpdateInput,
+	ProcurementDocumentCreateInput,
+	ProcurementDocumentDto,
+	ProcurementDocumentListQuery,
 	ProviderCreateInput,
 	ProviderCredentialDto,
 	ProviderDashboardStatsDto,
@@ -79,11 +79,11 @@ import type {
 	ProviderLocationDto,
 	ProviderMonthlyVolumeDto,
 	ProviderNetworkDto,
+	ProviderProfileDto,
+	ProviderProfileUpdateInput,
 	ProviderRecentActivityDto,
 	ProviderRecentActivityQuery,
 	ProviderRejectionReasonDto,
-	ProviderProfileDto,
-	ProviderProfileUpdateInput,
 	ProviderRosterCreateInput,
 	ProviderRosterDto,
 	ProviderRosterListQuery,
@@ -103,13 +103,13 @@ import type {
 	VendorCategoryAssignmentListQuery,
 	VendorCategoryDto,
 	VendorCategoryListQuery,
-	VendorCreateInput,
 	VendorContactCreateInput,
 	VendorContactDto,
 	VendorContactUpdateInput,
+	VendorCreateInput,
+	VendorDto,
 	VendorIntegrationProfileDto,
 	VendorIntegrationProfileUpdateInput,
-	VendorDto,
 	VendorInviteCreateInput,
 	VendorInviteDto,
 	VendorNoteCreateInput,
@@ -650,7 +650,15 @@ export const vendorCoreApi = {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
 			>(vendorCoreEndpoints.accountsList, {
-				params: pageParams({ ...params, limit, offset }),
+				params: pageParams({
+					vendor_id: params?.vendor_id,
+					is_visible:
+						params?.is_visible != null ? String(params.is_visible) : undefined,
+					is_deleted:
+						params?.is_deleted != null ? String(params.is_deleted) : undefined,
+					limit,
+					offset,
+				}),
 			});
 			return mapPage(page, normalizeAccount);
 		});
@@ -1642,10 +1650,7 @@ export const vendorCoreApi = {
 			{ method: "DELETE" }
 		),
 
-	createProviderLocation: (
-		id: string,
-		body: Record<string, unknown>
-	) =>
+	createProviderLocation: (id: string, body: Record<string, unknown>) =>
 		vendorCoreFetch<ProviderLocationDto>(
 			vendorCoreEndpoints.providerLocationCreate(id),
 			{ method: "POST", body: JSON.stringify(body) }
@@ -2123,13 +2128,15 @@ export const vendorCoreApi = {
 	listVendorCategoryAssignments: async (
 		params?: VendorCategoryAssignmentListQuery
 	) => {
-		const query: Record<string, string | number | boolean | undefined> = {
+		const query: Record<string, string | number | undefined> = {
 			limit: params?.limit,
 			offset: params?.offset,
 			vendor_id: params?.vendor_id,
 		};
-		if (params?.is_visible != null) query.is_visible = params.is_visible;
-		if (params?.is_deleted != null) query.is_deleted = params.is_deleted;
+		if (params?.is_visible != null)
+			query.is_visible = String(params.is_visible);
+		if (params?.is_deleted != null)
+			query.is_deleted = String(params.is_deleted);
 		const page = await vendorCoreFetch<
 			PaginatedResult<VendorCategoryAssignmentDto>
 		>(vendorCoreEndpoints.vendorCategoryAssignmentsList, {
@@ -2723,15 +2730,19 @@ export const vendorCoreApi = {
 		);
 		const rows = Array.isArray(raw) ? raw : [];
 		return rows
-			.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+			.filter(
+				(row): row is Record<string, unknown> =>
+					!!row && typeof row === "object"
+			)
 			.map(normalizeWorkQueueAnalystStatsRow);
 	},
 
 	listWorkQueueBlockers: async (params?: WorkQueueFilterQuery) => {
-		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.workQueueBlockersList,
-			{ params: pageParams(params) }
-		);
+		const page = await vendorCoreFetch<
+			PaginatedResult<Record<string, unknown>>
+		>(vendorCoreEndpoints.workQueueBlockersList, {
+			params: pageParams(params),
+		});
 		return mapPage(page, normalizeWorkQueueBlockerRow);
 	},
 

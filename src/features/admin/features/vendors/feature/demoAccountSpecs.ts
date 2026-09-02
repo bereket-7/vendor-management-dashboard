@@ -11,7 +11,9 @@ export type DemoAccountSpec = {
 };
 
 /** Demo account rows — mirrors `scripts/seed-vendor-detail-demo.mjs`. */
-export function demoAccountSpecsForVendor(vendorCode: string): DemoAccountSpec[] {
+export function demoAccountSpecsForVendor(
+	vendorCode: string
+): DemoAccountSpec[] {
 	const code = (vendorCode || "demo").toUpperCase();
 	return [
 		{

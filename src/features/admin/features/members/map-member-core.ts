@@ -2,6 +2,11 @@
  * Map vendor-core Member 360 (snake_case) → dashboard MemberSummary / MemberDetail.
  * Keep UI types unchanged; fill gaps with safe empty defaults.
  */
+import {
+	fixNewtechId,
+	getDemoMemberOverlay,
+	normalizeMemberWireIds,
+} from "@/features/admin/features/members/member-id-normalize";
 import type {
 	AccumulatorAmountTriple,
 	AccumulatorKpi,
@@ -24,11 +29,6 @@ import type {
 	VendorSourceRow,
 } from "@/features/admin/features/members/mock-data";
 import { buildMockAccumulatorTransactions } from "@/features/admin/features/members/mock-data";
-import {
-	fixNewtechId,
-	getDemoMemberOverlay,
-	normalizeMemberWireIds,
-} from "@/features/admin/features/members/member-id-normalize";
 import { isMembersMockEnabled } from "@/lib/mock-mode";
 import type {
 	AccumulatorRowDetailDto,
@@ -185,15 +185,13 @@ export function memberListDtoToSummary(row: MemberListDto): MemberSummary {
 		id: str(row.id),
 		memberId: (demoOverlay?.memberId ?? ids.cardholderId).slice(0, 64),
 		vendorId: str(row.vendor_id) || nestedVendorId || undefined,
-		alternateId: demoOverlay?.alternateId ?? ids.alternateId || undefined,
+		alternateId: demoOverlay?.alternateId ?? (ids.alternateId || undefined),
 		newtechMemberId:
 			demoOverlay?.newtechMemberId ??
-			fixNewtechId(str(row.newtech_member_id)) ||
-			undefined,
+			(fixNewtechId(str(row.newtech_member_id)) || undefined),
 		newtechFamilyId:
 			demoOverlay?.newtechFamilyId ??
-			fixNewtechId(str(row.newtech_family_id)) ||
-			undefined,
+			(fixNewtechId(str(row.newtech_family_id)) || undefined),
 		firstName: demoOverlay?.firstName ?? str(row.first_name, "—"),
 		middleName: demoOverlay ? undefined : str(row.middle_name) || undefined,
 		lastName: demoOverlay?.lastName ?? str(row.last_name, "—"),
@@ -278,18 +276,19 @@ export function mapDependents(
 			alternateId: str(r.alternate_id),
 		});
 		return {
-		id: str(r.id),
-		name: demoOverlay
-			? `${demoOverlay.firstName} ${demoOverlay.lastName}`
-			: [str(r.first_name), str(r.last_name)].filter(Boolean).join(" ") || "—",
-		relationship: mapRelationship(str(r.relationship_code)),
-		dob: demoOverlay?.dob ?? dateStr(r.date_of_birth),
-		gender: demoOverlay?.gender ?? mapGender(str(r.gender)),
-		coverageStatus: mapMemberStatus(str(r.status)),
-		memberId: demoOverlay?.memberId ?? ids.cardholderId || undefined,
-		pcpName: str(r.pcp_name) || undefined,
-		planName: str(r.plan_name) || undefined,
-	};
+			id: str(r.id),
+			name: demoOverlay
+				? `${demoOverlay.firstName} ${demoOverlay.lastName}`
+				: [str(r.first_name), str(r.last_name)].filter(Boolean).join(" ") ||
+					"—",
+			relationship: mapRelationship(str(r.relationship_code)),
+			dob: demoOverlay?.dob ?? dateStr(r.date_of_birth),
+			gender: demoOverlay?.gender ?? mapGender(str(r.gender)),
+			coverageStatus: mapMemberStatus(str(r.status)),
+			memberId: demoOverlay?.memberId ?? (ids.cardholderId || undefined),
+			pcpName: str(r.pcp_name) || undefined,
+			planName: str(r.plan_name) || undefined,
+		};
 	});
 }
 
@@ -318,7 +317,7 @@ export function mapFamilyLinks(
 			dob: demoOverlay?.dob ?? dateStr(r.dependent_date_of_birth),
 			gender: demoOverlay?.gender ?? "—",
 			coverageStatus: mapMemberStatus(str(r.dependent_status)),
-			memberId: demoOverlay?.memberId ?? rawCardholderId || undefined,
+			memberId: demoOverlay?.memberId ?? (rawCardholderId || undefined),
 			dependentId: str(r.dependent_id) || undefined,
 		};
 	});
@@ -1127,12 +1126,10 @@ export function memberDetailDtoToDetail(row: MemberDetailDto): MemberDetail {
 		externalId: demoOverlay?.externalId || undefined,
 		newtechMemberId:
 			demoOverlay?.newtechMemberId ??
-			fixNewtechId(str(row.newtech_member_id)) ||
-			undefined,
+			(fixNewtechId(str(row.newtech_member_id)) || undefined),
 		newtechFamilyId:
 			demoOverlay?.newtechFamilyId ??
-			fixNewtechId(str(row.newtech_family_id)) ||
-			undefined,
+			(fixNewtechId(str(row.newtech_family_id)) || undefined),
 		employeeType: str(group.employee_type) || undefined,
 		sourceSystem: str(row.source_system || latest.source_system) || undefined,
 		sourceFileName: str(latest.original_filename) || undefined,
@@ -1141,13 +1138,17 @@ export function memberDetailDtoToDetail(row: MemberDetailDto): MemberDetail {
 			: undefined,
 		recordStatus: str(latest.record_status) || undefined,
 		changeDetected: str(latest.change_summary) || undefined,
-		preferredName: demoOverlay?.preferredName ?? str(row.preferred_name || demo.preferred_name) || null,
+		preferredName:
+			demoOverlay?.preferredName ??
+			(str(row.preferred_name || demo.preferred_name) || null),
 		preferredLanguage: str(
 			row.preferred_language || demo.preferred_language,
 			"—"
 		),
 		race: demoOverlay ? "Ethiopian" : str(row.race || demo.race, "—"),
-		ethnicity: demoOverlay ? "Ethiopian" : str(row.ethnicity || demo.ethnicity, "—"),
+		ethnicity: demoOverlay
+			? "Ethiopian"
+			: str(row.ethnicity || demo.ethnicity, "—"),
 		communicationPreference: mapComms(
 			str(row.communication_preference || demo.communication_preference)
 		),

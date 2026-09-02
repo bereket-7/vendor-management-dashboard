@@ -10,17 +10,17 @@ import { useCreateVendorMutation } from "@/features/shared/vms/queries";
 import { useRouter } from "@/i18n/navigation";
 import { isMockEnabled } from "@/lib/mock-mode";
 
-import { createVendorRecord } from "../feature/api/vendorsApi";
 import {
 	formatWizardSyncFailures,
 	syncVendorWizardExtras,
 } from "../feature/api/vendorWizardSync";
+import { createVendorRecord } from "../feature/api/vendorsApi";
 import { useVendorCategoriesQuery } from "../feature/queries/useVendorsQuery";
 import {
 	EMPTY_VENDOR_WIZARD,
 	VendorFormWizard,
-	wizardValuesToVendorCreatePayload,
 	type VendorWizardValues,
+	wizardValuesToVendorCreatePayload,
 } from "./VendorFormWizard";
 
 export function VendorCreatePage() {

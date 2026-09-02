@@ -246,9 +246,8 @@ export function wizardValuesToVendorCreatePayload(
 }
 
 export function countFilledContacts(values: VendorWizardValues): number {
-	return values.contacts.filter(
-		(row) => row.name.trim() || row.email.trim()
-	).length;
+	return values.contacts.filter((row) => row.name.trim() || row.email.trim())
+		.length;
 }
 
 export function countFilledAccounts(values: VendorWizardValues): number {
@@ -262,19 +261,22 @@ export function countFilledNotes(values: VendorWizardValues): number {
 }
 
 export function countFilledContracts(values: VendorWizardValues): number {
-	return values.contracts.filter(
-		(row) => row.number.trim() || row.title.trim()
-	).length;
+	return values.contracts.filter((row) => row.number.trim() || row.title.trim())
+		.length;
 }
 
-export function validateIdentityStep(values: VendorWizardValues): string | null {
+export function validateIdentityStep(
+	values: VendorWizardValues
+): string | null {
 	if (!values.legal_name.trim()) return "Legal name is required.";
 	if (!values.country.trim()) return "Country is required.";
 	if (!values.city.trim()) return "City is required.";
 	return null;
 }
 
-export function validateContactsStep(values: VendorWizardValues): string | null {
+export function validateContactsStep(
+	values: VendorWizardValues
+): string | null {
 	for (const contact of values.contacts) {
 		const started =
 			contact.name.trim() ||
@@ -288,7 +290,9 @@ export function validateContactsStep(values: VendorWizardValues): string | null 
 	return null;
 }
 
-export function validateAccountsStep(values: VendorWizardValues): string | null {
+export function validateAccountsStep(
+	values: VendorWizardValues
+): string | null {
 	for (const account of values.accounts) {
 		const started =
 			account.account_code.trim() ||
@@ -306,7 +310,9 @@ export function validateAccountsStep(values: VendorWizardValues): string | null 
 	return null;
 }
 
-export function validateIntegrationStep(values: VendorWizardValues): string | null {
+export function validateIntegrationStep(
+	values: VendorWizardValues
+): string | null {
 	const connectionStarted =
 		values.connection.name.trim() || values.connection.host.trim();
 	if (

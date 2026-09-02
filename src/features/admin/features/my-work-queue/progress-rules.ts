@@ -22,7 +22,8 @@ export function percentFromCompletedKeys(
 	defs: MilestoneDefinition[],
 	completedKeys: ReadonlySet<string> | readonly string[]
 ): number {
-	const completed = completedKeys instanceof Set ? completedKeys : new Set(completedKeys);
+	const completed =
+		completedKeys instanceof Set ? completedKeys : new Set(completedKeys);
 	let percent = 0;
 	for (const milestone of defs) {
 		if (completed.has(milestone.key)) {
@@ -73,8 +74,7 @@ export function milestoneStatusesFromCompletedKeys(
 	completedKeys: ReadonlySet<string>
 ): Record<string, MilestoneUiStatus> {
 	const highestCompleteIndex = defs.reduce(
-		(max, milestone, index) =>
-			completedKeys.has(milestone.key) ? index : max,
+		(max, milestone, index) => (completedKeys.has(milestone.key) ? index : max),
 		-1
 	);
 
@@ -96,9 +96,7 @@ export function completedKeysFromStatuses(
 	statuses: Record<string, MilestoneUiStatus | undefined>
 ): Set<string> {
 	return new Set(
-		defs
-			.filter((m) => statuses[m.key] === "complete")
-			.map((m) => m.key)
+		defs.filter((m) => statuses[m.key] === "complete").map((m) => m.key)
 	);
 }
 
@@ -168,7 +166,9 @@ export function applySftpPercentChange(
 	rawPercent: number
 ) {
 	const snapped = snapPercentToCatalog(SFTP_MILESTONE_DEFS, rawPercent);
-	const completed = new Set(completedKeysForPercent(SFTP_MILESTONE_DEFS, snapped));
+	const completed = new Set(
+		completedKeysForPercent(SFTP_MILESTONE_DEFS, snapped)
+	);
 	const sftpMilestones = milestoneStatusesFromCompletedKeys(
 		SFTP_MILESTONE_DEFS,
 		completed
@@ -199,11 +199,16 @@ export function applyEdiPercentChange(
 	sftpProgress: number,
 	currentEdiMilestones: Record<string, MilestoneUiStatus>,
 	rawPercent: number
-): { ediProgress: number; ediMilestones: Record<string, MilestoneUiStatus> } | null {
+): {
+	ediProgress: number;
+	ediMilestones: Record<string, MilestoneUiStatus>;
+} | null {
 	if (!canSetEdiProgress(sftpProgress)) return null;
 
 	const snapped = snapPercentToCatalog(EDI_MILESTONE_DEFS, rawPercent);
-	const completed = new Set(completedKeysForPercent(EDI_MILESTONE_DEFS, snapped));
+	const completed = new Set(
+		completedKeysForPercent(EDI_MILESTONE_DEFS, snapped)
+	);
 	return {
 		ediProgress: snapped,
 		ediMilestones: milestoneStatusesFromCompletedKeys(
@@ -252,7 +257,10 @@ export function applyEdiMilestoneStatusChange(
 	currentStatuses: Record<string, MilestoneUiStatus>,
 	key: string,
 	status: MilestoneUiStatus
-): { ediProgress: number; ediMilestones: Record<string, MilestoneUiStatus> } | null {
+): {
+	ediProgress: number;
+	ediMilestones: Record<string, MilestoneUiStatus>;
+} | null {
 	if (!canSetEdiProgress(sftpProgress)) return null;
 
 	const completed = applyMilestoneStatusChange(
@@ -329,8 +337,7 @@ export function applyMilestoneDateChange(
 		if (i <= index) {
 			return {
 				key: milestone.key,
-				completedAt:
-					i === index ? trimmed : milestone.completedAt || trimmed,
+				completedAt: i === index ? trimmed : milestone.completedAt || trimmed,
 			};
 		}
 		return { key: milestone.key, completedAt: null };

@@ -1,4 +1,3 @@
-import { demoAccountSpecsForVendor } from "../demoAccountSpecs";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
 import type {
 	AccountCreateInput,
@@ -21,6 +20,8 @@ import type {
 	VendorIntegrationProfileUpdateInput,
 	VendorNoteDto,
 } from "@/lib/vendor-core/types";
+
+import { demoAccountSpecsForVendor } from "../demoAccountSpecs";
 import {
 	forgetVendorAccountId,
 	listRememberedVendorAccountIds,
@@ -29,7 +30,9 @@ import {
 
 export { rememberVendorAccountId };
 
-export async function listVendors(): Promise<import("@/lib/vendor-core/types").VendorDto[]> {
+export async function listVendors(): Promise<
+	import("@/lib/vendor-core/types").VendorDto[]
+> {
 	const page = await vendorCoreApi.listVendors();
 	return page.results ?? [];
 }
@@ -200,7 +203,8 @@ export async function listVendorAccounts(
 					forgetVendorAccountId(vendorId, id);
 					continue;
 				}
-				const visible = (detail as { is_visible?: boolean }).is_visible !== false;
+				const visible =
+					(detail as { is_visible?: boolean }).is_visible !== false;
 				const deleted =
 					(detail as { is_deleted?: boolean }).is_deleted === true;
 				if (filters?.is_deleted === true && !deleted) continue;
@@ -261,7 +265,10 @@ export async function findVendorAccountByCode(
 	const code = accountCode.trim();
 	if (!code) return null;
 
-	const searches: Array<{ state: VendorAccountLookupState; filters: { is_visible?: boolean; is_deleted?: boolean } }> = [
+	const searches: Array<{
+		state: VendorAccountLookupState;
+		filters: { is_visible?: boolean; is_deleted?: boolean };
+	}> = [
 		{ state: "active", filters: { is_visible: true, is_deleted: false } },
 		{ state: "hidden", filters: { is_visible: false, is_deleted: false } },
 		{ state: "deleted", filters: { is_deleted: true } },
@@ -276,9 +283,9 @@ export async function findVendorAccountByCode(
 	for (const id of listRememberedVendorAccountIds(vendorId)) {
 		try {
 			const detail = await vendorCoreApi.getAccount(id);
-			if (detail.vendor_id !== vendorId || detail.account_code !== code) continue;
-			const deleted =
-				(detail as { is_deleted?: boolean }).is_deleted === true;
+			if (detail.vendor_id !== vendorId || detail.account_code !== code)
+				continue;
+			const deleted = (detail as { is_deleted?: boolean }).is_deleted === true;
 			const visible = (detail as { is_visible?: boolean }).is_visible !== false;
 			if (deleted) return { account: detail, state: "deleted" };
 			if (!visible) return { account: detail, state: "hidden" };
@@ -316,8 +323,7 @@ export async function seedDemoVendorAccounts(
 			const created = await createVendorAccount(payload);
 			byCode.set(spec.account_code, created);
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message.toLowerCase() : "";
+			const message = error instanceof Error ? error.message.toLowerCase() : "";
 			if (!message.includes("unique") && !message.includes("already")) {
 				throw error;
 			}
@@ -403,7 +409,9 @@ export async function reprocessInboundFile(id: string) {
 	return vendorCoreApi.reprocessInboundFile(id);
 }
 
-export async function listVendorNotes(vendorId: string): Promise<VendorNoteDto[]> {
+export async function listVendorNotes(
+	vendorId: string
+): Promise<VendorNoteDto[]> {
 	const page = await vendorCoreApi.listVendorNotes({ vendor_id: vendorId });
 	return page.results ?? [];
 }

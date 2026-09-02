@@ -11,13 +11,13 @@
 
 On `/admin/my-work-queue`:
 
-| UI area | Expected | Actual |
-|---------|----------|--------|
-| Top KPI cards (Assigned, Connected, …) | Counts | **Works** — e.g. 19 assigned |
-| Main TPA/TPV table | Rows | **Empty** — “No TPA/TPV records match your filters”, 0 entries |
-| EDI Analyst Progress panel | Analyst rows | **Blank** |
-| Escalation Summary cards | Counts | **All 0** |
-| SFTP/EDI summary (top) | May show from KPIs | Partial — KPI endpoint OK |
+| UI area                                | Expected           | Actual                                                         |
+| -------------------------------------- | ------------------ | -------------------------------------------------------------- |
+| Top KPI cards (Assigned, Connected, …) | Counts             | **Works** — e.g. 19 assigned                                   |
+| Main TPA/TPV table                     | Rows               | **Empty** — “No TPA/TPV records match your filters”, 0 entries |
+| EDI Analyst Progress panel             | Analyst rows       | **Blank**                                                      |
+| Escalation Summary cards               | Counts             | **All 0**                                                      |
+| SFTP/EDI summary (top)                 | May show from KPIs | Partial — KPI endpoint OK                                      |
 
 Data **exists** (KPIs prove 19 cases). List-driven UI cannot load it.
 
@@ -71,10 +71,10 @@ Storage shape (input to `build_progress_output`):
 
 ```json
 {
-  "completed": {},
-  "notes": "",
-  "updated_at": null,
-  "updated_by_id": null
+	"completed": {},
+	"notes": "",
+	"updated_at": null,
+	"updated_by_id": null
 }
 ```
 
@@ -145,12 +145,12 @@ Same for EDI. Remove duplicate logic from `_append_progress_fields` or drop the 
 
 ## Files to touch
 
-| File | Change |
-|------|--------|
-| `core/work_queue/serializers/migration_case.py` | Fix list + detail output serializers (P0) |
+| File                                                            | Change                                                          |
+| --------------------------------------------------------------- | --------------------------------------------------------------- |
+| `core/work_queue/serializers/migration_case.py`                 | Fix list + detail output serializers (P0)                       |
 | `core/work_queue/tests/serializers/test_migration_case_list.py` | **Add** — serialize a case with empty + populated progress (P0) |
-| `core/work_queue/apis/migration_case/crud.py` | No change expected |
-| `core/work_queue/progress.py` | No change expected |
+| `core/work_queue/apis/migration_case/crud.py`                   | No change expected                                              |
+| `core/work_queue/progress.py`                                   | No change expected                                              |
 
 ---
 
@@ -201,13 +201,13 @@ def test_migration_case_list_output_serializes_empty_progress(db, migration_case
 
 No frontend code change required for the 500 fix. Refresh My Work Queue:
 
-| Check | Pass |
-|-------|------|
-| Main table shows cases | Rows match KPI total (modulo filters) |
-| Pagination footer | Non-zero count |
-| EDI Analyst Progress | Rows per assigned analyst |
-| Escalation Summary | Counts from first 100 cases (may still be 0 if all `escalation_status: "none"`) |
-| Detail page | Opens without 500 |
+| Check                  | Pass                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| Main table shows cases | Rows match KPI total (modulo filters)                                           |
+| Pagination footer      | Non-zero count                                                                  |
+| EDI Analyst Progress   | Rows per assigned analyst                                                       |
+| Escalation Summary     | Counts from first 100 cases (may still be 0 if all `escalation_status: "none"`) |
+| Detail page            | Opens without 500                                                               |
 
 ---
 

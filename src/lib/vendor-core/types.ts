@@ -2568,8 +2568,7 @@ export function normalizeProvider(raw: Record<string, unknown>): ProviderDto {
 			raw.tab_counts && typeof raw.tab_counts === "object"
 				? (raw.tab_counts as ProviderTabCountsDto)
 				: null,
-		claims12m:
-			raw.claims12m != null ? Number(raw.claims12m) : undefined,
+		claims12m: raw.claims12m != null ? Number(raw.claims12m) : undefined,
 		paid12m: raw.paid12m != null ? Number(raw.paid12m) : undefined,
 		rejection_rate:
 			raw.rejection_rate != null ? Number(raw.rejection_rate) : undefined,
@@ -2692,8 +2691,7 @@ export function normalizeMigrationCaseDocument(
 		migration_case_id: pickString(raw, "migration_case_id") || undefined,
 		name: pickString(raw, "name") || "Document",
 		mime_type: pickString(raw, "mime_type") || undefined,
-		size_bytes:
-			raw.size_bytes != null ? Number(raw.size_bytes) : undefined,
+		size_bytes: raw.size_bytes != null ? Number(raw.size_bytes) : undefined,
 		web_url: pickString(raw, "web_url") || undefined,
 		created_at: pickString(raw, "created_at") || undefined,
 		updated_at: pickString(raw, "updated_at") || undefined,

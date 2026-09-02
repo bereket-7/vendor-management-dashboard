@@ -1,3 +1,4 @@
+import { contractDtoToModel } from "@/features/admin/features/contracts/feature/mappers/contractCoreMappers";
 import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import { vendorDtoToModel } from "@/features/shared/vms/map-vendor-core";
 import type { VendorContact, VendorModel } from "@/features/shared/vms/types";
@@ -11,21 +12,17 @@ import {
 	mapIntegrationProfileDto,
 } from "../../live-vendor-detail";
 import {
-	summarizeRuns,
 	type VendorIntegrationProfile,
+	summarizeRuns,
 } from "../../vendor-types";
 import type { VendorDetailRawBundleDto } from "../dto/vendorDetailDto";
-import {
-	accountDtoToRow,
-	mergeAccountOpsSummary,
-} from "./accountMappers";
-import { vendorNoteDtoToUi } from "./noteMappers";
-import { contractDtoToModel } from "@/features/admin/features/contracts/feature/mappers/contractCoreMappers";
 import type {
 	VendorDetailBundleModel,
 	VendorDetailHeaderModel,
 	VendorDetailLoadError,
 } from "../types/vendorDetailModel";
+import { accountDtoToRow, mergeAccountOpsSummary } from "./accountMappers";
+import { vendorNoteDtoToUi } from "./noteMappers";
 
 function mapHeaderContacts(
 	vendor: VendorModel,
@@ -43,7 +40,9 @@ function mapHeaderContacts(
 				}))
 			: vendor.contacts;
 	const primary =
-		headerContacts.find((contact) => contact.isPrimary) ?? headerContacts[0] ?? null;
+		headerContacts.find((contact) => contact.isPrimary) ??
+		headerContacts[0] ??
+		null;
 	return {
 		primaryContact: primary,
 		additionalContacts: headerContacts.filter(

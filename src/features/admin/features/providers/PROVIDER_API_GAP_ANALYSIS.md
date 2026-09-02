@@ -9,33 +9,33 @@
 
 ## Integrated (live)
 
-| Area | Status |
-|------|--------|
-| List + dashboard stats | Wired |
-| Create / update / status / delete / restore (list) | Wired |
-| Detail: profile, summary, tabs (locations, identifiers, networks, credentials, exceptions, vendor-sources) | Wired |
-| **Claims analytics** (`monthly-volume`, `rejection-reasons`, `recent/list`) | **Wired** in `getProviderDetail()` |
-| Summary trend % (`claims_trend_pct`, etc.) | **Wired** from `GET …/summary/` |
-| Vendor-sources `data_sent`, `frequency`, `status` | **Wired** in `mapVendorSources()` |
+| Area                                                                                                       | Status                             |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| List + dashboard stats                                                                                     | Wired                              |
+| Create / update / status / delete / restore (list)                                                         | Wired                              |
+| Detail: profile, summary, tabs (locations, identifiers, networks, credentials, exceptions, vendor-sources) | Wired                              |
+| **Claims analytics** (`monthly-volume`, `rejection-reasons`, `recent/list`)                                | **Wired** in `getProviderDetail()` |
+| Summary trend % (`claims_trend_pct`, etc.)                                                                 | **Wired** from `GET …/summary/`    |
+| Vendor-sources `data_sent`, `frequency`, `status`                                                          | **Wired** in `mapVendorSources()`  |
 
 ---
 
 ## Remote-backend dependency (not local)
 
-| Area | Status |
-|------|--------|
+| Area                                                | Status                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | List row `claims12m` / `paid12m` / `rejection_rate` | **Not on list API** — `providersToSummaries()` shows `0` until remote backend adds list KPI embed |
 
 ---
 
 ## Client available (no dedicated UI yet)
 
-| Endpoint group | Client (`vendorCoreApi`) |
-|----------------|--------------------------|
-| Sub-resource CRUD (locations, networks, credentials, exceptions) | `create/update/delete*` methods |
-| Identifier delete | `deleteProviderIdentifier` |
-| Hard delete provider / roster | `hardDeleteProvider`, `hardDeleteProviderRoster` |
-| Roster providers list | `listProviderRosterProviders` |
+| Endpoint group                                                   | Client (`vendorCoreApi`)                         |
+| ---------------------------------------------------------------- | ------------------------------------------------ |
+| Sub-resource CRUD (locations, networks, credentials, exceptions) | `create/update/delete*` methods                  |
+| Identifier delete                                                | `deleteProviderIdentifier`                       |
+| Hard delete provider / roster                                    | `hardDeleteProvider`, `hardDeleteProviderRoster` |
+| Roster providers list                                            | `listProviderRosterProviders`                    |
 
 Detail tabs remain read-only; see [PROVIDER_DETAIL_FRONTEND_GAPS.md](./PROVIDER_DETAIL_FRONTEND_GAPS.md) for frontend-only follow-ups.
 

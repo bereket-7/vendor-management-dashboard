@@ -28,7 +28,9 @@ export function isMembersMockEnabled(): boolean {
 	const value = process.env.NEXT_PUBLIC_MEMBERS_USE_MOCK;
 	if (value === "false" || value === "0") return false;
 	// Default on: Ethiopian demo fixtures until live scrub deployed everywhere.
-	return value === undefined || value === "" || value === "true" || value === "1";
+	return (
+		value === undefined || value === "" || value === "true" || value === "1"
+	);
 }
 
 /** Inverse of {@link isMockEnabled} — NestJS / vendor-core are expected. */

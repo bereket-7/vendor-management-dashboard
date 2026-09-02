@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
 import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -43,7 +42,10 @@ import { formatDate, formatMoney } from "@/features/shared/vms/utils";
 import { Link, useRouter } from "@/i18n/navigation";
 
 import { CreateContractDialog } from "../components/CreateContractDialog";
-import { useContractsList, useProcurementDocumentsList } from "../feature/queries/useContractsQuery";
+import {
+	useContractsList,
+	useProcurementDocumentsList,
+} from "../feature/queries/useContractsQuery";
 
 const STATUS_OPTIONS: ContractStatus[] = [
 	"draft",
@@ -65,9 +67,8 @@ export function ContractsPage({
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const { contracts, isLoading, error } = useContractsList(vendorId);
-	const { documents: procurementDocuments } = useProcurementDocumentsList(
-		vendorId
-	);
+	const { documents: procurementDocuments } =
+		useProcurementDocumentsList(vendorId);
 	const [search, setSearch] = useState("");
 	const [status, setStatus] = useState("all");
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -97,10 +98,7 @@ export function ContractsPage({
 		const counts = new Map<string, number>();
 		for (const document of procurementDocuments) {
 			if (!document.vendorId) continue;
-			counts.set(
-				document.vendorId,
-				(counts.get(document.vendorId) ?? 0) + 1
-			);
+			counts.set(document.vendorId, (counts.get(document.vendorId) ?? 0) + 1);
 		}
 		return counts;
 	}, [procurementDocuments]);

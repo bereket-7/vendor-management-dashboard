@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { VendorIntegrationProfileUpdateInput } from "@/lib/vendor-core/types";
-
 import {
 	Bell,
 	CheckCircle2,
@@ -69,6 +67,7 @@ import {
 	type VendorSftpConnection,
 } from "@/features/admin/features/vendors/vendor-types";
 import { cn } from "@/lib/utils";
+import type { VendorIntegrationProfileUpdateInput } from "@/lib/vendor-core/types";
 
 const JOB_SUBTABS = [
 	"Jobs",

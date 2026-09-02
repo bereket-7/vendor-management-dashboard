@@ -33,15 +33,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { CONTRACT_TYPE_OPTIONS } from "@/features/admin/features/contracts/feature/mappers/contractCoreMappers";
 import type { RiskLevel, VendorStatus } from "@/features/shared/vms/types";
 import { Link } from "@/i18n/navigation";
-import type { VendorCategoryDto } from "@/lib/vendor-core/types";
 import { cn } from "@/lib/utils";
+import type { VendorCategoryDto } from "@/lib/vendor-core/types";
 
 import {
+	EMPTY_VENDOR_WIZARD,
+	VENDOR_WIZARD_STEPS,
+	type VendorWizardStepId,
+	type VendorWizardValues,
 	countFilledAccounts,
 	countFilledContacts,
 	countFilledContracts,
 	countFilledNotes,
-	EMPTY_VENDOR_WIZARD,
 	emptyAccountDraft,
 	emptyContactDraft,
 	emptyContractDraft,
@@ -52,9 +55,6 @@ import {
 	validateIdentityStep,
 	validateIntegrationStep,
 	validateNotesContractsStep,
-	VENDOR_WIZARD_STEPS,
-	type VendorWizardStepId,
-	type VendorWizardValues,
 } from "../feature/types/vendorWizardTypes";
 
 export {
@@ -480,10 +480,9 @@ function CommercialStep({
 			? [...values.category_ids, categoryId]
 			: values.category_ids.filter((id) => id !== categoryId);
 		const primary =
-			values.primary_category_id &&
-			next.includes(values.primary_category_id)
+			values.primary_category_id && next.includes(values.primary_category_id)
 				? values.primary_category_id
-				: next[0] ?? "";
+				: (next[0] ?? "");
 		onChange({ category_ids: next, primary_category_id: primary });
 	}
 
@@ -600,7 +599,10 @@ function ContactsStep({
 	values: VendorWizardValues;
 	onChange: (patch: Partial<VendorWizardValues>) => void;
 }) {
-	function updateContact(index: number, patch: Partial<VendorWizardValues["contacts"][number]>) {
+	function updateContact(
+		index: number,
+		patch: Partial<VendorWizardValues["contacts"][number]>
+	) {
 		onChange({
 			contacts: values.contacts.map((row, i) =>
 				i === index ? { ...row, ...patch } : row
@@ -661,9 +663,7 @@ function ContactsStep({
 						<Field label="Name" required>
 							<Input
 								value={contact.name}
-								onChange={(e) =>
-									updateContact(index, { name: e.target.value })
-								}
+								onChange={(e) => updateContact(index, { name: e.target.value })}
 								className="h-11"
 							/>
 						</Field>
@@ -689,9 +689,7 @@ function ContactsStep({
 						<Field label="Role">
 							<Input
 								value={contact.role}
-								onChange={(e) =>
-									updateContact(index, { role: e.target.value })
-								}
+								onChange={(e) => updateContact(index, { role: e.target.value })}
 								className="h-11"
 							/>
 						</Field>
@@ -720,7 +718,10 @@ function AccountsStep({
 	values: VendorWizardValues;
 	onChange: (patch: Partial<VendorWizardValues>) => void;
 }) {
-	function updateAccount(index: number, patch: Partial<VendorWizardValues["accounts"][number]>) {
+	function updateAccount(
+		index: number,
+		patch: Partial<VendorWizardValues["accounts"][number]>
+	) {
 		onChange({
 			accounts: values.accounts.map((row, i) =>
 				i === index ? { ...row, ...patch } : row
@@ -773,9 +774,7 @@ function AccountsStep({
 						<Field label="Name" required>
 							<Input
 								value={account.name}
-								onChange={(e) =>
-									updateAccount(index, { name: e.target.value })
-								}
+								onChange={(e) => updateAccount(index, { name: e.target.value })}
 								className="h-11"
 							/>
 						</Field>
@@ -827,9 +826,7 @@ function IntegrationStep({
 	onChange: (patch: Partial<VendorWizardValues>) => void;
 	vendorName: string;
 }) {
-	function patchIntegration(
-		patch: Partial<VendorWizardValues["integration"]>
-	) {
+	function patchIntegration(patch: Partial<VendorWizardValues["integration"]>) {
 		onChange({ integration: { ...values.integration, ...patch } });
 	}
 
@@ -837,7 +834,10 @@ function IntegrationStep({
 		onChange({ connection: { ...values.connection, ...patch } });
 	}
 
-	function updateJob(index: number, patch: Partial<VendorWizardValues["jobs"][number]>) {
+	function updateJob(
+		index: number,
+		patch: Partial<VendorWizardValues["jobs"][number]>
+	) {
 		onChange({
 			jobs: values.jobs.map((row, i) =>
 				i === index ? { ...row, ...patch } : row
@@ -874,9 +874,7 @@ function IntegrationStep({
 					<Field label="Encryption">
 						<Input
 							value={values.integration.encryption}
-							onChange={(e) =>
-								patchIntegration({ encryption: e.target.value })
-							}
+							onChange={(e) => patchIntegration({ encryption: e.target.value })}
 							className="h-11"
 						/>
 					</Field>
@@ -943,9 +941,7 @@ function IntegrationStep({
 					<Field label="Environment">
 						<Select
 							value={values.connection.environment}
-							onValueChange={(environment) =>
-								patchConnection({ environment })
-							}
+							onValueChange={(environment) => patchConnection({ environment })}
 						>
 							<SelectTrigger className="h-11">
 								<SelectValue />
@@ -1009,9 +1005,7 @@ function IntegrationStep({
 							<Field label="Job name" className="sm:col-span-2">
 								<Input
 									value={job.name}
-									onChange={(e) =>
-										updateJob(index, { name: e.target.value })
-									}
+									onChange={(e) => updateJob(index, { name: e.target.value })}
 									className="h-11"
 								/>
 							</Field>
@@ -1115,7 +1109,10 @@ function NotesContractsStep({
 	values: VendorWizardValues;
 	onChange: (patch: Partial<VendorWizardValues>) => void;
 }) {
-	function updateNote(index: number, patch: Partial<VendorWizardValues["notes"][number]>) {
+	function updateNote(
+		index: number,
+		patch: Partial<VendorWizardValues["notes"][number]>
+	) {
 		onChange({
 			notes: values.notes.map((row, i) =>
 				i === index ? { ...row, ...patch } : row
@@ -1351,7 +1348,8 @@ function ReviewStep({
 				{ label: "Status", value: values.status },
 				{
 					label: "Location",
-					value: [values.city, values.country].filter(Boolean).join(", ") || "—",
+					value:
+						[values.city, values.country].filter(Boolean).join(", ") || "—",
 				},
 				{ label: "Website", value: values.website.trim() || "—" },
 				{ label: "Tax ID", value: values.tax_id.trim() || "—" },
