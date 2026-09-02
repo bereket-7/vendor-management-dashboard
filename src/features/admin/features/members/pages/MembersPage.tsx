@@ -63,7 +63,7 @@ import {
 } from "@/features/admin/features/members/pages/member-list-actions";
 import { Link, useRouter } from "@/i18n/navigation";
 import { downloadBlob, stampFilename } from "@/lib/export/csv";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import type {
 	MemberDashboardStatsQuery,
@@ -76,6 +76,8 @@ type GenderFilter = "all" | "Male" | "Female" | "Other" | "Unknown";
 type MemberSearchFilters = {
 	memberId: string;
 	alternateId: string;
+	newtechMemberId: string;
+	newtechFamilyId: string;
 	firstName: string;
 	lastName: string;
 	dob: string;
@@ -97,6 +99,8 @@ type MemberSearchFilters = {
 const EMPTY_MEMBER_FILTERS: MemberSearchFilters = {
 	memberId: "",
 	alternateId: "",
+	newtechMemberId: "",
+	newtechFamilyId: "",
 	firstName: "",
 	lastName: "",
 	dob: "",
@@ -119,6 +123,8 @@ function hasMemberFilters(filters: MemberSearchFilters): boolean {
 	return (
 		filters.memberId.trim().length > 0 ||
 		filters.alternateId.trim().length > 0 ||
+		filters.newtechMemberId.trim().length > 0 ||
+		filters.newtechFamilyId.trim().length > 0 ||
 		filters.firstName.trim().length > 0 ||
 		filters.lastName.trim().length > 0 ||
 		filters.dob.length > 0 ||
@@ -151,6 +157,10 @@ function buildMemberListQuery(
 	};
 	if (filters.memberId.trim()) q.cardholder_id = filters.memberId.trim();
 	if (filters.alternateId.trim()) q.alternate_id = filters.alternateId.trim();
+	if (filters.newtechMemberId.trim())
+		q.newtech_member_id = filters.newtechMemberId.trim();
+	if (filters.newtechFamilyId.trim())
+		q.newtech_family_id = filters.newtechFamilyId.trim();
 	if (filters.firstName.trim()) q.first_name = filters.firstName.trim();
 	if (filters.lastName.trim()) q.last_name = filters.lastName.trim();
 	if (filters.dob) q.date_of_birth = filters.dob;
@@ -185,6 +195,29 @@ function buildMemberStatsQuery(
 	return rest;
 }
 
+function filterLiveNewTechRows(
+	members: MemberSummary[],
+	filters: MemberSearchFilters
+): MemberSummary[] {
+	return members.filter((m) => {
+		if (
+			filters.newtechMemberId &&
+			!(m.newtechMemberId ?? "")
+				.toLowerCase()
+				.includes(filters.newtechMemberId.toLowerCase())
+		)
+			return false;
+		if (
+			filters.newtechFamilyId &&
+			!(m.newtechFamilyId ?? "")
+				.toLowerCase()
+				.includes(filters.newtechFamilyId.toLowerCase())
+		)
+			return false;
+		return true;
+	});
+}
+
 function filterMockMembers(
 	members: MemberSummary[],
 	filters: MemberSearchFilters,
@@ -203,6 +236,20 @@ function filterMockMembers(
 				!(m.alternateId ?? "")
 					.toLowerCase()
 					.includes(filters.alternateId.toLowerCase())
+			)
+				return false;
+			if (
+				filters.newtechMemberId &&
+				!(m.newtechMemberId ?? "")
+					.toLowerCase()
+					.includes(filters.newtechMemberId.toLowerCase())
+			)
+				return false;
+			if (
+				filters.newtechFamilyId &&
+				!(m.newtechFamilyId ?? "")
+					.toLowerCase()
+					.includes(filters.newtechFamilyId.toLowerCase())
 			)
 				return false;
 			if (
@@ -268,7 +315,7 @@ function filterMockMembers(
 			if (filters.search.trim()) {
 				const s = filters.search.trim().toLowerCase();
 				const hay =
-					`${m.memberId} ${m.firstName} ${m.lastName} ${m.alternateId ?? ""}`.toLowerCase();
+					`${m.memberId} ${m.firstName} ${m.lastName} ${m.alternateId ?? ""} ${m.newtechMemberId ?? ""} ${m.newtechFamilyId ?? ""}`.toLowerCase();
 				if (!hay.includes(s)) return false;
 			}
 			if (
@@ -364,7 +411,7 @@ function EligibilityPill({
 }
 
 export function MembersPage() {
-	if (!isMockEnabled()) {
+	if (!isMembersMockEnabled()) {
 		return (
 			<VendorCoreGate title="Members">
 				<MembersDirectoryPage />
@@ -376,7 +423,7 @@ export function MembersPage() {
 
 function MembersDirectoryPage() {
 	const router = useRouter();
-	const useApi = !isMockEnabled();
+	const useApi = !isMembersMockEnabled();
 	const invalidate = useInvalidateVendorCore();
 	const vendorsQ = useVendorCoreVendors();
 	const programFilter = useAdminModuleStore((s) => s.fileType);
@@ -432,7 +479,7 @@ function MembersDirectoryPage() {
 	const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
 	const safePage = Math.min(page, pageCount);
 	const pageRows = useApi
-		? (pageQ.data?.results ?? [])
+		? filterLiveNewTechRows(pageQ.data?.results ?? [], debouncedFilters)
 		: mockFiltered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
 	const plans = useMemo(
@@ -767,6 +814,30 @@ function MembersDirectoryPage() {
 								onChange={(e) => patchFilters({ alternateId: e.target.value })}
 								placeholder="Alternate ID"
 								className={compactFieldClass}
+							/>
+						</CompactField>
+						<CompactField id="newtech-member-id" label="NewTech Member ID">
+							<Input
+								id="newtech-member-id"
+								value={filters.newtechMemberId}
+								onChange={(e) =>
+									patchFilters({ newtechMemberId: e.target.value })
+								}
+								placeholder="8-digit ID"
+								className={compactFieldClass}
+								inputMode="numeric"
+							/>
+						</CompactField>
+						<CompactField id="newtech-family-id" label="NewTech Family ID">
+							<Input
+								id="newtech-family-id"
+								value={filters.newtechFamilyId}
+								onChange={(e) =>
+									patchFilters({ newtechFamilyId: e.target.value })
+								}
+								placeholder="8-digit ID"
+								className={compactFieldClass}
+								inputMode="numeric"
 							/>
 						</CompactField>
 						<CompactField id="first-name" label="First name">

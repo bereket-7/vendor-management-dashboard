@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { SummaryCard, SummaryCardsGrid } from "@/components/admin/SummaryCard";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -48,7 +49,6 @@ import {
 	vendorNoteDtoToUi,
 } from "../feature/mappers/noteMappers";
 import {
-	useCreateVendorNoteMutation,
 	useDeleteVendorNoteMutation,
 	useUpdateVendorNoteMutation,
 	useVendorNotesQuery,
@@ -98,213 +98,32 @@ function statusTone(status: NoteStatus) {
 	return "bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300";
 }
 
-function initials(name: string) {
-	return name
-		.split(/\s+/)
-		.filter(Boolean)
-		.slice(0, 2)
-		.map((part) => part[0]?.toUpperCase() ?? "")
-		.join("");
+function formatDisplayUser(value: string) {
+	if (!value.includes("@")) return value;
+	const [local, domain] = value.split("@");
+	if (!domain || local == null) return value;
+	if (local.length <= 14) return value;
+	return `${local.slice(0, 12)}…@${domain}`;
 }
 
-function buildNotes(
-	vendorName: string,
-	integrationNotes?: string
-): VendorNote[] {
-	const short = vendorName.split(/\s+/).slice(0, 2).join(" ") || "Vendor";
-	const seed: Array<Omit<VendorNote, "id" | "activity">> = [
-		{
-			title: "SFTP port change completed",
-			category: "Configuration",
-			priority: "High",
-			status: "Open",
-			createdBy: "Kassie M.",
-			createdAt: "07/24/2026 09:15 AM",
-			updatedAt: "07/24/2026 09:20 AM",
-			updatedBy: "Kassie M.",
-			body:
-				integrationNotes?.trim() ||
-				`Updated ${short} SFTP port from 21 to 22 after connectivity validation. Incoming eligibility and claims jobs resumed successfully.`,
-			starred: true,
-			actionItem: true,
-			attachments: [
-				{
-					id: "att-1",
-					name: `${short.replace(/\s+/g, "_").toUpperCase()}_SFTP_Port_Change_07242026.pdf`,
-					size: "245 KB",
-				},
-			],
-		},
-		{
-			title: "Eligibility import schedule adjusted",
-			category: "Operations",
-			priority: "Medium",
-			status: "Open",
-			createdBy: "Brian B.",
-			createdAt: "07/23/2026 02:40 PM",
-			updatedAt: "07/23/2026 03:05 PM",
-			updatedBy: "Brian B.",
-			body: "Moved Eligibility (834) job from weekly to daily at 6:00 AM CT after ops request.",
-			starred: false,
-			actionItem: true,
-			attachments: [],
-		},
-		{
-			title: "Medical claims mapping review",
-			category: "Mapping",
-			priority: "High",
-			status: "Open",
-			createdBy: "Priya P.",
-			createdAt: "07/22/2026 11:10 AM",
-			updatedAt: "07/22/2026 04:18 PM",
-			updatedBy: "Alex C.",
-			body: "Reviewed 837 claim field mappings. Pending confirmation on diagnosis code fallback.",
-			starred: false,
-			actionItem: true,
-			attachments: [
-				{
-					id: "att-2",
-					name: "837_mapping_diff.xlsx",
-					size: "128 KB",
-				},
-			],
-		},
-		{
-			title: "Onboarding kickoff notes",
-			category: "General",
-			priority: "Low",
-			status: "Closed",
-			createdBy: "Alex C.",
-			createdAt: "07/18/2026 10:00 AM",
-			updatedAt: "07/20/2026 01:12 PM",
-			updatedBy: "Alex C.",
-			body: "Captured initial contacts, file types, and target go-live window for this vendor.",
-			starred: false,
-			actionItem: false,
-			attachments: [],
-		},
-		{
-			title: "PGP key rotation reminder",
-			category: "Access",
-			priority: "Medium",
-			status: "Open",
-			createdBy: "Sam O.",
-			createdAt: "07/21/2026 08:25 AM",
-			updatedAt: "07/21/2026 08:25 AM",
-			updatedBy: "Sam O.",
-			body: "Vendor encryption key expires in 30 days. Schedule rotation with security contact.",
-			starred: true,
-			actionItem: false,
-			attachments: [],
-		},
-		{
-			title: "Accumulator feed late file follow-up",
-			category: "Operations",
-			priority: "High",
-			status: "Closed",
-			createdBy: "Jordan L.",
-			createdAt: "07/19/2026 07:05 AM",
-			updatedAt: "07/19/2026 05:40 PM",
-			updatedBy: "Jordan L.",
-			body: "Late accumulator file recovered after vendor rerun. SLA breach acknowledged.",
-			starred: false,
-			actionItem: false,
-			attachments: [
-				{
-					id: "att-3",
-					name: "accumulator_late_file_log.txt",
-					size: "18 KB",
-				},
-			],
-		},
-		{
-			title: "Account LOB cleanup",
-			category: "General",
-			priority: "Low",
-			status: "Archived",
-			createdBy: "Taylor B.",
-			createdAt: "07/10/2026 03:30 PM",
-			updatedAt: "07/15/2026 09:00 AM",
-			updatedBy: "Taylor B.",
-			body: "Archived obsolete marketplace test accounts after migration.",
-			starred: false,
-			actionItem: false,
-			attachments: [],
-		},
-		{
-			title: "Alert threshold tuning",
-			category: "Configuration",
-			priority: "Medium",
-			status: "Archived",
-			createdBy: "Morgan E.",
-			createdAt: "07/08/2026 12:45 PM",
-			updatedAt: "07/12/2026 10:20 AM",
-			updatedBy: "Morgan E.",
-			body: "Raised validation failure alert threshold from 1% to 2% for pharmacy claims.",
-			starred: false,
-			actionItem: false,
-			attachments: [],
-		},
-	];
-
-	// Expand to ~18 notes for summary realism
-	const expanded = Array.from({ length: 18 }, (_, index) => {
-		const base = seed[index % seed.length]!;
-		const statusCycle: NoteStatus[] =
-			index < 5 ? ["Open"] : index < 12 ? ["Closed", "Open"] : ["Archived"];
-		const status = statusCycle[index % statusCycle.length]!;
-		return {
-			...base,
-			id: `note-${index + 1}`,
-			title: index < seed.length ? base.title : `${base.title} (#${index + 1})`,
-			status: index < seed.length ? base.status : status,
-			starred: index === 0 || index === 4,
-			actionItem: index < 3,
-			attachments:
-				index % 3 === 0 || index < 3
-					? base.attachments.length
-						? base.attachments
-						: [
-								{
-									id: `att-x-${index}`,
-									name: `note_attachment_${index + 1}.pdf`,
-									size: `${80 + index * 7} KB`,
-								},
-							]
-					: [],
-			activity: [
-				{
-					id: `act-${index}-1`,
-					user: base.createdBy,
-					action: "created this note",
-					at: base.createdAt,
-				},
-				{
-					id: `act-${index}-2`,
-					user: base.updatedBy,
-					action: "updated this note",
-					at: base.updatedAt,
-				},
-				...(base.attachments.length || index % 3 === 0
-					? [
-							{
-								id: `act-${index}-3`,
-								user: base.updatedBy,
-								action: "Added attachment",
-								at: base.updatedAt,
-							},
-						]
-					: []),
-			],
-		} satisfies VendorNote;
-	});
-
-	return expanded;
+function NoteBadge({ label, className }: { label: string; className: string }) {
+	return (
+		<span
+			className={cn(
+				"inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold",
+				className
+			)}
+		>
+			{label}
+		</span>
+	);
 }
 
-export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
+export function VendorNotesTab({
+	vendorId,
+	vendorName: _vendorName,
+}: VendorNotesTabProps) {
 	const notesQuery = useVendorNotesQuery(vendorId);
-	const createNoteMutation = useCreateVendorNoteMutation(vendorId);
 	const updateNoteMutation = useUpdateVendorNoteMutation();
 	const deleteNoteMutation = useDeleteVendorNoteMutation();
 	const notes = useMemo(
@@ -312,11 +131,6 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 		[notesQuery.data]
 	);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
-
-	useEffect(() => {
-		const firstId = notesQuery.data?.[0]?.id;
-		if (!selectedId && firstId) setSelectedId(firstId);
-	}, [notesQuery.data, selectedId]);
 	const [search, setSearch] = useState("");
 	const [category, setCategory] = useState("all");
 	const [priority, setPriority] = useState("all");
@@ -324,16 +138,22 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 
-	const summary = useMemo(() => {
-		return {
+	useEffect(() => {
+		const firstId = notesQuery.data?.[0]?.id;
+		if (!selectedId && firstId) setSelectedId(firstId);
+	}, [notesQuery.data, selectedId]);
+
+	const summary = useMemo(
+		() => ({
 			total: notes.length,
 			open: notes.filter((n) => n.status === "Open").length,
 			actionItems: notes.filter((n) => n.actionItem && n.status === "Open")
 				.length,
 			withAttachments: notes.filter((n) => n.attachments.length > 0).length,
 			archived: notes.filter((n) => n.status === "Archived").length,
-		};
-	}, [notes]);
+		}),
+		[notes]
+	);
 
 	const filtered = useMemo(() => {
 		const q = search.trim().toLowerCase();
@@ -390,81 +210,56 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 			.catch(() => toast.error("Could not archive note."));
 	}
 
-	function closeNote(noteId: string) {
+	function closeNote(_noteId: string) {
 		toast.message("Close status is not stored on the API yet.");
 	}
 
 	return (
 		<section className="min-w-0 space-y-4">
-			<div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
-				<h2 className="text-lg font-semibold tracking-tight text-foreground">
-					Notes Summary
-				</h2>
-				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-					{[
-						{
-							label: "Total Notes",
-							value: summary.total,
-							icon: FileText,
-							tone: "text-sky-700 bg-sky-500/15 ring-sky-500/20",
-						},
-						{
-							label: "Open Notes",
-							value: summary.open,
-							icon: FileText,
-							tone: "text-emerald-700 bg-emerald-500/15 ring-emerald-500/20",
-						},
-						{
-							label: "Action Items",
-							value: summary.actionItems,
-							icon: Flag,
-							tone: "text-amber-700 bg-amber-500/15 ring-amber-500/20",
-						},
-						{
-							label: "With Attachments",
-							value: summary.withAttachments,
-							icon: Paperclip,
-							tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
-						},
-						{
-							label: "Archived Notes",
-							value: summary.archived,
-							icon: Archive,
-							tone: "text-zinc-700 bg-zinc-500/15 ring-zinc-500/20",
-						},
-					].map((item) => {
-						const Icon = item.icon;
-						return (
-							<div
-								key={item.label}
-								className="flex items-center gap-3 rounded-xl border border-border bg-card shadow-sm p-4"
-							>
-								<div
-									className={cn(
-										"flex size-10 shrink-0 items-center justify-center rounded-lg",
-										item.tone
-									)}
-								>
-									<Icon className="size-4" />
-								</div>
-								<div>
-									<p className="text-2xl font-semibold tabular-nums tracking-tight">
-										{item.value}
-									</p>
-									<p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-										{item.label}
-									</p>
-								</div>
-							</div>
-						);
-					})}
-				</div>
-			</div>
+			<SummaryCardsGrid columns={5}>
+				<SummaryCard
+					label="Total notes"
+					value={summary.total}
+					icon={FileText}
+					tone="text-sky-700 bg-sky-500/15 ring-sky-500/20"
+				/>
+				<SummaryCard
+					label="Open notes"
+					value={summary.open}
+					icon={FileText}
+					tone="text-emerald-700 bg-emerald-500/15 ring-emerald-500/20"
+				/>
+				<SummaryCard
+					label="Action items"
+					value={summary.actionItems}
+					icon={Flag}
+					tone="text-amber-700 bg-amber-500/15 ring-amber-500/20"
+				/>
+				<SummaryCard
+					label="With attachments"
+					value={summary.withAttachments}
+					icon={Paperclip}
+					tone="text-violet-700 bg-violet-500/15 ring-violet-500/20"
+				/>
+				<SummaryCard
+					label="Archived"
+					value={summary.archived}
+					icon={Archive}
+					tone="text-zinc-700 bg-zinc-500/15 ring-zinc-500/20"
+				/>
+			</SummaryCardsGrid>
 
-			<div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-				<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-					<div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-500/10 p-3.5">
-						<div className="relative min-w-[180px] flex-1">
+			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+				<div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+					<div className="border-b border-border px-4 py-3">
+						<h2 className="text-sm font-semibold tracking-tight">Notes</h2>
+						<p className="mt-0.5 text-xs text-muted-foreground">
+							Vendor notes and operational context.
+						</p>
+					</div>
+
+					<div className="grid gap-2 border-b border-border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] lg:items-center">
+						<div className="relative min-w-0 sm:col-span-2 lg:col-span-1">
 							<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 							<Input
 								value={search}
@@ -473,7 +268,7 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 									setPage(1);
 								}}
 								placeholder="Search notes..."
-								className="h-9 pl-8"
+								className="h-9 bg-background pl-8"
 							/>
 						</div>
 						<Select
@@ -483,11 +278,11 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 								setPage(1);
 							}}
 						>
-							<SelectTrigger className="h-9 w-[150px]">
+							<SelectTrigger className="h-9 w-full bg-background lg:w-[140px]">
 								<SelectValue placeholder="Category" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="all">All Categories</SelectItem>
+								<SelectItem value="all">All categories</SelectItem>
 								{(
 									[
 										"Configuration",
@@ -510,11 +305,11 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 								setPage(1);
 							}}
 						>
-							<SelectTrigger className="h-9 w-[140px]">
+							<SelectTrigger className="h-9 w-full bg-background lg:w-[130px]">
 								<SelectValue placeholder="Priority" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="all">All Priorities</SelectItem>
+								<SelectItem value="all">All priorities</SelectItem>
 								{(["High", "Medium", "Low"] as NotePriority[]).map((item) => (
 									<SelectItem key={item} value={item}>
 										{item}
@@ -529,11 +324,11 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 								setPage(1);
 							}}
 						>
-							<SelectTrigger className="h-9 w-[140px]">
+							<SelectTrigger className="h-9 w-full bg-background lg:w-[130px]">
 								<SelectValue placeholder="Status" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="all">All Statuses</SelectItem>
+								<SelectItem value="all">All statuses</SelectItem>
 								{(["Open", "Closed", "Archived"] as NoteStatus[]).map(
 									(item) => (
 										<SelectItem key={item} value={item}>
@@ -545,145 +340,133 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 						</Select>
 						<Button
 							type="button"
-							variant="ghost"
+							variant="outline"
 							size="sm"
 							className="h-9"
 							onClick={clearFilters}
 						>
-							Clear Filters
+							Clear
 						</Button>
 					</div>
 
-					<div className="w-full overflow-x-auto">
-						<Table className="min-w-[860px] text-sm">
-							<TableHeader>
-								<TableRow className="hover:bg-transparent">
-									<TableHead className="pl-4">Note Title</TableHead>
-									<TableHead>Category</TableHead>
-									<TableHead>Priority</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Created By</TableHead>
-									<TableHead>Created Date</TableHead>
-									<TableHead className="pr-4 text-right">Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{pageRows.map((note) => {
-									const active = selectedId === note.id;
-									return (
-										<TableRow
-											key={note.id}
-											className={cn(
-												"cursor-pointer hover:bg-muted/30",
-												active && "bg-sky-50 dark:bg-sky-950/30"
-											)}
-											onClick={() => setSelectedId(note.id)}
-										>
-											<TableCell className="pl-4 font-medium">
-												<span className="inline-flex items-center gap-1.5">
-													{note.starred ? (
-														<Star className="size-3.5 fill-amber-400 text-amber-500" />
-													) : null}
-													{note.title}
-												</span>
-											</TableCell>
-											<TableCell>
-												<span
-													className={cn(
-														"inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-														categoryTone(note.category)
-													)}
-												>
-													{note.category}
-												</span>
-											</TableCell>
-											<TableCell>
-												<span
-													className={cn(
-														"inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-														priorityTone(note.priority)
-													)}
-												>
-													{note.priority}
-												</span>
-											</TableCell>
-											<TableCell>
-												<span
-													className={cn(
-														"inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-														statusTone(note.status)
-													)}
-												>
-													{note.status}
-												</span>
-											</TableCell>
-											<TableCell>{note.createdBy}</TableCell>
-											<TableCell className="whitespace-nowrap text-muted-foreground">
-												{note.createdAt}
-											</TableCell>
-											<TableCell
-												className="pr-4 text-right"
-												onClick={(e) => e.stopPropagation()}
-											>
-												<DropdownMenu>
-													<DropdownMenuTrigger asChild>
-														<Button
-															type="button"
-															variant="ghost"
-															size="icon"
-															className="size-8"
-														>
-															<MoreHorizontal className="size-4" />
-														</Button>
-													</DropdownMenuTrigger>
-													<DropdownMenuContent align="end">
-														<DropdownMenuItem
-															onSelect={() => setSelectedId(note.id)}
-														>
-															View details
-														</DropdownMenuItem>
-														<DropdownMenuItem
-															onSelect={() => toggleStar(note.id)}
-														>
-															{note.starred ? "Unstar note" : "Star note"}
-														</DropdownMenuItem>
-														<DropdownMenuItem
-															onSelect={() => closeNote(note.id)}
-														>
-															Mark closed
-														</DropdownMenuItem>
-														<DropdownMenuSeparator />
-														<DropdownMenuItem
-															onSelect={() => archiveNote(note.id)}
-														>
-															Archive note
-														</DropdownMenuItem>
-													</DropdownMenuContent>
-												</DropdownMenu>
-											</TableCell>
-										</TableRow>
-									);
-								})}
-								{pageRows.length === 0 ? (
-									<TableRow>
+					<Table>
+						<TableHeader>
+							<TableRow className="bg-muted/30 hover:bg-muted/30">
+								<TableHead className="pl-4">Note</TableHead>
+								<TableHead className="hidden md:table-cell">Category</TableHead>
+								<TableHead className="hidden lg:table-cell">Priority</TableHead>
+								<TableHead>Status</TableHead>
+								<TableHead className="hidden sm:table-cell">Created</TableHead>
+								<TableHead className="w-10 pr-4" />
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{pageRows.map((note) => {
+								const active = selectedId === note.id;
+								return (
+									<TableRow
+										key={note.id}
+										className={cn("cursor-pointer", active && "bg-primary/5")}
+										onClick={() => setSelectedId(note.id)}
+									>
+										<TableCell className="max-w-0 pl-4">
+											<div className="flex min-w-0 items-start gap-2">
+												{note.starred ? (
+													<Star className="mt-0.5 size-3.5 shrink-0 fill-amber-400 text-amber-500" />
+												) : (
+													<span className="mt-0.5 size-3.5 shrink-0" />
+												)}
+												<div className="min-w-0">
+													<p className="truncate text-sm font-medium">
+														{note.title}
+													</p>
+													<p className="truncate text-xs text-muted-foreground">
+														{formatDisplayUser(note.createdBy)}
+													</p>
+												</div>
+											</div>
+										</TableCell>
+										<TableCell className="hidden md:table-cell">
+											<NoteBadge
+												label={note.category}
+												className={categoryTone(note.category)}
+											/>
+										</TableCell>
+										<TableCell className="hidden lg:table-cell">
+											<NoteBadge
+												label={note.priority}
+												className={priorityTone(note.priority)}
+											/>
+										</TableCell>
+										<TableCell>
+											<NoteBadge
+												label={note.status}
+												className={statusTone(note.status)}
+											/>
+										</TableCell>
+										<TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground sm:table-cell">
+											{note.createdAt}
+										</TableCell>
 										<TableCell
-											colSpan={7}
-											className="h-24 text-center text-muted-foreground"
+											className="pr-4"
+											onClick={(e) => e.stopPropagation()}
 										>
-											No notes match the current filters.
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														className="size-8"
+													>
+														<MoreHorizontal className="size-4" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem
+														onSelect={() => setSelectedId(note.id)}
+													>
+														View details
+													</DropdownMenuItem>
+													<DropdownMenuItem
+														onSelect={() => toggleStar(note.id)}
+													>
+														{note.starred ? "Unstar note" : "Star note"}
+													</DropdownMenuItem>
+													<DropdownMenuItem onSelect={() => closeNote(note.id)}>
+														Mark closed
+													</DropdownMenuItem>
+													<DropdownMenuSeparator />
+													<DropdownMenuItem
+														onSelect={() => archiveNote(note.id)}
+													>
+														Archive note
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
 										</TableCell>
 									</TableRow>
-								) : null}
-							</TableBody>
-						</Table>
-					</div>
+								);
+							})}
+							{pageRows.length === 0 ? (
+								<TableRow>
+									<TableCell
+										colSpan={6}
+										className="h-24 text-center text-sm text-muted-foreground"
+									>
+										No notes match the current filters.
+									</TableCell>
+								</TableRow>
+							) : null}
+						</TableBody>
+					</Table>
 
-					<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground">
+					<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
 						<p>
 							Showing{" "}
-							{filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1} to{" "}
+							{filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–
 							{Math.min(safePage * pageSize, filtered.length)} of{" "}
-							{filtered.length} notes
+							{filtered.length}
 						</p>
 						<div className="flex items-center gap-1">
 							<Button
@@ -719,53 +502,54 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 								<ChevronRight className="size-4" />
 							</Button>
 						</div>
-						<div className="flex items-center gap-2">
-							<span className="text-xs">Rows per page</span>
-							<Select
-								value={String(pageSize)}
-								onValueChange={(value) => {
-									setPageSize(Number(value));
-									setPage(1);
-								}}
-							>
-								<SelectTrigger className="h-8 w-[72px]">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{[10, 25, 50].map((size) => (
-										<SelectItem key={size} value={String(size)}>
-											{size}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
+						<Select
+							value={String(pageSize)}
+							onValueChange={(value) => {
+								setPageSize(Number(value));
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className="h-8 w-[72px] bg-background">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{[10, 25, 50].map((size) => (
+									<SelectItem key={size} value={String(size)}>
+										{size}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 				</div>
 
-				<aside className="h-fit rounded-xl border border-border bg-card shadow-sm xl:sticky xl:top-4">
+				<aside className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm xl:sticky xl:top-4 xl:self-start">
 					{selected ? (
 						<>
-							<div className="flex items-start justify-between gap-2 border-b border-border bg-violet-500/10 px-4 py-3.5">
-								<div>
-									<p className="text-sm font-semibold tracking-tight text-foreground">
-										Note Details
+							<div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+								<div className="min-w-0 flex-1">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+										Note detail
 									</p>
-									<div className="mt-1.5 flex flex-wrap items-center gap-2">
-										<span
-											className={cn(
-												"inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-												statusTone(selected.status)
-											)}
-										>
-											{selected.status}
-										</span>
-										<span className="text-xs text-muted-foreground">
-											Created on {selected.createdAt}
-										</span>
+									<h3 className="mt-1 line-clamp-3 text-sm font-semibold leading-snug">
+										{selected.title}
+									</h3>
+									<div className="mt-2 flex flex-wrap gap-1.5">
+										<NoteBadge
+											label={selected.category}
+											className={categoryTone(selected.category)}
+										/>
+										<NoteBadge
+											label={selected.priority}
+											className={priorityTone(selected.priority)}
+										/>
+										<NoteBadge
+											label={selected.status}
+											className={statusTone(selected.status)}
+										/>
 									</div>
 								</div>
-								<div className="flex items-center gap-1">
+								<div className="flex shrink-0 items-center gap-0.5">
 									<Button
 										type="button"
 										variant="ghost"
@@ -795,50 +579,49 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 							</div>
 
 							<div className="space-y-4 p-4">
-								<h3 className="text-base font-semibold tracking-tight">
-									{selected.title}
-								</h3>
+								<p className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-foreground">
+									{selected.body}
+								</p>
 
-								<div className="grid gap-3 sm:grid-cols-2">
-									{[
-										["Category", selected.category],
-										["Priority", selected.priority],
-										["Created By", selected.createdBy],
-										[
-											"Last Updated",
-											`${selected.updatedAt} by ${selected.updatedBy}`,
-										],
-									].map(([label, value]) => (
-										<div key={label}>
-											<p className="text-[11px] text-muted-foreground">
-												{label}
-											</p>
-											<p className="mt-0.5 text-sm font-medium">{value}</p>
-										</div>
-									))}
-								</div>
+								<dl className="grid grid-cols-2 gap-3 text-sm">
+									<div>
+										<dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+											Created by
+										</dt>
+										<dd className="mt-1 break-all font-medium">
+											{selected.createdBy}
+										</dd>
+									</div>
+									<div>
+										<dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+											Created
+										</dt>
+										<dd className="mt-1 font-medium">{selected.createdAt}</dd>
+									</div>
+									<div className="col-span-2">
+										<dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+											Last updated
+										</dt>
+										<dd className="mt-1 font-medium">
+											{selected.updatedAt} · {selected.updatedBy}
+										</dd>
+									</div>
+								</dl>
 
 								<div>
-									<p className="mb-1.5 text-sm font-medium">Note</p>
-									<p className="rounded-md border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
-										{selected.body}
-									</p>
-								</div>
-
-								<div>
-									<p className="mb-1.5 text-sm font-medium">
+									<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 										Attachments ({selected.attachments.length})
 									</p>
 									{selected.attachments.length === 0 ? (
-										<p className="text-sm text-muted-foreground">
-											No attachments.
+										<p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-sm text-muted-foreground">
+											No attachments
 										</p>
 									) : (
 										<div className="space-y-2">
 											{selected.attachments.map((file) => (
 												<div
 													key={file.id}
-													className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2"
+													className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
 												>
 													<div className="flex min-w-0 items-center gap-2">
 														<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -853,49 +636,17 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 															</p>
 														</div>
 													</div>
-													<div className="flex items-center gap-1">
-														<Button
-															type="button"
-															variant="ghost"
-															size="icon"
-															className="size-8"
-															onClick={() =>
-																toast.success(`Downloading ${file.name}`)
-															}
-														>
-															<Download className="size-3.5" />
-														</Button>
-														<DropdownMenu>
-															<DropdownMenuTrigger asChild>
-																<Button
-																	type="button"
-																	variant="ghost"
-																	size="icon"
-																	className="size-8"
-																>
-																	<MoreHorizontal className="size-3.5" />
-																</Button>
-															</DropdownMenuTrigger>
-															<DropdownMenuContent align="end">
-																<DropdownMenuItem
-																	onSelect={() =>
-																		toast.message(
-																			"Attachment preview opens here"
-																		)
-																	}
-																>
-																	Preview
-																</DropdownMenuItem>
-																<DropdownMenuItem
-																	onSelect={() =>
-																		toast.success(`Downloading ${file.name}`)
-																	}
-																>
-																	Download
-																</DropdownMenuItem>
-															</DropdownMenuContent>
-														</DropdownMenu>
-													</div>
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														className="size-8 shrink-0"
+														onClick={() =>
+															toast.success(`Downloading ${file.name}`)
+														}
+													>
+														<Download className="size-3.5" />
+													</Button>
 												</div>
 											))}
 										</div>
@@ -903,24 +654,22 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 								</div>
 
 								<div>
-									<p className="mb-2 text-sm font-medium">Activity</p>
-									<ul className="space-y-4">
+									<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										Activity
+									</p>
+									<ul className="space-y-3 border-l border-border pl-3">
 										{selected.activity.map((item) => (
-											<li key={item.id} className="flex gap-2.5">
-												<div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-													{initials(item.user)}
-												</div>
-												<div className="min-w-0">
-													<p className="text-sm">
-														<span className="font-medium">{item.user}</span>{" "}
-														<span className="text-muted-foreground">
-															{item.action}
-														</span>
-													</p>
-													<p className="text-xs text-muted-foreground">
-														{item.at}
-													</p>
-												</div>
+											<li key={item.id} className="relative pl-3">
+												<span className="absolute top-2 -left-[7px] size-2 rounded-full bg-primary" />
+												<p className="text-sm">
+													<span className="font-medium">{item.user}</span>{" "}
+													<span className="text-muted-foreground">
+														{item.action}
+													</span>
+												</p>
+												<p className="text-xs text-muted-foreground">
+													{item.at}
+												</p>
 											</li>
 										))}
 									</ul>
@@ -928,8 +677,14 @@ export function VendorNotesTab({ vendorId, vendorName }: VendorNotesTabProps) {
 							</div>
 						</>
 					) : (
-						<div className="px-4 py-10 text-center text-sm text-muted-foreground">
-							Select a note to view details, attachments, and activity.
+						<div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+							<FileText className="size-8 text-muted-foreground/60" />
+							<p className="text-sm font-medium text-foreground">
+								Select a note
+							</p>
+							<p className="text-xs text-muted-foreground">
+								Choose a row to view details, attachments, and activity.
+							</p>
 						</div>
 					)}
 				</aside>

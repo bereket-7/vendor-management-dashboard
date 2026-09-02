@@ -67,6 +67,7 @@ import {
 	type VendorSftpConnection,
 } from "@/features/admin/features/vendors/vendor-types";
 import { cn } from "@/lib/utils";
+import type { VendorIntegrationProfileUpdateInput } from "@/lib/vendor-core/types";
 
 const JOB_SUBTABS = [
 	"Jobs",
@@ -106,6 +107,9 @@ type VendorConfigurationTabProps = {
 	onDisableJob?: (jobId: string) => Promise<void>;
 	onTestConnection?: () => Promise<void>;
 	onUpdateConnectionHost?: (host: string) => Promise<void>;
+	onSaveIntegrationProfile?: (
+		patch: VendorIntegrationProfileUpdateInput
+	) => Promise<void>;
 };
 
 function emptyDraft(vendorName: string): JobDraft {
@@ -140,6 +144,7 @@ export function VendorConfigurationTab({
 	onDisableJob,
 	onTestConnection,
 	onUpdateConnectionHost,
+	onSaveIntegrationProfile,
 }: VendorConfigurationTabProps) {
 	const [activeStep, setActiveStep] = useState(1);
 	const [jobSubtab, setJobSubtab] = useState<JobSubtab>("Jobs");
@@ -152,6 +157,14 @@ export function VendorConfigurationTab({
 	const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
 	const [connectionDraftOpen, setConnectionDraftOpen] = useState(false);
 	const [connectionHost, setConnectionHost] = useState("");
+	const [profileDraftOpen, setProfileDraftOpen] = useState(false);
+	const [profileDraft, setProfileDraft] = useState({
+		timezone: integration.timezone,
+		transmission_method: integration.transmissionMethod,
+		encryption: integration.encryption,
+		health: integration.health,
+	});
+	const [profileSaving, setProfileSaving] = useState(false);
 	const [jobSaving, setJobSaving] = useState(false);
 	const jobSavingRef = useRef(false);
 
@@ -159,10 +172,26 @@ export function VendorConfigurationTab({
 		setJobs(configJobs);
 	}, [configJobs]);
 
+	useEffect(() => {
+		setProfileDraft({
+			timezone: integration.timezone,
+			transmission_method: integration.transmissionMethod,
+			encryption: integration.encryption,
+			health: integration.health,
+		});
+	}, [
+		integration.timezone,
+		integration.transmissionMethod,
+		integration.encryption,
+		integration.health,
+	]);
+
 	const connected = connection.status === "Connected";
 	const alertsEnabled = Math.max(integration.alertsCount, 3);
 	const fileTypesCount = new Set(jobs.map((j) => j.fileType)).size;
-	const pgpEnabled = integration.encryption.toLowerCase().includes("pgp");
+	const pgpEnabled = (integration.encryption ?? "")
+		.toLowerCase()
+		.includes("pgp");
 	const activeJobs = jobs.filter((job) => job.status === "Active").length;
 	const deleteTarget = jobs.find((job) => job.id === deleteJobId) ?? null;
 	const dialogJob =
@@ -387,6 +416,38 @@ export function VendorConfigurationTab({
 		finish();
 	}
 
+	function openProfileDraft() {
+		setProfileDraft({
+			timezone: integration.timezone,
+			transmission_method: integration.transmissionMethod,
+			encryption: integration.encryption,
+			health: integration.health,
+		});
+		setProfileDraftOpen(true);
+	}
+
+	async function saveIntegrationProfile() {
+		if (!onSaveIntegrationProfile) {
+			setProfileDraftOpen(false);
+			toast.success("Integration profile updated.");
+			return;
+		}
+		setProfileSaving(true);
+		try {
+			await onSaveIntegrationProfile({
+				timezone: profileDraft.timezone.trim() || undefined,
+				transmission_method: profileDraft.transmission_method.trim() || null,
+				encryption: profileDraft.encryption.trim() || null,
+				health: profileDraft.health,
+			});
+			setProfileDraftOpen(false);
+		} catch {
+			toast.error("Could not update integration profile.");
+		} finally {
+			setProfileSaving(false);
+		}
+	}
+
 	return (
 		<section className="min-w-0 space-y-4">
 			<div className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -401,6 +462,45 @@ export function VendorConfigurationTab({
 						Configure connections, jobs, mappings, schedules and alerts to
 						process vendor files.
 					</p>
+				</div>
+			</div>
+
+			<div className="rounded-xl border border-border bg-card shadow-sm">
+				<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-violet-500/10 px-4 py-3.5">
+					<div>
+						<h3 className="text-sm font-semibold tracking-tight text-foreground">
+							Integration Profile
+						</h3>
+						<p className="text-sm leading-relaxed text-muted-foreground">
+							Timezone, transmission, and encryption settings for this vendor.
+						</p>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="h-8 text-xs"
+						disabled={!onSaveIntegrationProfile}
+						onClick={openProfileDraft}
+					>
+						<Pencil className="mr-1.5 size-3.5" />
+						Edit profile
+					</Button>
+				</div>
+				<div className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+					{[
+						["Timezone", integration.timezone],
+						["Transmission method", integration.transmissionMethod],
+						["Encryption", integration.encryption],
+						["Health", integration.health],
+					].map(([label, value]) => (
+						<div key={label}>
+							<p className="text-[11px] font-medium text-muted-foreground">
+								{label}
+							</p>
+							<p className="mt-1 text-sm font-medium">{value}</p>
+						</div>
+					))}
 				</div>
 			</div>
 
@@ -1308,6 +1408,97 @@ export function VendorConfigurationTab({
 						</Button>
 						<Button type="button" onClick={saveConnectionHost}>
 							Save connection
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={profileDraftOpen} onOpenChange={setProfileDraftOpen}>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Edit integration profile</DialogTitle>
+						<DialogDescription>
+							Update timezone, transmission, encryption, and health status.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="grid gap-3 py-1">
+						<div className="space-y-1.5">
+							<Label htmlFor="profile-timezone">Timezone</Label>
+							<Input
+								id="profile-timezone"
+								value={profileDraft.timezone}
+								onChange={(e) =>
+									setProfileDraft((prev) => ({
+										...prev,
+										timezone: e.target.value,
+									}))
+								}
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="profile-transmission">Transmission method</Label>
+							<Input
+								id="profile-transmission"
+								value={profileDraft.transmission_method}
+								onChange={(e) =>
+									setProfileDraft((prev) => ({
+										...prev,
+										transmission_method: e.target.value,
+									}))
+								}
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="profile-encryption">Encryption</Label>
+							<Input
+								id="profile-encryption"
+								value={profileDraft.encryption}
+								onChange={(e) =>
+									setProfileDraft((prev) => ({
+										...prev,
+										encryption: e.target.value,
+									}))
+								}
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Health</Label>
+							<Select
+								value={profileDraft.health}
+								onValueChange={(value) =>
+									setProfileDraft((prev) => ({
+										...prev,
+										health: value as typeof prev.health,
+									}))
+								}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="healthy">Healthy</SelectItem>
+									<SelectItem value="warning">Warning</SelectItem>
+									<SelectItem value="failed">Failed</SelectItem>
+									<SelectItem value="in_progress">In progress</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="outline"
+							disabled={profileSaving}
+							onClick={() => setProfileDraftOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="button"
+							disabled={profileSaving || !onSaveIntegrationProfile}
+							onClick={() => void saveIntegrationProfile()}
+						>
+							{profileSaving ? "Saving…" : "Save profile"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

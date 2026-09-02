@@ -67,15 +67,13 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
+import { VendorCoreErrorBanner } from "@/components/vendor-core/VendorCoreLiveChrome";
 import { AuditTrailView } from "@/features/admin/features/audit-trail/components/AuditTrailView";
-import { useContractsList } from "@/features/admin/features/contracts/feature/queries/useContractsQuery";
 import type { FileRun } from "@/features/admin/features/file-management/mock-data";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
-import {
-	useUpdateVendorMutation,
-	useVendor,
-} from "@/features/shared/vms/queries";
+import { useUpdateVendorMutation } from "@/features/shared/vms/queries";
 import type { VendorStatus } from "@/features/shared/vms/types";
+import type { VendorContact } from "@/features/shared/vms/types";
 import { formatDate } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 import {
@@ -86,9 +84,8 @@ import { cn } from "@/lib/utils";
 import type {
 	ConnectionDto,
 	InboundFileDto,
-	IntakeJobDto,
+	VendorIntegrationProfileUpdateInput,
 } from "@/lib/vendor-core/types";
-import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 import { VendorAccountsTab } from "../components/VendorAccountsTab";
 import {
@@ -96,13 +93,18 @@ import {
 	vendorModelToActionsTarget,
 } from "../components/VendorActionsMenu";
 import { VendorConfigurationTab } from "../components/VendorConfigurationTab";
+import { VendorContactsTab } from "../components/VendorContactsTab";
 import { VendorContractsTab } from "../components/VendorContractsTab";
 import { VendorNotesTab } from "../components/VendorNotesTab";
 import { VendorOperationsTab } from "../components/VendorOperationsTab";
 import {
-	accountDtoToRow,
-	mergeAccountOpsSummary,
-} from "../feature/mappers/accountMappers";
+	findVendorAccountByCode,
+	getVendorAccount,
+	listVendorAccounts,
+	restoreVendorAccount,
+	updateVendorAccount,
+} from "../feature/api/vendorsApi";
+import { accountDtoToRow } from "../feature/mappers/accountMappers";
 import {
 	listInboundFileEvents,
 	useCreateIntakeJobMutation,
@@ -116,26 +118,17 @@ import {
 	useUpdateConnectionMutation,
 	useUpdateIntakeJobMutation,
 	useUpdateVendorAccountMutation,
-	useVendorAccountOpsQuery,
-	useVendorAccountsQuery,
-	useVendorConnectionsQuery,
-	useVendorInboundFilesQuery,
-	useVendorJobsQuery,
+	useUpdateVendorIntegrationProfileMutation,
+	useVendorDetailBundleQuery,
 } from "../feature/queries/useVendorsQuery";
-import {
-	buildTrendFromRuns,
-	buildVendorAlerts,
-	buildVendorIntegrationProfile,
-	connectionToSftp,
-	inboundFilesToRuns,
-	intakeJobsToConfigJobs,
-} from "../live-vendor-detail";
+import { connectionToSftp, inboundFilesToRuns } from "../live-vendor-detail";
 import { runBucket } from "../vendor-types";
 
 const TABS = [
 	"Overview",
 	"Operations",
 	"Configuration",
+	"Contacts",
 	"Accounts",
 	"Contracts",
 	"Audit Trail",
@@ -143,7 +136,6 @@ const TABS = [
 ] as const;
 
 const EMPTY_CONNECTIONS: ConnectionDto[] = [];
-const EMPTY_JOBS: IntakeJobDto[] = [];
 const EMPTY_INBOUND_FILES: InboundFileDto[] = [];
 
 type Tab = (typeof TABS)[number];
@@ -329,18 +321,13 @@ function VendorDetailView() {
 	}>();
 	const vendorId = params.vendorId ?? params.id;
 	const locale = params.locale ?? "en";
-	const { vendor, isLoading, error } = useVendor(vendorId);
-	const connectionsQuery = useVendorConnectionsQuery(vendorId);
-	const jobsQuery = useVendorJobsQuery(vendorId);
-	const inboundFilesQuery = useVendorInboundFilesQuery(
-		vendorId ? { vendor_id: vendorId } : undefined
-	);
-	const accountsQuery = useVendorAccountsQuery(vendorId, Boolean(vendorId));
-	const accountOpsQuery = useVendorAccountOpsQuery(vendorId, Boolean(vendorId));
+	const bundleQuery = useVendorDetailBundleQuery(vendorId);
+	const bundle = bundleQuery.data;
+	const vendor = bundle?.vendor;
+	const isLoading = bundleQuery.isLoading;
+	const error = bundleQuery.error;
 	const updateAccountMutation = useUpdateVendorAccountMutation();
-	const createAccountMutation = useCreateVendorAccountMutation(
-		String(vendorId)
-	);
+	const createAccountMutation = useCreateVendorAccountMutation();
 	const deleteAccountMutation = useDeleteVendorAccountMutation();
 	const runJobMutation = useRunIntakeJobMutation();
 	const updateJobMutation = useUpdateIntakeJobMutation();
@@ -348,8 +335,9 @@ function VendorDetailView() {
 	const reprocessMutation = useReprocessInboundFileMutation();
 	const testConnectionMutation = useTestConnectionMutation();
 	const updateConnectionMutation = useUpdateConnectionMutation();
+	const updateIntegrationProfileMutation =
+		useUpdateVendorIntegrationProfileMutation(String(vendorId));
 	const invalidateVendorCore = useInvalidateVendorCore();
-	const { contracts } = useContractsList(vendorId);
 	const updateVendor = useUpdateVendorMutation();
 	const [editOpen, setEditOpen] = useState(false);
 	const [tab, setTab] = useState<Tab>("Overview");
@@ -372,53 +360,42 @@ function VendorDetailView() {
 		setPendingInvite(getPendingInviteByVendorId(vendor.id));
 	}, [vendor, inviteTick]);
 
-	const displayName = vendor?.tradeName ?? vendor?.legalName ?? "Vendor";
-	const primary =
-		vendor?.contacts.find((c) => c.isPrimary) ?? vendor?.contacts[0];
+	const displayName = bundle?.header.displayName ?? "Vendor";
+	const primary = bundle?.header.primaryContact;
+	const additionalContacts = bundle?.header.additionalContacts ?? [];
+	const contacts = useMemo(() => {
+		const rows: VendorContact[] = [];
+		if (primary) rows.push(primary);
+		for (const contact of additionalContacts) {
+			if (!rows.some((row) => row.id === contact.id)) rows.push(contact);
+		}
+		return rows;
+	}, [primary, additionalContacts]);
+	const integration = bundle?.header.integration ?? null;
 
-	const connections = connectionsQuery.data ?? EMPTY_CONNECTIONS;
-	const jobs = jobsQuery.data ?? EMPTY_JOBS;
-	const inboundFiles = inboundFilesQuery.data ?? EMPTY_INBOUND_FILES;
-
-	const accounts = useMemo(() => {
-		const opsByAccount = new Map(
-			(accountOpsQuery.data ?? []).map((row) => [row.account_id, row])
-		);
-		return (accountsQuery.data ?? []).map((dto) =>
-			mergeAccountOpsSummary(accountDtoToRow(dto), opsByAccount.get(dto.id))
-		);
-	}, [accountsQuery.data, accountOpsQuery.data]);
-
-	const integration = useMemo(() => {
-		if (!vendor) return null;
-		return buildVendorIntegrationProfile(
-			vendor,
-			connections,
-			jobs,
-			accounts.length
-		);
-	}, [vendor, connections, jobs, accounts.length]);
-
-	const configJobs = useMemo(() => intakeJobsToConfigJobs(jobs), [jobs]);
+	const connections = bundle?.raw.connections ?? EMPTY_CONNECTIONS;
+	const inboundFiles = bundle?.raw.inboundFiles ?? EMPTY_INBOUND_FILES;
+	const accounts = bundle?.accounts.rows ?? [];
+	const configJobs = bundle?.operations.configJobs ?? [];
+	const alerts = bundle?.operations.alerts ?? [];
+	const contracts = bundle?.contracts.contracts ?? [];
 
 	const sftpConnection = useMemo(() => {
 		if (!vendor || !integration) return null;
 		return connectionToSftp(connections[0], displayName, integration.health);
 	}, [vendor, integration, connections, displayName]);
 
-	const programFilter = useAdminModuleStore((s) => s.fileType);
 	const [runLogs, setRunLogs] = useState<
 		Record<string, Awaited<ReturnType<typeof listInboundFileEvents>>>
 	>({});
 
 	useEffect(() => {
-		const files = inboundFilesQuery.data;
-		if (!files?.length) {
+		if (!inboundFiles.length) {
 			setRunLogs({});
 			return;
 		}
 		let cancelled = false;
-		const top = files.slice(0, 8);
+		const top = inboundFiles.slice(0, 8);
 		Promise.all(
 			top.map((file) =>
 				listInboundFileEvents(file.id).then(
@@ -435,46 +412,39 @@ function VendorDetailView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [inboundFilesQuery.data]);
+	}, [inboundFiles]);
 
 	const runs = useMemo((): FileRun[] => {
 		if (!vendor) return [];
-		const all = inboundFilesToRuns(inboundFiles, vendor.id, displayName).map(
-			(run) => ({
-				...run,
-				logs: (runLogs[run.id] ?? []).map((event, index) => {
-					const rawLevel = (event.level ?? "info").toLowerCase();
-					let level: "error" | "info" | "warn" | "debug" = "info";
-					if (rawLevel === "error") level = "error";
-					else if (rawLevel === "warn" || rawLevel === "warning")
-						level = "warn";
-					else if (rawLevel === "debug") level = "debug";
-					return {
-						id: `${run.id}-log-${index}`,
-						at: event.occurred_at ?? event.created_at ?? "—",
-						level,
-						message: event.message,
-						component: event.source ?? event.stage ?? "pipeline",
-					};
-				}),
-			})
-		);
-		if (programFilter) {
-			return all.filter((run) => run.program === programFilter);
-		}
-		return all;
-	}, [vendor, inboundFiles, displayName, programFilter, runLogs]);
+		const baseRuns =
+			bundle?.operations.runs ??
+			inboundFilesToRuns(inboundFiles, vendor.id, displayName);
+		return baseRuns.map((run) => ({
+			...run,
+			logs: (runLogs[run.id] ?? []).map((event, index) => {
+				const rawLevel = (event.level ?? "info").toLowerCase();
+				let level: "error" | "info" | "warn" | "debug" = "info";
+				if (rawLevel === "error") level = "error";
+				else if (rawLevel === "warn" || rawLevel === "warning") level = "warn";
+				else if (rawLevel === "debug") level = "debug";
+				return {
+					id: `${run.id}-log-${index}`,
+					at: event.occurred_at ?? event.created_at ?? "—",
+					level,
+					message: event.message,
+					component: event.source ?? event.stage ?? "pipeline",
+				};
+			}),
+		}));
+	}, [vendor, bundle?.operations.runs, inboundFiles, displayName, runLogs]);
 
-	const alerts = useMemo(() => {
-		if (!vendor) return [];
-		return buildVendorAlerts(
-			vendor.id,
-			displayName,
-			connections,
-			inboundFiles,
-			runs
-		);
-	}, [vendor, displayName, connections, inboundFiles, runs]);
+	const subQueryErrors = useMemo(
+		() =>
+			(bundle?.errors ?? []).map(
+				(entry) => `${entry.resource.replace(/_/g, " ")}: ${entry.message}`
+			),
+		[bundle?.errors]
+	);
 
 	const fileTypePie = useMemo(() => {
 		if (runs.length === 0) return [];
@@ -494,7 +464,7 @@ function VendorDetailView() {
 
 	const totalFiles30 = fileTypePie.reduce((sum, item) => sum + item.value, 0);
 
-	const trend = useMemo(() => buildTrendFromRuns(runs), [runs]);
+	const trend = bundle?.overview.trend ?? [];
 
 	const inviteHref = useMemo(() => {
 		if (!vendor) return "/admin/vendors/invite";
@@ -567,12 +537,16 @@ function VendorDetailView() {
 	}
 
 	const tabCounts: Partial<Record<Tab, number>> = {
-		Accounts: accounts.length || integration.accountsCount,
-		Contracts: contracts.length,
+		Contacts: contacts.length,
+		Accounts: bundle?.tabCounts.accounts ?? accounts.length,
+		Contracts: bundle?.tabCounts.contracts ?? contracts.length,
 	};
 
 	return (
 		<div className="space-y-4">
+			{subQueryErrors.map((message) => (
+				<VendorCoreErrorBanner key={message} message={message} />
+			))}
 			{/* Header */}
 			<div className="space-y-4 rounded-xl border border-primary/20 bg-card p-5 shadow-sm">
 				<div className="flex flex-wrap items-start justify-between gap-3">
@@ -697,40 +671,16 @@ function VendorDetailView() {
 						toneIndex={0}
 					/>
 					<MetaItem
-						label="Primary Contact"
-						value={
-							primary ? (
-								<div>
-									<p>{primary.name}</p>
-									{primary.email ? (
-										<p className="mt-0.5 text-xs font-normal text-muted-foreground">
-											{primary.email}
-										</p>
-									) : null}
-									{primary.phone ? (
-										<p className="text-xs font-normal text-muted-foreground">
-											{primary.phone}
-										</p>
-									) : null}
-								</div>
-							) : (
-								"—"
-							)
-						}
-						icon={User}
-						toneIndex={1}
-					/>
-					<MetaItem
 						label="Phone"
 						value={primary?.phone ?? "—"}
 						icon={Phone}
-						toneIndex={2}
+						toneIndex={1}
 					/>
 					<MetaItem
 						label="Email"
 						value={primary?.email ?? "—"}
 						icon={Mail}
-						toneIndex={3}
+						toneIndex={2}
 					/>
 					<MetaItem
 						label="SFTP Server"
@@ -738,31 +688,31 @@ function VendorDetailView() {
 							<span className="font-mono text-xs">{integration.sftpHost}</span>
 						}
 						icon={Server}
-						toneIndex={4}
+						toneIndex={3}
 					/>
 					<MetaItem
 						label="Time Zone"
 						value={integration.timezone}
 						icon={Clock3}
-						toneIndex={0}
+						toneIndex={4}
 					/>
 					<MetaItem
 						label="Created On"
 						value={formatDate(vendor.createdAt)}
 						icon={Calendar}
-						toneIndex={1}
+						toneIndex={0}
 					/>
 					<MetaItem
 						label="Created By"
 						value={integration.createdBy}
 						icon={User}
-						toneIndex={2}
+						toneIndex={1}
 					/>
 					<MetaItem
 						label="Last Updated"
 						value={formatDate(vendor.updatedAt)}
 						icon={Calendar}
-						toneIndex={3}
+						toneIndex={2}
 					/>
 					<div className="flex items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm">
 						<div
@@ -793,7 +743,7 @@ function VendorDetailView() {
 
 			{/* Tabs */}
 			<nav
-				className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7"
+				className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8"
 				aria-label="Vendor sections"
 			>
 				{TABS.map((item) => (
@@ -1194,6 +1144,12 @@ function VendorDetailView() {
 										},
 									},
 									{
+										label: "Manage Contacts",
+										href: "#",
+										icon: User,
+										onClick: () => setTab("Contacts"),
+									},
+									{
 										label: "Add Note",
 										href: "#",
 										icon: NotebookPen,
@@ -1259,14 +1215,145 @@ function VendorDetailView() {
 			{tab === "Accounts" && (
 				<VendorAccountsTab
 					accounts={accounts}
+					vendorId={vendor?.id}
+					accountsLoadError={
+						bundle?.errors.find((entry) => entry.resource === "accounts")
+							?.message ?? null
+					}
+					inboundFiles={inboundFiles}
+					jobs={bundle?.raw.jobs ?? []}
+					connections={connections}
+					onRefresh={async () => {
+						await bundleQuery.refetch();
+						toast.success("Accounts refreshed.");
+					}}
 					onUpdateAccount={async (id, patch) => {
 						await updateAccountMutation.mutateAsync({ id, patch });
+						await bundleQuery.refetch();
 					}}
 					onCreateAccount={async (input) => {
-						await createAccountMutation.mutateAsync(input);
+						const resolvedVendorId = vendor?.id ?? String(vendorId);
+						const accountCode = input.account_code.trim();
+						try {
+							const created = await createAccountMutation.mutateAsync({
+								vendor_id: resolvedVendorId,
+								account_code: accountCode,
+								name: input.name.trim(),
+								line_of_business: input.line_of_business,
+								active: input.active ?? true,
+							});
+							if (!created?.id) {
+								throw new Error(
+									"Create response had no account id — nothing was saved."
+								);
+							}
+							let full = await getVendorAccount(created.id);
+							if (full.vendor_id && full.vendor_id !== resolvedVendorId) {
+								throw new Error(
+									`Account was created under vendor ${full.vendor_id}, not this vendor (${resolvedVendorId}).`
+								);
+							}
+							const rawVisible = (full as { is_visible?: boolean }).is_visible;
+							if (rawVisible === false) {
+								full = await updateVendorAccount(full.id, {
+									is_visible: true,
+								});
+							}
+							// #region agent log
+							const listedAfterCreate =
+								await listVendorAccounts(resolvedVendorId);
+							const listedVendorOnly =
+								(
+									await import("@/lib/vendor-core/api").then((m) =>
+										m.vendorCoreApi.listAccounts({
+											vendor_id: resolvedVendorId,
+										})
+									)
+								).results ?? [];
+							fetch(
+								"http://127.0.0.1:7619/ingest/2f252828-01b8-43ea-88bb-1263f3c1d386",
+								{
+									method: "POST",
+									headers: {
+										"Content-Type": "application/json",
+										"X-Debug-Session-Id": "6ffff2",
+									},
+									body: JSON.stringify({
+										sessionId: "6ffff2",
+										runId: "pre-fix",
+										hypothesisId: "H1-H2-H3",
+										location:
+											"VendorDetailPage.tsx:onCreateAccount:afterCreate",
+										message: "account created — detail vs list",
+										data: {
+											resolvedVendorId,
+											routeVendorId: String(vendorId),
+											createdId: created.id,
+											accountCode,
+											fullVendorId: full.vendor_id,
+											is_visible: (full as { is_visible?: boolean }).is_visible,
+											is_deleted: (full as { is_deleted?: boolean }).is_deleted,
+											inDefaultList: listedAfterCreate.some(
+												(r) => r.id === created.id
+											),
+											inUnfilteredList: listedVendorOnly.some(
+												(r) => r.id === created.id
+											),
+											defaultListCount: listedAfterCreate.length,
+											vendorOnlyListCount: listedVendorOnly.length,
+										},
+										timestamp: Date.now(),
+									}),
+								}
+							).catch(() => {});
+							// #endregion
+							await bundleQuery.refetch();
+							return accountDtoToRow(full);
+						} catch (err) {
+							const message =
+								err instanceof Error ? err.message.toLowerCase() : "";
+							if (!message.includes("already exists")) throw err;
+
+							const existing = await findVendorAccountByCode(
+								String(vendorId),
+								accountCode
+							);
+							if (existing?.state === "deleted") {
+								const restored = await restoreVendorAccount(
+									existing.account.id
+								);
+								const updated = await updateVendorAccount(restored.id, {
+									name: input.name.trim(),
+									line_of_business: input.line_of_business,
+									active: input.active ?? true,
+									is_visible: true,
+								});
+								await bundleQuery.refetch();
+								return accountDtoToRow(await getVendorAccount(updated.id));
+							}
+							if (existing?.state === "hidden") {
+								const updated = await updateVendorAccount(existing.account.id, {
+									name: input.name.trim(),
+									line_of_business: input.line_of_business,
+									active: input.active ?? true,
+									is_visible: true,
+								});
+								await bundleQuery.refetch();
+								return accountDtoToRow(await getVendorAccount(updated.id));
+							}
+							if (existing?.state === "active") {
+								throw new Error(
+									`Account code "${accountCode}" is already linked to this vendor and should appear in the list. Refresh the page.`
+								);
+							}
+							throw new Error(
+								`Account code "${accountCode}" already exists for this vendor but could not be loaded. Try a different code or contact support.`
+							);
+						}
 					}}
 					onDeleteAccount={async (id) => {
 						await deleteAccountMutation.mutateAsync(id);
+						await bundleQuery.refetch();
 					}}
 				/>
 			)}
@@ -1373,7 +1460,17 @@ function VendorDetailView() {
 							body: { config },
 						});
 					}}
+					onSaveIntegrationProfile={async (
+						patch: VendorIntegrationProfileUpdateInput
+					) => {
+						await updateIntegrationProfileMutation.mutateAsync(patch);
+						toast.success("Integration profile updated.");
+					}}
 				/>
+			)}
+
+			{tab === "Contacts" && (
+				<VendorContactsTab vendorId={vendor.id} contacts={contacts} />
 			)}
 
 			{tab === "Contracts" && <VendorContractsTab vendorId={vendor.id} />}

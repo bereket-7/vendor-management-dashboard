@@ -33,6 +33,7 @@
 		"seed:providers": "node scripts/seed-providers.mjs",
 		"seed:claim-lines": "node scripts/seed-claim-lines.mjs",
 		"seed:member-coverages": "node scripts/seed-member-coverages.mjs",
+		"seed:vendor-detail": "node scripts/seed-vendor-detail-demo.mjs",
 		"test-all": "pnpm run check-types && pnpm run check-format && pnpm run lint && pnpm run test && pnpm run build",
 		"analyze": "ANALYZE=true pnpm build",
 		"build:cloudflare": "opennextjs-cloudflare build",

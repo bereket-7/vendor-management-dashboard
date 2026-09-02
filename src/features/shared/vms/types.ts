@@ -170,6 +170,7 @@ export type ContractDocumentItem = {
 	type: string;
 	uploadedOn: string;
 	fileExtension?: string;
+	vendorId?: string;
 };
 
 export type ContractModel = {

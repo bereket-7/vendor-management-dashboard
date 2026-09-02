@@ -1,5 +1,12 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+
 import { ContractsPage } from "@/features/admin/features/contracts/pages/ContractsPage";
 
 export default function Page() {
-	return <ContractsPage />;
+	const searchParams = useSearchParams();
+	const initialCreateOpen = searchParams.get("create") === "1";
+
+	return <ContractsPage initialCreateOpen={initialCreateOpen} />;
 }

@@ -50,10 +50,8 @@ export function vendorNoteDtoToUi(dto: VendorNoteDto): VendorNoteUi {
 	const createdBy = authorName(dto);
 	const createdAt = formatWhen(dto.created_at);
 	const updatedAt = formatWhen(dto.updated_at ?? dto.created_at);
-	const title =
-		dto.body.trim().length > 64
-			? `${dto.body.trim().slice(0, 64)}…`
-			: dto.body.trim() || "Note";
+	const body = (dto.body ?? "").trim();
+	const title = body.length > 64 ? `${body.slice(0, 64)}…` : body || "Note";
 	return {
 		id: dto.id,
 		title,
@@ -64,7 +62,7 @@ export function vendorNoteDtoToUi(dto: VendorNoteDto): VendorNoteUi {
 		createdAt,
 		updatedAt,
 		updatedBy: createdBy,
-		body: dto.body,
+		body,
 		starred: dto.is_pinned,
 		actionItem: false,
 		attachments: [],

@@ -49,7 +49,7 @@ import { buildAccumulatorSummaryForMember } from "@/features/admin/features/memb
 import type { MemberDetail } from "@/features/admin/features/members/mock-data";
 import { MemberWriteForm } from "@/features/admin/features/members/pages/member-write-form";
 import { useRouter } from "@/i18n/navigation";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 
 type Tab =
 	| "Edit"
@@ -76,7 +76,7 @@ export function useMemberTabData(
 	tab: Tab,
 	_claimsPane: "claims" | "encounters"
 ): MemberDetail | undefined {
-	const useApi = !isMockEnabled();
+	const useApi = !isMembersMockEnabled();
 	const elig = useMemberEligibilityHistoryQuery(
 		memberId,
 		useApi && (tab === "Eligibility" || tab === "Overview")
@@ -196,7 +196,7 @@ export function MemberCreateExceptionButton({
 	const [description, setDescription] = useState("");
 	const mutation = useCreateMemberExceptionMutation(memberId);
 
-	if (isMockEnabled()) return null;
+	if (isMembersMockEnabled()) return null;
 
 	return (
 		<>
@@ -281,7 +281,7 @@ export function MemberCreateAccumulatorButton({
 	const [remaining, setRemaining] = useState("1500");
 	const mutation = useCreateMemberAccumulatorMutation(memberId);
 
-	if (isMockEnabled()) return null;
+	if (isMembersMockEnabled()) return null;
 
 	return (
 		<>
@@ -388,7 +388,7 @@ export function MemberCreateClaimButton({ memberId }: { memberId: string }) {
 	const [kind, setKind] = useState("medical");
 	const mutation = useCreateMemberClaimMutation(memberId);
 
-	if (isMockEnabled()) return null;
+	if (isMembersMockEnabled()) return null;
 
 	return (
 		<>

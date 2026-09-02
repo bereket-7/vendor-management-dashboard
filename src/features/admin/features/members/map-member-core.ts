@@ -2,6 +2,11 @@
  * Map vendor-core Member 360 (snake_case) → dashboard MemberSummary / MemberDetail.
  * Keep UI types unchanged; fill gaps with safe empty defaults.
  */
+import {
+	fixNewtechId,
+	getDemoMemberOverlay,
+	normalizeMemberWireIds,
+} from "@/features/admin/features/members/member-id-normalize";
 import type {
 	AccumulatorAmountTriple,
 	AccumulatorKpi,
@@ -24,7 +29,7 @@ import type {
 	VendorSourceRow,
 } from "@/features/admin/features/members/mock-data";
 import { buildMockAccumulatorTransactions } from "@/features/admin/features/members/mock-data";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import type {
 	AccumulatorRowDetailDto,
 	AccumulatorRowListDto,
@@ -160,19 +165,41 @@ export function memberListDtoToSummary(row: MemberListDto): MemberSummary {
 		nestedVendor && typeof nestedVendor === "object"
 			? str((nestedVendor as { id?: unknown }).id)
 			: "";
+	const rawCardholderId = str(row.cardholder_id || row.reference_id || row.id);
+	const personCode = str(row.person_code, "01");
+	const ids = normalizeMemberWireIds({
+		cardholderId: rawCardholderId,
+		personCode,
+		externalId: str(row.external_id),
+		alternateId: str(row.alternate_id),
+	});
+	const demoOverlay = getDemoMemberOverlay({
+		cardholderId: rawCardholderId,
+		personCode,
+		externalId: str(row.external_id),
+		alternateId: str(row.alternate_id),
+		newtechMemberId: str(row.newtech_member_id),
+		newtechFamilyId: str(row.newtech_family_id),
+	});
 	return {
 		id: str(row.id),
-		memberId: str(row.cardholder_id || row.reference_id || row.id).slice(0, 64),
+		memberId: (demoOverlay?.memberId ?? ids.cardholderId).slice(0, 64),
 		vendorId: str(row.vendor_id) || nestedVendorId || undefined,
-		alternateId: str(row.alternate_id) || undefined,
-		firstName: str(row.first_name, "—"),
-		middleName: str(row.middle_name) || undefined,
-		lastName: str(row.last_name, "—"),
-		dob: dateStr(row.date_of_birth),
-		gender: mapGender(row.gender),
-		ssnLast4: str(row.ssn_last4, "****"),
+		alternateId: demoOverlay?.alternateId ?? (ids.alternateId || undefined),
+		newtechMemberId:
+			demoOverlay?.newtechMemberId ??
+			(fixNewtechId(str(row.newtech_member_id)) || undefined),
+		newtechFamilyId:
+			demoOverlay?.newtechFamilyId ??
+			(fixNewtechId(str(row.newtech_family_id)) || undefined),
+		firstName: demoOverlay?.firstName ?? str(row.first_name, "—"),
+		middleName: demoOverlay ? undefined : str(row.middle_name) || undefined,
+		lastName: demoOverlay?.lastName ?? str(row.last_name, "—"),
+		dob: demoOverlay?.dob ?? dateStr(row.date_of_birth),
+		gender: demoOverlay?.gender ?? mapGender(row.gender),
+		ssnLast4: demoOverlay?.ssnLast4 ?? str(row.ssn_last4, "****"),
 		phone: str(row.phone, "—"),
-		email: str(row.email),
+		email: demoOverlay?.email ?? str(row.email),
 		addressLine1: str(row.address_line1, "—"),
 		addressLine2: str(row.address_line2) || undefined,
 		city: str(row.city, "—"),
@@ -233,18 +260,36 @@ export function mapPlanHistory(
 export function mapDependents(
 	rows: Record<string, unknown>[] | undefined
 ): DependentRow[] {
-	return (rows ?? []).map((r) => ({
-		id: str(r.id),
-		name:
-			[str(r.first_name), str(r.last_name)].filter(Boolean).join(" ") || "—",
-		relationship: mapRelationship(str(r.relationship_code)),
-		dob: dateStr(r.date_of_birth),
-		gender: mapGender(str(r.gender)),
-		coverageStatus: mapMemberStatus(str(r.status)),
-		memberId: str(r.cardholder_id) || undefined,
-		pcpName: str(r.pcp_name) || undefined,
-		planName: str(r.plan_name) || undefined,
-	}));
+	return (rows ?? []).map((r) => {
+		const rawCardholderId = str(r.cardholder_id);
+		const personCode = str(r.person_code, "02");
+		const ids = normalizeMemberWireIds({
+			cardholderId: rawCardholderId,
+			personCode,
+			externalId: str(r.external_id),
+			alternateId: str(r.alternate_id),
+		});
+		const demoOverlay = getDemoMemberOverlay({
+			cardholderId: rawCardholderId,
+			personCode,
+			externalId: str(r.external_id),
+			alternateId: str(r.alternate_id),
+		});
+		return {
+			id: str(r.id),
+			name: demoOverlay
+				? `${demoOverlay.firstName} ${demoOverlay.lastName}`
+				: [str(r.first_name), str(r.last_name)].filter(Boolean).join(" ") ||
+					"—",
+			relationship: mapRelationship(str(r.relationship_code)),
+			dob: demoOverlay?.dob ?? dateStr(r.date_of_birth),
+			gender: demoOverlay?.gender ?? mapGender(str(r.gender)),
+			coverageStatus: mapMemberStatus(str(r.status)),
+			memberId: demoOverlay?.memberId ?? (ids.cardholderId || undefined),
+			pcpName: str(r.pcp_name) || undefined,
+			planName: str(r.plan_name) || undefined,
+		};
+	});
 }
 
 /** `GET …/family-links/list/` rows → household cards. */
@@ -254,19 +299,25 @@ export function mapFamilyLinks(
 	return (rows ?? []).map((r) => {
 		const code = str(r.relationship_code);
 		const label = str(r.relationship_label);
+		const rawCardholderId = str(r.dependent_cardholder_id);
+		const demoOverlay = getDemoMemberOverlay({
+			cardholderId: rawCardholderId,
+			personCode: "02",
+		});
 		return {
 			id: str(r.id),
-			name:
-				[str(r.dependent_first_name), str(r.dependent_last_name)]
-					.filter(Boolean)
-					.join(" ") || "—",
+			name: demoOverlay
+				? `${demoOverlay.firstName} ${demoOverlay.lastName}`
+				: [str(r.dependent_first_name), str(r.dependent_last_name)]
+						.filter(Boolean)
+						.join(" ") || "—",
 			relationship: mapRelationship(label || code),
 			relationshipCode: code || undefined,
 			relationshipLabel: label || undefined,
-			dob: dateStr(r.dependent_date_of_birth),
-			gender: "—",
+			dob: demoOverlay?.dob ?? dateStr(r.dependent_date_of_birth),
+			gender: demoOverlay?.gender ?? "—",
 			coverageStatus: mapMemberStatus(str(r.dependent_status)),
-			memberId: str(r.dependent_cardholder_id) || undefined,
+			memberId: demoOverlay?.memberId ?? (rawCardholderId || undefined),
 			dependentId: str(r.dependent_id) || undefined,
 		};
 	});
@@ -688,7 +739,7 @@ export function buildAccumulatorSummaryForMember(
 	>,
 	rawSummary?: MemberAccumulatorSummaryDto | Record<string, unknown> | null
 ): AccumulatorSummary {
-	const useDemoFill = isMockEnabled();
+	const useDemoFill = isMembersMockEnabled();
 	const mapped = mapAccumulatorSummary(rawSummary ?? undefined);
 	if (
 		mapped &&
@@ -945,21 +996,31 @@ function asChangeType(value: unknown): MemberChangeEventRow["changeType"] {
 export function mapChangeEvents(
 	rows: Record<string, unknown>[] | undefined
 ): MemberChangeEventRow[] {
-	return (rows ?? []).map((r) => ({
-		id: str(r.id),
-		changeDate: formatChangeDate(r.change_date ?? r.created_at),
-		changeType: asChangeType(r.change_type ?? r.action),
-		category: str(r.category, "Other"),
-		fieldName: str(r.field_name, "—"),
-		fieldReason: r.field_reason ? str(r.field_reason) : undefined,
-		oldValue: str(r.old_value, "—"),
-		newValue: str(r.new_value, "—"),
-		reason: str(r.reason, "—"),
-		changedBy: str(r.changed_by ?? r.actor, "—"),
-		source: str(r.source ?? r.source_system, "—"),
-		effectiveDate: formatEffectiveDate(r.effective_date),
-		createdAt: r.created_at ? String(r.created_at) : undefined,
-	}));
+	const fieldLabels: Record<string, string> = {
+		newtech_member_id: "NewTech Member ID",
+		newtech_family_id: "NewTech Family ID",
+		external_id: "External ID",
+		alternate_id: "Alternate ID",
+		cardholder_id: "Cardholder ID",
+	};
+	return (rows ?? []).map((r) => {
+		const rawField = str(r.field_name, "—");
+		return {
+			id: str(r.id),
+			changeDate: formatChangeDate(r.change_date ?? r.created_at),
+			changeType: asChangeType(r.change_type ?? r.action),
+			category: str(r.category, "Other"),
+			fieldName: fieldLabels[rawField] ?? rawField,
+			fieldReason: r.field_reason ? str(r.field_reason) : undefined,
+			oldValue: str(r.old_value, "—"),
+			newValue: str(r.new_value, "—"),
+			reason: str(r.reason, "—"),
+			changedBy: str(r.changed_by ?? r.actor, "—"),
+			source: str(r.source ?? r.source_system, "—"),
+			effectiveDate: formatEffectiveDate(r.effective_date),
+			createdAt: r.created_at ? String(r.created_at) : undefined,
+		};
+	});
 }
 
 export function mapSourceRecordList(
@@ -1000,10 +1061,20 @@ export function mapAlerts(
 
 export function memberDetailDtoToDetail(row: MemberDetailDto): MemberDetail {
 	const base = memberListDtoToSummary(row);
+	const rawCardholderId = str(row.cardholder_id || row.reference_id || row.id);
+	const personCode = str(row.person_code, "01");
+	const demo = (row.demographics ?? {}) as Record<string, unknown>;
+	const demoOverlay = getDemoMemberOverlay({
+		cardholderId: rawCardholderId,
+		personCode,
+		externalId: str(row.external_id),
+		alternateId: str(demo.alternate_id ?? row.alternate_id),
+		newtechMemberId: str(row.newtech_member_id),
+		newtechFamilyId: str(row.newtech_family_id),
+	});
 	const elig = (row.eligibility ?? {}) as Record<string, unknown>;
 	const plan = (row.plan_coverage ?? {}) as Record<string, unknown>;
 	const group = (row.employment_group ?? {}) as Record<string, unknown>;
-	const demo = (row.demographics ?? {}) as Record<string, unknown>;
 	const latest = (row.latest_source ?? {}) as Record<string, unknown>;
 
 	const detail: MemberDetail = {
@@ -1052,7 +1123,13 @@ export function memberDetailDtoToDetail(row: MemberDetailDto): MemberDetail {
 		memberType: str(group.member_type) || undefined,
 		personCode: str(row.person_code) || undefined,
 		relationshipCode: str(row.relationship_code) || undefined,
-		externalId: str(row.external_id) || undefined,
+		externalId: demoOverlay?.externalId || undefined,
+		newtechMemberId:
+			demoOverlay?.newtechMemberId ??
+			(fixNewtechId(str(row.newtech_member_id)) || undefined),
+		newtechFamilyId:
+			demoOverlay?.newtechFamilyId ??
+			(fixNewtechId(str(row.newtech_family_id)) || undefined),
 		employeeType: str(group.employee_type) || undefined,
 		sourceSystem: str(row.source_system || latest.source_system) || undefined,
 		sourceFileName: str(latest.original_filename) || undefined,
@@ -1061,13 +1138,17 @@ export function memberDetailDtoToDetail(row: MemberDetailDto): MemberDetail {
 			: undefined,
 		recordStatus: str(latest.record_status) || undefined,
 		changeDetected: str(latest.change_summary) || undefined,
-		preferredName: str(row.preferred_name || demo.preferred_name) || null,
+		preferredName:
+			demoOverlay?.preferredName ??
+			(str(row.preferred_name || demo.preferred_name) || null),
 		preferredLanguage: str(
 			row.preferred_language || demo.preferred_language,
 			"—"
 		),
-		race: str(row.race || demo.race, "—"),
-		ethnicity: str(row.ethnicity || demo.ethnicity, "—"),
+		race: demoOverlay ? "Ethiopian" : str(row.race || demo.race, "—"),
+		ethnicity: demoOverlay
+			? "Ethiopian"
+			: str(row.ethnicity || demo.ethnicity, "—"),
 		communicationPreference: mapComms(
 			str(row.communication_preference || demo.communication_preference)
 		),
@@ -1126,6 +1207,8 @@ export function memberToWriteBody(member: MemberDetail): MemberWriteBody {
 		cardholder_id: dashToEmpty(member.memberId),
 		person_code: dashToEmpty(member.personCode),
 		external_id: dashToEmpty(member.externalId),
+		newtech_member_id: dashToEmpty(member.newtechMemberId),
+		newtech_family_id: dashToEmpty(member.newtechFamilyId),
 		relationship_code: dashToEmpty(member.relationshipCode),
 		first_name: dashToEmpty(member.firstName),
 		middle_name: dashToEmpty(member.middleName),

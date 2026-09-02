@@ -1,4 +1,4 @@
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
 import type { VendorCoreBlobResult } from "@/lib/vendor-core/client";
 import type {
@@ -132,7 +132,7 @@ export function genderLabelToApi(
 export async function getMemberDashboardStats(
 	params?: MemberDashboardStatsQuery
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const all = getMemberSummaries();
 		const program = params?.program;
 		const scoped = program ? all.filter((m) => m.program === program) : all;
@@ -152,7 +152,7 @@ export async function getMemberDashboardStats(
 export async function listMemberSummaries(
 	filters?: MemberListQuery
 ): Promise<MemberSummary[]> {
-	if (isMockEnabled()) return getMemberSummaries();
+	if (isMembersMockEnabled()) return getMemberSummaries();
 	const page = await vendorCoreApi.listMembers(filters);
 	return (page.results ?? []).map(memberListDtoToSummary);
 }
@@ -160,7 +160,7 @@ export async function listMemberSummaries(
 export async function listMemberSummariesPage(
 	filters?: MemberListQuery
 ): Promise<MemberSummariesPage> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const all = getMemberSummaries();
 		const limit = filters?.limit ?? 50;
 		const offset = filters?.offset ?? 0;
@@ -183,7 +183,7 @@ export async function listMemberSummariesPage(
 export async function getMemberDetail(
 	idOrMemberId: string
 ): Promise<MemberDetail | undefined> {
-	if (isMockEnabled()) return getMember(idOrMemberId);
+	if (isMembersMockEnabled()) return getMember(idOrMemberId);
 	try {
 		const dto = await vendorCoreApi.getMember(idOrMemberId);
 		return attachLivePcp(memberDetailDtoToDetail(dto), dto);
@@ -251,7 +251,8 @@ function matchProviderForMember(
 export async function listMemberEligibilityHistory(
 	memberId: string
 ): Promise<EligibilityHistoryRow[]> {
-	if (isMockEnabled()) return getMember(memberId)?.eligibilityHistory ?? [];
+	if (isMembersMockEnabled())
+		return getMember(memberId)?.eligibilityHistory ?? [];
 	const page = await vendorCoreApi.listMemberEligibilityHistory(memberId);
 	return mapEligibilityHistory(page.results as Record<string, unknown>[]);
 }
@@ -259,7 +260,7 @@ export async function listMemberEligibilityHistory(
 export async function listMemberPlanHistory(
 	memberId: string
 ): Promise<PlanHistoryRow[]> {
-	if (isMockEnabled()) return getMember(memberId)?.planHistory ?? [];
+	if (isMembersMockEnabled()) return getMember(memberId)?.planHistory ?? [];
 	const page = await vendorCoreApi.listMemberPlanHistory(memberId);
 	return mapPlanHistory(page.results as Record<string, unknown>[]);
 }
@@ -267,7 +268,7 @@ export async function listMemberPlanHistory(
 export async function listMemberExceptions(
 	memberId: string
 ): Promise<EligibilityExceptionRow[]> {
-	if (isMockEnabled()) return getMember(memberId)?.exceptions ?? [];
+	if (isMembersMockEnabled()) return getMember(memberId)?.exceptions ?? [];
 	const page = await vendorCoreApi.listMemberExceptions(memberId);
 	return mapExceptions(page.results as Record<string, unknown>[]);
 }
@@ -275,7 +276,7 @@ export async function listMemberExceptions(
 export async function listMemberAccumulators(
 	memberId: string
 ): Promise<AccumulatorRow[]> {
-	if (isMockEnabled()) return getMember(memberId)?.accumulators ?? [];
+	if (isMembersMockEnabled()) return getMember(memberId)?.accumulators ?? [];
 	const page = await vendorCoreApi.listMemberAccumulators(memberId);
 	return mapAccumulators(page.results as Record<string, unknown>[]);
 }
@@ -306,7 +307,7 @@ export async function getMemberAccumulatorSummary(
 		| "accumulatorSummary"
 	>
 ): Promise<AccumulatorSummary | undefined> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const m = getMember(memberId);
 		if (!m) return undefined;
 		return m.accumulatorSummary ?? buildAccumulatorSummaryForMember(m);
@@ -411,7 +412,7 @@ export async function getMemberAccumulatorSummary(
 export async function listAccumulatorFiles(
 	params?: AccumulatorFileListQuery
 ): Promise<{ results: AccumulatorFileDto[]; count?: number }> {
-	if (isMockEnabled()) return { results: [], count: 0 };
+	if (isMembersMockEnabled()) return { results: [], count: 0 };
 	const page = await vendorCoreApi.listAccumulatorFiles(params);
 	return { results: page.results ?? [], count: page.count };
 }
@@ -425,7 +426,7 @@ export async function getAccumulatorFile(
 export async function listAccumulatorRows(
 	params?: AccumulatorRowListQuery
 ): Promise<{ results: AccumulatorRowListDto[]; count?: number }> {
-	if (isMockEnabled()) return { results: [], count: 0 };
+	if (isMembersMockEnabled()) return { results: [], count: 0 };
 	const page = await vendorCoreApi.listAccumulatorRows(params);
 	return { results: page.results ?? [], count: page.count };
 }
@@ -456,7 +457,7 @@ export async function deleteAccumulatorRow(id: string): Promise<void> {
 export async function listPharmacyClaimFiles(
 	params?: PharmacyClaimFileListQuery
 ): Promise<{ results: PharmacyClaimFileDto[]; count?: number }> {
-	if (isMockEnabled()) return { results: [], count: 0 };
+	if (isMembersMockEnabled()) return { results: [], count: 0 };
 	const page = await vendorCoreApi.listPharmacyClaimFiles(params);
 	return { results: page.results ?? [], count: page.count };
 }
@@ -470,7 +471,7 @@ export async function getPharmacyClaimFile(
 export async function listPharmacyClaimRows(
 	params?: PharmacyClaimRowListQuery
 ): Promise<{ results: PharmacyClaimRowListDto[]; count?: number }> {
-	if (isMockEnabled()) return { results: [], count: 0 };
+	if (isMembersMockEnabled()) return { results: [], count: 0 };
 	const page = await vendorCoreApi.listPharmacyClaimRows(params);
 	return { results: page.results ?? [], count: page.count };
 }
@@ -502,7 +503,7 @@ export async function listMemberClaims(
 	memberId: string,
 	claimKind?: string
 ): Promise<MemberClaimRow[]> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const m = getMember(memberId);
 		if (!m) return [];
 		if (claimKind === "encounter") return m.encounters;
@@ -516,7 +517,7 @@ export async function listMemberClaims(
 }
 
 export async function listMemberChangeEvents(memberId: string) {
-	if (isMockEnabled()) return buildMockMemberChangeEvents(memberId);
+	if (isMembersMockEnabled()) return buildMockMemberChangeEvents(memberId);
 	const page = await vendorCoreApi.listMemberChangeEvents(memberId);
 	const mapped = mapChangeEvents(page.results as Record<string, unknown>[]);
 	if (mapped.length > 0) return mapped;
@@ -524,7 +525,7 @@ export async function listMemberChangeEvents(memberId: string) {
 }
 
 export async function listMemberSourceRecords(memberId: string) {
-	if (isMockEnabled()) return [];
+	if (isMembersMockEnabled()) return [];
 	const page = await vendorCoreApi.listMemberSourceRecords(memberId);
 	return mapSourceRecordList(page.results as Record<string, unknown>[]);
 }
@@ -533,7 +534,7 @@ export async function getMemberSourceRecord(
 	memberId: string,
 	recordId: string
 ): Promise<Record<string, unknown>> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return { id: recordId, message: "Mock mode — no source payload" };
 	}
 	return vendorCoreApi.getMemberSourceRecord(memberId, recordId);
@@ -549,7 +550,7 @@ export async function createMemberException(
 		resolution?: string;
 	}
 ): Promise<EligibilityExceptionRow> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return mapExceptions([
 			{
 				id: crypto.randomUUID(),
@@ -569,7 +570,7 @@ export async function createMemberAccumulator(
 	memberId: string,
 	body: MemberAccumulatorCreateBody
 ): Promise<AccumulatorRow> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return mapAccumulators([
 			{
 				id: crypto.randomUUID(),
@@ -600,7 +601,7 @@ export async function createMemberClaim(
 		status?: string;
 	}
 ): Promise<MemberClaimRow> {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return mapClaims([
 			{
 				id: crypto.randomUUID(),
@@ -623,7 +624,7 @@ export async function updateMemberException(
 	exceptionId: string,
 	body: Record<string, unknown>
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return mapExceptions([{ id: exceptionId, ...body }])[0]!;
 	}
 	const row = await vendorCoreApi.updateMemberException(
@@ -638,7 +639,7 @@ export async function deleteMemberException(
 	memberId: string,
 	exceptionId: string
 ) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.deleteMemberException(memberId, exceptionId);
 }
 
@@ -647,7 +648,7 @@ export async function updateMemberAccumulator(
 	accumulatorId: string,
 	body: MemberAccumulatorUpdateBody
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return mapAccumulators([{ id: accumulatorId, ...body }])[0]!;
 	}
 	const row = await vendorCoreApi.updateMemberAccumulator(
@@ -662,7 +663,7 @@ export async function deleteMemberAccumulator(
 	memberId: string,
 	accumulatorId: string
 ) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.deleteMemberAccumulator(memberId, accumulatorId);
 }
 
@@ -671,7 +672,7 @@ export async function updateMemberClaim(
 	claimId: string,
 	body: Record<string, unknown>
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return mapClaims([{ id: claimId, ...body }])[0]!;
 	}
 	const row = await vendorCoreApi.updateMemberClaim(memberId, claimId, body);
@@ -679,14 +680,14 @@ export async function updateMemberClaim(
 }
 
 export async function deleteMemberClaim(memberId: string, claimId: string) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.deleteMemberClaim(memberId, claimId);
 }
 
 export async function createMember(
 	body: MemberCreateBody | Record<string, unknown>
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const existing = getMemberSummaries()[0];
 		if (!existing) throw new Error("No mock members");
 		return getMember(existing.id)!;
@@ -714,7 +715,7 @@ export async function updateMember(
 	id: string,
 	body: MemberWriteBody | Record<string, unknown>
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const member = getMember(id);
 		if (!member) throw new Error("Member not found");
 		return member;
@@ -727,17 +728,17 @@ export async function updateMember(
 }
 
 export async function deleteMember(id: string) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.deleteMember(id);
 }
 
 export async function hardDeleteMember(id: string) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.hardDeleteMember(id);
 }
 
 export async function restoreMember(id: string) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const member = getMember(id);
 		if (!member) throw new Error("Member not found");
 		return member;
@@ -747,14 +748,14 @@ export async function restoreMember(id: string) {
 }
 
 export async function seedMembers(body?: Record<string, unknown>) {
-	if (isMockEnabled()) return { created: 0, skipped: true };
+	if (isMembersMockEnabled()) return { created: 0, skipped: true };
 	return vendorCoreApi.seedMembers(body);
 }
 
 export async function listMemberFamilyLinks(
 	memberId: string
 ): Promise<DependentRow[]> {
-	if (isMockEnabled()) return getMember(memberId)?.dependents ?? [];
+	if (isMembersMockEnabled()) return getMember(memberId)?.dependents ?? [];
 	const page = await vendorCoreApi.listMemberFamilyLinks(memberId);
 	const rows = Array.isArray(page)
 		? page
@@ -765,7 +766,7 @@ export async function listMemberFamilyLinks(
 }
 
 export async function getMemberFamilyLink(memberId: string, linkId: string) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		const dep = getMember(memberId)?.dependents.find((d) => d.id === linkId);
 		if (!dep) throw new Error("Family link not found");
 		return mapFamilyLinkDetail({
@@ -793,7 +794,7 @@ export async function createMemberFamilyLink(
 		relationship_label?: string;
 	}
 ) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.createMemberFamilyLink(memberId, body);
 }
 
@@ -802,17 +803,17 @@ export async function updateMemberFamilyLink(
 	linkId: string,
 	body: { relationship_code?: string; relationship_label?: string }
 ) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.updateMemberFamilyLink(memberId, linkId, body);
 }
 
 export async function deleteMemberFamilyLink(memberId: string, linkId: string) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.deleteMemberFamilyLink(memberId, linkId);
 }
 
 export async function syncMemberFamilyLinks(memberId: string) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.syncMemberFamilyLinks(memberId);
 }
 
@@ -821,7 +822,7 @@ export async function transferMemberFamilyLink(
 	linkId: string,
 	body: { new_subscriber_id: string }
 ) {
-	if (isMockEnabled()) return;
+	if (isMembersMockEnabled()) return;
 	await vendorCoreApi.transferMemberFamilyLink(memberId, linkId, body);
 }
 

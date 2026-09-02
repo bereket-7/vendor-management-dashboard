@@ -7,7 +7,9 @@ import type {
 	ConnectionDto,
 	InboundFileDto,
 	IntakeJobDto,
+	VendorIntegrationProfileDto,
 } from "@/lib/vendor-core/types";
+import type { ProgramFileType } from "@/types/UI/system.types";
 
 import type {
 	VendorAlert,
@@ -63,8 +65,8 @@ function mapJobStatus(status?: string | null): VendorConfigJob["status"] {
 	return "Active";
 }
 
-function mapInboundStageToRunStatus(stage: string): ProcessStatus {
-	const value = stage.toLowerCase();
+function mapInboundStageToRunStatus(stage?: string | null): ProcessStatus {
+	const value = (stage ?? "").toLowerCase();
 	if (value.includes("fail") || value.includes("error")) return "failed";
 	if (value.includes("warn")) return "warning";
 	if (value.includes("process") || value.includes("pars")) return "processing";
@@ -72,6 +74,66 @@ function mapInboundStageToRunStatus(stage: string): ProcessStatus {
 	if (value.includes("pending") || value.includes("received"))
 		return "processing";
 	return "processing";
+}
+
+function mapProfileHealth(health?: string | null): VendorHealth {
+	const value = (health ?? "").toLowerCase();
+	if (value === "healthy") return "healthy";
+	if (value === "warning") return "warning";
+	if (value === "failed") return "failed";
+	return "in_progress";
+}
+
+function formatProcessingTime(seconds?: number | null): string {
+	if (seconds == null || Number.isNaN(seconds)) return "—";
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	const remainder = seconds % 60;
+	return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
+}
+
+function inferInboundProgram(file: InboundFileDto): ProgramFileType {
+	const metadata = (file as { metadata?: Record<string, unknown> }).metadata;
+	const parseResult = file.parse_result;
+	const raw =
+		(typeof metadata?.program === "string" ? metadata.program : null) ??
+		(typeof parseResult?.program === "string" ? parseResult.program : null);
+	if (raw === "MDH" || raw === "DHCF" || raw === "BHP") return raw;
+	return "MDH";
+}
+
+export function mapIntegrationProfileDto(
+	dto: VendorIntegrationProfileDto,
+	vendor: VendorModel,
+	connections: ConnectionDto[],
+	jobs: IntakeJobDto[],
+	accountsCount: number
+): VendorIntegrationProfile {
+	const fallback = buildVendorIntegrationProfile(
+		vendor,
+		connections,
+		jobs,
+		accountsCount
+	);
+	return {
+		...fallback,
+		vendorId: dto.vendor_id,
+		timezone: dto.timezone || fallback.timezone,
+		transmissionMethod:
+			dto.transmission_method?.trim() || fallback.transmissionMethod,
+		encryption: dto.encryption?.trim() || fallback.encryption,
+		fileFormats: dto.file_formats?.length
+			? dto.file_formats
+			: fallback.fileFormats,
+		tradingPartnerId:
+			dto.trading_partner_id?.trim() || fallback.tradingPartnerId,
+		protocol: dto.protocol?.trim() || fallback.protocol,
+		accountsCount: dto.accounts_count ?? fallback.accountsCount,
+		jobsCount: dto.jobs_count ?? fallback.jobsCount,
+		avgProcessingTime: formatProcessingTime(dto.avg_processing_time_seconds),
+		health: mapProfileHealth(dto.health),
+		notes: dto.notes?.trim() || fallback.notes,
+	};
 }
 
 function connectionHealth(connections: ConnectionDto[]): VendorHealth {
@@ -193,6 +255,16 @@ export function intakeJobsToConfigJobs(
 	}));
 }
 
+function formatDurationSeconds(
+	seconds: number | null | undefined
+): string | null {
+	if (seconds == null || !Number.isFinite(seconds)) return null;
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	const remainder = seconds % 60;
+	return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`;
+}
+
 export function inboundFilesToRuns(
 	files: InboundFileDto[],
 	vendorId: string,
@@ -208,7 +280,7 @@ export function inboundFilesToRuns(
 			account: "—",
 			client: "—",
 			fileType: mapFileType(file.detected_type ?? file.destination_module),
-			program: "DHCF" as const,
+			program: inferInboundProgram(file),
 			direction: "inbound" as const,
 			frequency: "—",
 			expectedAt: formatWhen(file.created_at),
@@ -217,13 +289,13 @@ export function inboundFilesToRuns(
 			completedAt: file.updated_at ?? null,
 			status: mapInboundStageToRunStatus(file.stage),
 			fileName: file.original_filename,
-			records: null,
+			records: file.record_count ?? null,
 			recordsValid: null,
 			recordsRejected: null,
 			recordsLoaded: null,
 			errorCount: file.error_count ?? 0,
 			warningCount: 0,
-			duration: null,
+			duration: formatDurationSeconds(file.duration_seconds),
 			fileSizeKb: null,
 			checksum: null,
 			protocol: "SFTP",
@@ -288,7 +360,7 @@ export function buildVendorAlerts(
 	}
 
 	for (const file of files.filter((f) => f.vendor_id === vendorId)) {
-		if (!file.stage.toLowerCase().includes("fail")) continue;
+		if (!(file.stage ?? "").toLowerCase().includes("fail")) continue;
 		alerts.push({
 			id: `file-${file.id}`,
 			vendorId,

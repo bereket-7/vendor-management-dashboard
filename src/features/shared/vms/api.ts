@@ -151,12 +151,19 @@ export const vmsApi = {
 		throw new Error("Vendor API unavailable");
 	},
 	async createVendor(
-		input: Parameters<typeof vmsStore.createVendor>[0]
+		input: Parameters<typeof vmsStore.createVendor>[0] & {
+			vendorCode?: string;
+			standardPaymentTermsDays?: number;
+			defaultCurrency?: string;
+			riskScore?: number;
+		}
 	): Promise<VendorModel> {
 		if (isMockEnabled()) return mockDelay(vmsStore.createVendor(input));
 		if (isVendorCoreLive()) {
 			const code =
-				input.tags?.[0]?.trim() || `VND-${Date.now().toString().slice(-8)}`;
+				input.vendorCode?.trim() ||
+				input.tags?.[0]?.trim() ||
+				`VND-${Date.now().toString().slice(-8)}`;
 			const dto = await vendorCoreApi.createVendor({
 				vendor_code: code,
 				legal_name: input.legalName,
@@ -174,12 +181,15 @@ export const vmsApi = {
 								  input.status === "suspended"
 								? input.status
 								: "active",
-				metadata: {
-					...(input.categories?.length
-						? { vendor_type: input.categories[0] }
-						: {}),
-					...(input.description ? { description: input.description } : {}),
-				},
+				description: input.description ?? undefined,
+				website: input.website ?? undefined,
+				tax_id: input.taxId ?? undefined,
+				risk_level: input.riskLevel,
+				risk_score: input.riskScore ?? undefined,
+				tags: input.tags ?? [],
+				standard_payment_terms_days:
+					input.standardPaymentTermsDays ?? undefined,
+				default_currency: input.defaultCurrency ?? undefined,
 			});
 			return vendorDtoToModel(dto);
 		}

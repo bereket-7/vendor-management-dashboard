@@ -12,10 +12,25 @@
  * `NEXT_PUBLIC_DEV_ADMIN` is ignored while Django shell auth is active.
  * Restart `pnpm dev` after changing `NEXT_PUBLIC_*` values.
  */
-export function isMockEnabled(): boolean {
-	const value = process.env.NEXT_PUBLIC_USE_MOCK;
+function envFlag(name: string): boolean {
+	const value = process.env[name];
 	if (value === undefined || value === "") return false;
 	return value === "true" || value === "1";
+}
+
+export function isMockEnabled(): boolean {
+	return envFlag("NEXT_PUBLIC_USE_MOCK");
+}
+
+/** Members fixtures without turning on global mock for other admin modules. */
+export function isMembersMockEnabled(): boolean {
+	if (isMockEnabled()) return true;
+	const value = process.env.NEXT_PUBLIC_MEMBERS_USE_MOCK;
+	if (value === "false" || value === "0") return false;
+	// Default on: Ethiopian demo fixtures until live scrub deployed everywhere.
+	return (
+		value === undefined || value === "" || value === "true" || value === "1"
+	);
 }
 
 /** Inverse of {@link isMockEnabled} — NestJS / vendor-core are expected. */

@@ -112,6 +112,10 @@ export async function getProviderDetail(
 			credentialsPage,
 			exceptionsPage,
 			vendorSourcesPage,
+			monthlyVolume,
+			rejectionReasons,
+			recentClaims,
+			recentEncounters,
 		] = await Promise.all([
 			getProviderDto(id),
 			vendorCoreApi.getProviderProfile(id).catch(() => null),
@@ -124,6 +128,14 @@ export async function getProviderDetail(
 			vendorCoreApi
 				.listProviderVendorSources(id)
 				.catch(() => ({ results: [] })),
+			vendorCoreApi.listProviderMonthlyVolume(id).catch(() => []),
+			vendorCoreApi.listProviderRejectionReasons(id).catch(() => []),
+			vendorCoreApi
+				.listProviderRecentActivity(id, { kind: "claim", limit: 25 })
+				.catch(() => []),
+			vendorCoreApi
+				.listProviderRecentActivity(id, { kind: "encounter", limit: 25 })
+				.catch(() => []),
 		]);
 		if (!dto) return null;
 		return providerDtoToDetail(dto, programCode, {
@@ -135,6 +147,10 @@ export async function getProviderDetail(
 			credentials: credentialsPage.results ?? [],
 			exceptions: exceptionsPage.results ?? [],
 			vendorSources: vendorSourcesPage.results ?? [],
+			monthlyVolume,
+			rejectionReasons,
+			recentClaims,
+			recentEncounters,
 		});
 	}
 
@@ -261,6 +277,28 @@ export async function restoreProvider(id: string) {
 	return vendorCoreApi.restoreProvider(id);
 }
 
+export async function hardDeleteProvider(id: string) {
+	return vendorCoreApi.hardDeleteProvider(id);
+}
+
+export async function listProviderRosterProviders(
+	rosterId: string,
+	params?: ProviderListQuery
+) {
+	const page = await vendorCoreApi.listProviderRosterProviders(
+		rosterId,
+		params
+	);
+	return page.results ?? [];
+}
+
+export async function deleteProviderIdentifier(
+	providerId: string,
+	identifierId: string
+) {
+	return vendorCoreApi.deleteProviderIdentifier(providerId, identifierId);
+}
+
 export async function listProviderRosters(params?: ProviderRosterListQuery) {
 	const page = await vendorCoreApi.listProviderRosters(params);
 	return page.results ?? [];
@@ -287,4 +325,8 @@ export async function deleteProviderRoster(id: string) {
 
 export async function restoreProviderRoster(id: string) {
 	return vendorCoreApi.restoreProviderRoster(id);
+}
+
+export async function hardDeleteProviderRoster(id: string) {
+	return vendorCoreApi.hardDeleteProviderRoster(id);
 }

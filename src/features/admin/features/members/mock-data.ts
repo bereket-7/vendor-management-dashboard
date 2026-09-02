@@ -1,5 +1,5 @@
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
-import { fixtureRecord, isMockEnabled } from "@/lib/mock-mode";
+import { fixtureRecord, isMembersMockEnabled } from "@/lib/mock-mode";
 
 export type MemberStatus = "active" | "inactive" | "pending" | "termed";
 export type EligibilityStatus =
@@ -16,6 +16,8 @@ export type MemberSummary = {
 	/** Core vendor UUID when known (live API). */
 	vendorId?: string;
 	alternateId?: string;
+	newtechMemberId?: string;
+	newtechFamilyId?: string;
 	firstName: string;
 	middleName?: string;
 	lastName: string;
@@ -225,6 +227,8 @@ export type MemberDetail = MemberSummary & {
 	personCode?: string;
 	relationshipCode?: string;
 	externalId?: string;
+	newtechMemberId?: string;
+	newtechFamilyId?: string;
 	employeeType?: string;
 	sourceSystem?: string;
 	sourceFileName?: string;
@@ -724,7 +728,7 @@ function buildSummaries(): MemberSummary[] {
 		"FEDERAL EMPLOYEE GROUP",
 		"STATE HEALTH GROUP",
 	];
-	for (let i = 0; i < 28; i++) {
+	for (let i = 0; i < 2; i++) {
 		const first = FIRST[i % FIRST.length]!;
 		const last = LAST[i % LAST.length]!;
 		const program = PROGRAMS[i % 3]!;
@@ -739,8 +743,8 @@ function buildSummaries(): MemberSummary[] {
 		const day = String(10 + (i % 18)).padStart(2, "0");
 		rows.push({
 			id: `mem-${i + 1}`,
-			memberId: `M${pad(123456789 + i, 9)}`,
-			alternateId: `ALT-${pad(1000 + i, 5)}`,
+			memberId: `${pad(123456780 + i, 9)}`,
+			alternateId: `${pad(64980000 + i, 8)}`,
 			firstName: first,
 			middleName: i === 0 ? "T." : undefined,
 			lastName: last,
@@ -782,44 +786,79 @@ function buildSummaries(): MemberSummary[] {
 			vendorSource: VENDORS[i % VENDORS.length]!,
 		});
 	}
-	// Primary member matches design mockup
-	const michael = rows[0]!;
-	michael.firstName = "Michael";
-	michael.middleName = "T.";
-	michael.lastName = "Johnson";
-	michael.memberId = "M123456789";
-	michael.alternateId = "ALT987654321";
-	michael.dob = "1985-03-15";
-	michael.gender = "Male";
-	michael.ssnLast4 = "6789";
-	michael.phone = "(301) 555-0188";
-	michael.email = "michael.johnson@email.com";
-	michael.addressLine1 = "9000 Rockville Pike";
-	michael.city = "Bethesda";
-	michael.state = "MD";
-	michael.zip = "20892";
-	michael.status = "active";
-	michael.eligibilityLabel = "Active";
-	michael.accountGroup = "NIH EMPLOYEE GROUP";
-	michael.program = "MDH";
-	michael.planName = "NIH PLAN A";
-	michael.planType = "Commercial";
-	michael.lob = "Medical";
-	michael.pcpName = "Jane Smith, MD";
-	michael.pcpNpi = "1234567890";
-	michael.memberSince = "2026-01-01";
-	michael.coverageEffectiveDate = "2026-01-01";
-	michael.lastClaimDate = "2026-01-20";
-	michael.claimsYtd = 4;
-	michael.paidYtd = 453.86;
-	michael.vendorSource = "NIH Eligibility";
+	// Primary demo members — synthetic Ethiopian names, clearly labeled demo IDs
+	const abebe = rows[0]!;
+	abebe.firstName = "Abebe";
+	abebe.middleName = undefined;
+	abebe.lastName = "Kebede";
+	abebe.memberId = "099898779";
+	abebe.alternateId = "64987572";
+	abebe.newtechMemberId = "12345678";
+	abebe.newtechFamilyId = "12345678";
+	abebe.dob = "1990-03-15";
+	abebe.gender = "Male";
+	abebe.ssnLast4 = "0001";
+	abebe.phone = "(202) 555-0142";
+	abebe.email = "abebe.kebede.demo@example.invalid";
+	abebe.addressLine1 = "1200 Medical Center Dr";
+	abebe.city = "Washington";
+	abebe.state = "DC";
+	abebe.zip = "20037";
+	abebe.status = "active";
+	abebe.eligibilityLabel = "Active";
+	abebe.accountGroup = "NIH EMPLOYEE GROUP";
+	abebe.program = "MDH";
+	abebe.planName = "MDH CareFirst PPO";
+	abebe.planType = "PPO";
+	abebe.lob = "Medicaid";
+	abebe.pcpName = "Dr. Samira Patel";
+	abebe.pcpNpi = "1234567890";
+	abebe.memberSince = "2025-01-15";
+	abebe.coverageEffectiveDate = "2025-01-15";
+	abebe.lastClaimDate = "2026-01-20";
+	abebe.claimsYtd = 4;
+	abebe.paidYtd = 453.86;
+	abebe.vendorSource = "NIH Eligibility";
+
+	const tigist = rows[1]!;
+	tigist.firstName = "Tigist";
+	tigist.middleName = undefined;
+	tigist.lastName = "Hailemariam";
+	tigist.memberId = "099876543";
+	tigist.alternateId = "64981234";
+	tigist.newtechMemberId = "12345678";
+	tigist.newtechFamilyId = "12345678";
+	tigist.dob = "1985-11-22";
+	tigist.gender = "Female";
+	tigist.ssnLast4 = "0002";
+	tigist.phone = "(202) 555-0143";
+	tigist.email = "tigist.hailemariam.demo@example.invalid";
+	tigist.addressLine1 = "1200 Medical Center Dr";
+	tigist.city = "Washington";
+	tigist.state = "DC";
+	tigist.zip = "20037";
+	tigist.status = "active";
+	tigist.eligibilityLabel = "Active";
+	tigist.accountGroup = "DC MEDICAID GROUP";
+	tigist.program = "DHCF";
+	tigist.planName = "DHCF Community Plus";
+	tigist.planType = "PPO";
+	tigist.lob = "Medicaid";
+	tigist.pcpName = "Dr. Samira Patel";
+	tigist.pcpNpi = "1234567890";
+	tigist.memberSince = "2025-02-01";
+	tigist.coverageEffectiveDate = "2025-02-01";
+	tigist.lastClaimDate = "2026-01-18";
+	tigist.claimsYtd = 2;
+	tigist.paidYtd = 210.0;
+	tigist.vendorSource = "NIH Eligibility";
 	return rows;
 }
 
 let _memberSummariesCache: MemberSummary[] | null = null;
 
 export function getMemberSummaries(): MemberSummary[] {
-	if (!isMockEnabled()) return [];
+	if (!isMembersMockEnabled()) return [];
 	if (!_memberSummariesCache) _memberSummariesCache = buildSummaries();
 	return _memberSummariesCache;
 }
@@ -827,7 +866,7 @@ export function getMemberSummaries(): MemberSummary[] {
 let _memberDetailsCache: Record<string, MemberDetail> | null = null;
 
 function getMemberDetailsMap(): Record<string, MemberDetail> {
-	if (!isMockEnabled()) return {};
+	if (!isMembersMockEnabled()) return {};
 	if (!_memberDetailsCache) {
 		_memberDetailsCache = Object.fromEntries(
 			getMemberSummaries().map((s) => [s.id, detailFor(s)])
@@ -837,7 +876,10 @@ function getMemberDetailsMap(): Record<string, MemberDetail> {
 }
 
 function detailFor(summary: MemberSummary): MemberDetail {
-	const isJohn = summary.id === "mem-1";
+	const isAbebe = summary.id === "mem-1";
+	const isTigist = summary.id === "mem-2";
+	const isDemoPrimary = isAbebe || isTigist;
+	const isJohn = isAbebe;
 	const idx = Number(summary.id.replace(/\D/g, "")) || 1;
 	const languages = ["English", "Spanish", "Amharic", "French", "Mandarin"];
 	const races = [
@@ -862,45 +904,57 @@ function detailFor(summary: MemberSummary): MemberDetail {
 	return {
 		...summary,
 		eligibilityStatus: summary.status === "termed" ? "termed" : "eligible",
-		coverageStart: isJohn
-			? "2026-01-01"
+		coverageStart: isDemoPrimary
+			? (summary.coverageEffectiveDate ?? summary.memberSince)
 			: `${summary.memberSince.slice(0, 4)}-01-01`,
 		coverageEnd: summary.status === "termed" ? "2026-06-30" : null,
-		planId: isJohn
-			? "PLAN_A"
-			: `PLAN-${summary.program}-00${summary.id.slice(-1)}`,
-		planCode: isJohn ? "PLAN_A" : `PLAN_${summary.program}`,
-		benefitPackage: isJohn ? "STANDARD" : "BASIC",
-		coverageLevelCode: isJohn ? "FAM" : "IND",
-		coverageLevel: isJohn ? "Family" : "Individual",
+		planId: isAbebe
+			? "PPO-01"
+			: isTigist
+				? "PPO-01"
+				: `PLAN-${summary.program}-00${summary.id.slice(-1)}`,
+		planCode: isDemoPrimary ? "PPO-01" : `PLAN_${summary.program}`,
+		benefitPackage: isDemoPrimary ? "Standard" : "BASIC",
+		coverageLevelCode: isDemoPrimary ? "EMP" : "IND",
+		coverageLevel: isDemoPrimary ? "Employee Only" : "Individual",
 		secondaryCoverage: "No",
 		statusEffectiveDate: "2026-01-01",
 		statusTermDate: summary.status === "termed" ? "2026-06-30" : null,
-		enrollmentDate: isJohn ? "2026-01-01" : summary.memberSince,
+		enrollmentDate: isDemoPrimary ? summary.memberSince : summary.memberSince,
 		disenrollmentDate: summary.status === "termed" ? "2026-06-30" : null,
 		lastEligibilityUpdate: "01/28/2026 08:45 AM",
-		groupId: isJohn ? "NIH GROUP 001" : `${summary.program} GROUP 00${idx}`,
+		groupId: isAbebe
+			? "GRP-100"
+			: isTigist
+				? "GRP-100"
+				: `${summary.program} GROUP 00${idx}`,
 		groupName: summary.accountGroup ?? `${summary.program} GROUP`,
-		clientId: isJohn ? "NIH001" : `${summary.program}${pad(idx, 3)}`,
+		clientId: isDemoPrimary ? "CL-1" : `${summary.program}${pad(idx, 3)}`,
 		accountType: "Employer Group",
 		accountStatus: summary.status === "termed" ? "Inactive" : "Active",
 		memberType: "Subscriber",
-		personCode: isJohn ? "01" : String(idx).padStart(2, "0"),
-		relationshipCode: isJohn ? "18" : idx % 3 === 0 ? "01" : "18",
-		externalId: isJohn ? "E987654321" : `E${pad(100000000 + idx, 9)}`,
+		personCode: isDemoPrimary ? "01" : String(idx).padStart(2, "0"),
+		relationshipCode: isDemoPrimary ? "18" : idx % 3 === 0 ? "01" : "18",
+		externalId: isAbebe
+			? "87654321"
+			: isTigist
+				? "87654324"
+				: `${pad(87650000 + idx, 8)}`,
 		employeeType: summary.status === "termed" ? "Termed" : "Active",
-		sourceSystem: isJohn ? "NIH Eligibility" : summary.vendorSource,
-		sourceFileName: isJohn
-			? "NIH_Eligibility_20260128_001330.txt"
+		sourceSystem: isDemoPrimary ? "NIH Eligibility" : summary.vendorSource,
+		sourceFileName: isDemoPrimary
+			? "NIH_Eligibility_demo.txt"
 			: `${summary.program}_Eligibility_20260128.txt`,
 		sourceFileReceived: "01/28/2026 01:33 AM",
 		recordStatus: "Processed",
-		changeDetected: isJohn ? "Plan / Address Update" : "Eligibility Refresh",
-		preferredName: isJohn ? "Mike" : null,
-		preferredLanguage: isJohn ? "English" : languages[idx % languages.length]!,
-		race: isJohn ? "White" : races[idx % races.length]!,
-		ethnicity: isJohn
-			? "Not Hispanic or Latino"
+		changeDetected: isDemoPrimary ? "New Member" : "Eligibility Refresh",
+		preferredName: isDemoPrimary ? summary.firstName : null,
+		preferredLanguage: isDemoPrimary
+			? "English"
+			: languages[idx % languages.length]!,
+		race: isDemoPrimary ? "Ethiopian" : races[idx % races.length]!,
+		ethnicity: isDemoPrimary
+			? "Ethiopian"
 			: ethnicities[idx % ethnicities.length]!,
 		communicationPreference: isJohn ? "Email" : comms[idx % comms.length]!,
 		emergencyContactName: isJohn
@@ -1291,7 +1345,11 @@ function detailFor(summary: MemberSummary): MemberDetail {
 			accountGroup:
 				summary.accountGroup ??
 				(isJohn ? "NIH GROUP 001" : `${summary.program} GROUP`),
-			memberId: isJohn ? "MEM00012345" : summary.memberId,
+			memberId: isAbebe
+				? "099898779"
+				: isTigist
+					? "099876543"
+					: summary.memberId,
 			familyId: isJohn ? "FAM00012345" : `FAM${pad(idx, 8)}`,
 			coverageStart: isJohn
 				? "2026-01-01"
@@ -1529,7 +1587,7 @@ export function displayName(
 }
 
 export function getMember(idOrMemberId: string): MemberDetail | undefined {
-	if (!isMockEnabled()) return undefined;
+	if (!isMembersMockEnabled()) return undefined;
 	const decoded = decodeURIComponent(idOrMemberId);
 	const details = getMemberDetailsMap();
 	const byId = details[decoded];

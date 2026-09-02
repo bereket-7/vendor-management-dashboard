@@ -20,6 +20,7 @@ import type {
 	ClaimLineDto,
 	ConnectionDto,
 	ContractCreateInput,
+	ContractDetailDto,
 	ContractDto,
 	ContractListQuery,
 	ContractUpdateInput,
@@ -62,6 +63,9 @@ import type {
 	PharmacyClaimRowListDto,
 	PharmacyClaimRowListQuery,
 	PharmacyClaimRowUpdateInput,
+	ProcurementDocumentCreateInput,
+	ProcurementDocumentDto,
+	ProcurementDocumentListQuery,
 	ProviderCreateInput,
 	ProviderCredentialDto,
 	ProviderDashboardStatsDto,
@@ -73,9 +77,13 @@ import type {
 	ProviderIdentifierUpdateInput,
 	ProviderListQuery,
 	ProviderLocationDto,
+	ProviderMonthlyVolumeDto,
 	ProviderNetworkDto,
 	ProviderProfileDto,
 	ProviderProfileUpdateInput,
+	ProviderRecentActivityDto,
+	ProviderRecentActivityQuery,
+	ProviderRejectionReasonDto,
 	ProviderRosterCreateInput,
 	ProviderRosterDto,
 	ProviderRosterListQuery,
@@ -90,12 +98,18 @@ import type {
 	RoleUpdateInput,
 	RoutingRuleDto,
 	ValidationResultDto,
+	VendorCategoryAssignmentCreateInput,
+	VendorCategoryAssignmentDto,
+	VendorCategoryAssignmentListQuery,
 	VendorCategoryDto,
 	VendorCategoryListQuery,
 	VendorContactCreateInput,
 	VendorContactDto,
 	VendorContactUpdateInput,
+	VendorCreateInput,
 	VendorDto,
+	VendorIntegrationProfileDto,
+	VendorIntegrationProfileUpdateInput,
 	VendorInviteCreateInput,
 	VendorInviteDto,
 	VendorNoteCreateInput,
@@ -146,6 +160,10 @@ export const vendorCoreEndpoints = {
 	vendorsMe: "/api/v1/vendors/me/",
 	vendorsTeam: "/api/v1/vendors/team/",
 	vendor: (id: string) => `/api/v1/vendors/${id}/`,
+	vendorIntegrationProfile: (id: string) =>
+		`/api/v1/vendors/${id}/integration-profile/`,
+	vendorIntegrationProfileUpdate: (id: string) =>
+		`/api/v1/vendors/${id}/integration-profile/update/`,
 	accountsList: "/api/v1/accounts/list/",
 	accountsCreate: "/api/v1/accounts/create/",
 	account: (id: string) => `/api/v1/accounts/${id}/`,
@@ -155,10 +173,17 @@ export const vendorCoreEndpoints = {
 	accountHardDelete: (id: string) => `/api/v1/accounts/${id}/hard-delete/`,
 	accountOpsSummaryList: "/api/v1/accounts/ops-summary/list/",
 	categoriesList: "/api/v1/categories/list/",
+	vendorCategoryAssignmentsList: "/api/v1/vendor-category-assignments/list/",
+	vendorCategoryAssignmentsCreate:
+		"/api/v1/vendor-category-assignments/create/",
 	contractsList: "/api/v1/contracts/list/",
 	contractsCreate: "/api/v1/contracts/create/",
 	contract: (id: string) => `/api/v1/contracts/${id}/`,
 	contractUpdate: (id: string) => `/api/v1/contracts/${id}/update/`,
+	documentsList: "/api/v1/documents/list/",
+	documentsCreate: "/api/v1/documents/create/",
+	document: (id: string) => `/api/v1/documents/${id}/`,
+	documentUpdate: (id: string) => `/api/v1/documents/${id}/update/`,
 	vendorContactsList: "/api/v1/vendor-contacts/list/",
 	vendorContactsCreate: "/api/v1/vendor-contacts/create/",
 	vendorContact: (id: string) => `/api/v1/vendor-contacts/${id}/`,
@@ -298,6 +323,40 @@ export const vendorCoreEndpoints = {
 		`/api/v1/providers/${id}/credentials/list/`,
 	providerExceptionsList: (id: string) =>
 		`/api/v1/providers/${id}/exceptions/list/`,
+	providerMonthlyVolumeList: (id: string) =>
+		`/api/v1/providers/${id}/claims/monthly-volume/list/`,
+	providerRejectionReasonsList: (id: string) =>
+		`/api/v1/providers/${id}/claims/rejection-reasons/list/`,
+	providerRecentActivityList: (id: string) =>
+		`/api/v1/providers/${id}/claims/recent/list/`,
+	providerLocationCreate: (id: string) =>
+		`/api/v1/providers/${id}/locations/create/`,
+	providerLocationUpdate: (id: string, locationId: string) =>
+		`/api/v1/providers/${id}/locations/${locationId}/update/`,
+	providerLocationDelete: (id: string, locationId: string) =>
+		`/api/v1/providers/${id}/locations/${locationId}/delete/`,
+	providerIdentifierDelete: (id: string, identifierId: string) =>
+		`/api/v1/providers/${id}/identifiers/${identifierId}/delete/`,
+	providerNetworkCreate: (id: string) =>
+		`/api/v1/providers/${id}/networks/create/`,
+	providerNetworkUpdate: (id: string, networkId: string) =>
+		`/api/v1/providers/${id}/networks/${networkId}/update/`,
+	providerNetworkDelete: (id: string, networkId: string) =>
+		`/api/v1/providers/${id}/networks/${networkId}/delete/`,
+	providerCredentialCreate: (id: string) =>
+		`/api/v1/providers/${id}/credentials/create/`,
+	providerCredentialUpdate: (id: string, credentialId: string) =>
+		`/api/v1/providers/${id}/credentials/${credentialId}/update/`,
+	providerCredentialDelete: (id: string, credentialId: string) =>
+		`/api/v1/providers/${id}/credentials/${credentialId}/delete/`,
+	providerExceptionCreate: (id: string) =>
+		`/api/v1/providers/${id}/exceptions/create/`,
+	providerExceptionUpdate: (id: string, exceptionId: string) =>
+		`/api/v1/providers/${id}/exceptions/${exceptionId}/update/`,
+	providerExceptionDelete: (id: string, exceptionId: string) =>
+		`/api/v1/providers/${id}/exceptions/${exceptionId}/delete/`,
+	providerRosterProvidersList: (id: string) =>
+		`/api/v1/provider-rosters/${id}/providers/list/`,
 	providerRostersList: "/api/v1/provider-rosters/list/",
 	providerRostersCreate: "/api/v1/provider-rosters/create/",
 	providerRoster: (id: string) => `/api/v1/provider-rosters/${id}/`,
@@ -467,16 +526,7 @@ function mapPage<T, R>(
 }
 
 export const vendorCoreApi = {
-	createVendor: (body: {
-		vendor_code: string;
-		legal_name: string;
-		country: string;
-		city: string;
-		trade_name?: string;
-		status?: string;
-		tier?: string;
-		metadata?: Record<string, unknown>;
-	}) =>
+	createVendor: (body: VendorCreateInput) =>
 		vendorCoreFetch<VendorDto>(vendorCoreEndpoints.vendorsCreate, {
 			method: "POST",
 			body: JSON.stringify(body),
@@ -504,6 +554,7 @@ export const vendorCoreApi = {
 	deleteAccount: (id: string) =>
 		vendorCoreFetch<void>(vendorCoreEndpoints.accountDelete(id), {
 			method: "DELETE",
+			raw: true,
 		}),
 
 	restoreAccount: (id: string) =>
@@ -573,12 +624,41 @@ export const vendorCoreApi = {
 		return normalizeVendor(raw);
 	},
 
-	listAccounts: async (params?: { vendor_id?: string }) => {
+	getVendorIntegrationProfile: async (id: string) =>
+		vendorCoreFetch<VendorIntegrationProfileDto>(
+			vendorCoreEndpoints.vendorIntegrationProfile(id)
+		),
+
+	updateVendorIntegrationProfile: async (
+		id: string,
+		body: VendorIntegrationProfileUpdateInput
+	) =>
+		vendorCoreFetch<VendorIntegrationProfileDto>(
+			vendorCoreEndpoints.vendorIntegrationProfileUpdate(id),
+			{
+				method: "PATCH",
+				body: JSON.stringify(body),
+			}
+		),
+
+	listAccounts: async (params?: {
+		vendor_id?: string;
+		is_visible?: boolean;
+		is_deleted?: boolean;
+	}) => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
 				PaginatedResult<Record<string, unknown>>
 			>(vendorCoreEndpoints.accountsList, {
-				params: pageParams({ ...params, limit, offset }),
+				params: pageParams({
+					vendor_id: params?.vendor_id,
+					is_visible:
+						params?.is_visible != null ? String(params.is_visible) : undefined,
+					is_deleted:
+						params?.is_deleted != null ? String(params.is_deleted) : undefined,
+					limit,
+					offset,
+				}),
 			});
 			return mapPage(page, normalizeAccount);
 		});
@@ -768,6 +848,8 @@ export const vendorCoreApi = {
 					group_id: params?.group_id || undefined,
 					account_group: params?.account_group || undefined,
 					alternate_id: params?.alternate_id || undefined,
+					newtech_member_id: params?.newtech_member_id || undefined,
+					newtech_family_id: params?.newtech_family_id || undefined,
 					first_name: params?.first_name || undefined,
 					last_name: params?.last_name || undefined,
 					date_of_birth: params?.date_of_birth || undefined,
@@ -1538,6 +1620,158 @@ export const vendorCoreApi = {
 			{ params: pageParams({ limit: 200 }) }
 		),
 
+	listProviderMonthlyVolume: (id: string) =>
+		vendorCoreFetch<ProviderMonthlyVolumeDto[]>(
+			vendorCoreEndpoints.providerMonthlyVolumeList(id)
+		).then((rows) => rows ?? []),
+
+	listProviderRejectionReasons: (id: string) =>
+		vendorCoreFetch<ProviderRejectionReasonDto[]>(
+			vendorCoreEndpoints.providerRejectionReasonsList(id)
+		).then((rows) => rows ?? []),
+
+	listProviderRecentActivity: (
+		id: string,
+		params?: ProviderRecentActivityQuery
+	) =>
+		vendorCoreFetch<ProviderRecentActivityDto[]>(
+			vendorCoreEndpoints.providerRecentActivityList(id),
+			{
+				params: pageParams({
+					kind: params?.kind ?? "claim",
+					limit: params?.limit ?? 25,
+				}),
+			}
+		).then((rows) => rows ?? []),
+
+	deleteProviderIdentifier: (id: string, identifierId: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.providerIdentifierDelete(id, identifierId),
+			{ method: "DELETE" }
+		),
+
+	createProviderLocation: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<ProviderLocationDto>(
+			vendorCoreEndpoints.providerLocationCreate(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateProviderLocation: (
+		id: string,
+		locationId: string,
+		body: Record<string, unknown>
+	) =>
+		vendorCoreFetch<ProviderLocationDto>(
+			vendorCoreEndpoints.providerLocationUpdate(id, locationId),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	deleteProviderLocation: (id: string, locationId: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.providerLocationDelete(id, locationId),
+			{ method: "DELETE" }
+		),
+
+	createProviderNetwork: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<ProviderNetworkDto>(
+			vendorCoreEndpoints.providerNetworkCreate(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateProviderNetwork: (
+		id: string,
+		networkId: string,
+		body: Record<string, unknown>
+	) =>
+		vendorCoreFetch<ProviderNetworkDto>(
+			vendorCoreEndpoints.providerNetworkUpdate(id, networkId),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	deleteProviderNetwork: (id: string, networkId: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.providerNetworkDelete(id, networkId),
+			{ method: "DELETE" }
+		),
+
+	createProviderCredential: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<ProviderCredentialDto>(
+			vendorCoreEndpoints.providerCredentialCreate(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateProviderCredential: (
+		id: string,
+		credentialId: string,
+		body: Record<string, unknown>
+	) =>
+		vendorCoreFetch<ProviderCredentialDto>(
+			vendorCoreEndpoints.providerCredentialUpdate(id, credentialId),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	deleteProviderCredential: (id: string, credentialId: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.providerCredentialDelete(id, credentialId),
+			{ method: "DELETE" }
+		),
+
+	createProviderException: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<ProviderExceptionDto>(
+			vendorCoreEndpoints.providerExceptionCreate(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateProviderException: (
+		id: string,
+		exceptionId: string,
+		body: Record<string, unknown>
+	) =>
+		vendorCoreFetch<ProviderExceptionDto>(
+			vendorCoreEndpoints.providerExceptionUpdate(id, exceptionId),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	deleteProviderException: (id: string, exceptionId: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.providerExceptionDelete(id, exceptionId),
+			{ method: "DELETE" }
+		),
+
+	hardDeleteProvider: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.providerHardDelete(id), {
+			method: "DELETE",
+		}),
+
+	hardDeleteProviderRoster: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.providerRosterHardDelete(id), {
+			method: "DELETE",
+		}),
+
+	listProviderRosterProviders: (id: string, params?: ProviderListQuery) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.providerRosterProvidersList(id),
+			{
+				params: pageParams({
+					...params,
+					limit: params?.limit ?? 50,
+					offset: params?.offset ?? 0,
+					is_visible:
+						params?.is_visible === undefined
+							? undefined
+							: params.is_visible
+								? "true"
+								: "false",
+					is_deleted:
+						params?.is_deleted === undefined
+							? undefined
+							: params.is_deleted
+								? "true"
+								: "false",
+				}),
+			}
+		).then((page) => mapPage(page, normalizeProvider)),
+
 	listProviderRosters: async (params?: ProviderRosterListQuery) => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
@@ -1733,7 +1967,7 @@ export const vendorCoreApi = {
 	},
 
 	getContract: (id: string) =>
-		vendorCoreFetch<ContractDto>(vendorCoreEndpoints.contract(id)),
+		vendorCoreFetch<ContractDetailDto>(vendorCoreEndpoints.contract(id)),
 
 	createContract: (body: ContractCreateInput) =>
 		vendorCoreFetch<ContractDto>(vendorCoreEndpoints.contractsCreate, {
@@ -1746,6 +1980,23 @@ export const vendorCoreApi = {
 			method: "PATCH",
 			body: JSON.stringify(body),
 		}),
+
+	listDocuments: async (params?: ProcurementDocumentListQuery) => {
+		const page = await vendorCoreFetch<PaginatedResult<ProcurementDocumentDto>>(
+			vendorCoreEndpoints.documentsList,
+			{ params: pageParams(params) }
+		);
+		return mapPage(page, (row) => row as ProcurementDocumentDto);
+	},
+
+	createDocument: (body: ProcurementDocumentCreateInput) =>
+		vendorCoreFetch<ProcurementDocumentDto>(
+			vendorCoreEndpoints.documentsCreate,
+			{
+				method: "POST",
+				body: JSON.stringify(body),
+			}
+		),
 
 	listVendorContacts: async (params?: { vendor_id?: string }) => {
 		const page = await vendorCoreFetch<PaginatedResult<VendorContactDto>>(
@@ -1804,11 +2055,13 @@ export const vendorCoreApi = {
 		}),
 
 	listAccountOpsSummaries: async (vendorId: string) => {
-		const page = await vendorCoreFetch<PaginatedResult<AccountOpsSummaryDto>>(
-			vendorCoreEndpoints.accountOpsSummaryList,
-			{ params: pageParams({ vendor_id: vendorId }) }
-		);
-		return page.results ?? [];
+		const data = await vendorCoreFetch<
+			AccountOpsSummaryDto[] | PaginatedResult<AccountOpsSummaryDto>
+		>(vendorCoreEndpoints.accountOpsSummaryList, {
+			params: pageParams({ vendor_id: vendorId }),
+		});
+		if (Array.isArray(data)) return data;
+		return data.results ?? [];
 	},
 
 	updateVendor: (id: string, body: Record<string, unknown>) =>
@@ -1861,6 +2114,35 @@ export const vendorCoreApi = {
 			{ params: pageParams(query) }
 		);
 		return mapPage(page, (row) => row as VendorCategoryDto);
+	},
+
+	createVendorCategoryAssignment: (body: VendorCategoryAssignmentCreateInput) =>
+		vendorCoreFetch<VendorCategoryAssignmentDto>(
+			vendorCoreEndpoints.vendorCategoryAssignmentsCreate,
+			{
+				method: "POST",
+				body: JSON.stringify(body),
+			}
+		),
+
+	listVendorCategoryAssignments: async (
+		params?: VendorCategoryAssignmentListQuery
+	) => {
+		const query: Record<string, string | number | undefined> = {
+			limit: params?.limit,
+			offset: params?.offset,
+			vendor_id: params?.vendor_id,
+		};
+		if (params?.is_visible != null)
+			query.is_visible = String(params.is_visible);
+		if (params?.is_deleted != null)
+			query.is_deleted = String(params.is_deleted);
+		const page = await vendorCoreFetch<
+			PaginatedResult<VendorCategoryAssignmentDto>
+		>(vendorCoreEndpoints.vendorCategoryAssignmentsList, {
+			params: pageParams(query),
+		});
+		return mapPage(page, (row) => row as VendorCategoryAssignmentDto);
 	},
 
 	listUsers: async (params?: { search?: string }) => {
