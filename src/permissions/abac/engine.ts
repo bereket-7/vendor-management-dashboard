@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { ZodError } from "zod";
 
 import { logger } from "@/lib/logger";
 
@@ -596,9 +596,9 @@ export class PolicyEngine {
 			case "notin":
 				return Array.isArray(b) && !b.includes(a);
 			case "greaterthan":
-				return (a as any) > (b as any);
+				return PolicyEngine.compareOrdered(a, b, "gt");
 			case "lessthan":
-				return (a as any) < (b as any);
+				return PolicyEngine.compareOrdered(a, b, "lt");
 			case "contains":
 				return typeof a === "string" && a.includes(b as string);
 			case "startswith":
@@ -621,7 +621,7 @@ export class PolicyEngine {
 				);
 			case "between":
 				if (Array.isArray(b) && b.length === 2) {
-					return (a as any) >= b[0] && (a as any) <= b[1];
+					return PolicyEngine.isBetweenOrdered(a, b[0], b[1]);
 				}
 				if (typeof b === "object" && b !== null && "start" in b && "end" in b) {
 					return (
@@ -638,6 +638,39 @@ export class PolicyEngine {
 	}
 
 	// Legacy method
+	private static isOrderedComparable(value: unknown): value is number | string {
+		return typeof value === "number" || typeof value === "string";
+	}
+
+	private static compareOrdered(
+		a: unknown,
+		b: unknown,
+		direction: "gt" | "lt"
+	): boolean {
+		if (
+			!PolicyEngine.isOrderedComparable(a) ||
+			!PolicyEngine.isOrderedComparable(b)
+		) {
+			return false;
+		}
+		return direction === "gt" ? a > b : a < b;
+	}
+
+	private static isBetweenOrdered(
+		value: unknown,
+		min: unknown,
+		max: unknown
+	): boolean {
+		if (
+			!PolicyEngine.isOrderedComparable(value) ||
+			!PolicyEngine.isOrderedComparable(min) ||
+			!PolicyEngine.isOrderedComparable(max)
+		) {
+			return false;
+		}
+		return value >= min && value <= max;
+	}
+
 	private static applyOperator(op: string, a: unknown, b: unknown): boolean {
 		return this.applyOperatorFast(op, a, b);
 	}
@@ -845,7 +878,7 @@ export class PolicyEngine {
 class PolicyValidationError extends Error {
 	constructor(
 		message: string,
-		public readonly zodError: z.ZodError
+		public readonly zodError: ZodError
 	) {
 		super(`${message}: ${zodError.errors.map((e) => e.message).join(", ")}`);
 		this.name = "PolicyValidationError";

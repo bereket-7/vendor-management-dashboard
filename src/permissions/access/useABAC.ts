@@ -6,6 +6,7 @@ import { MOCK_ADMIN_USER, isMockAuthEnabled } from "@/lib/auth/mock-auth";
 import { resolveAbacUser, serverUserFromMe } from "@/lib/auth/session-user";
 
 import { PolicyEngine } from "../abac/engine";
+import type { AttributeContext, AttributeMap } from "../abac/types";
 
 export const useABAC = () => {
 	const { data: session } = authClient.useSession();
@@ -32,12 +33,15 @@ export const useABAC = () => {
 			time: new Date().toLocaleTimeString("en-US", { hour12: false }),
 		};
 
-		const context = {
+		const context: AttributeContext = {
 			action,
-			user: abacUser,
+			user: {
+				...abacUser,
+				attributes: abacUser.attributes as AttributeMap,
+			},
 			resource: {
 				type: resourceType,
-				attributes: resource ?? {},
+				attributes: (resource ?? {}) as AttributeMap,
 			},
 			environment,
 		};

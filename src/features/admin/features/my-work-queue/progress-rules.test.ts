@@ -1,3 +1,4 @@
+import { EDI_MILESTONE_DEFS, SFTP_MILESTONE_DEFS } from "./progress-data";
 import {
 	applyEdiPercentChange,
 	applyMilestoneDateChange,
@@ -10,7 +11,6 @@ import {
 	toggleMilestoneCompletion,
 	validateEdiMilestoneSave,
 } from "./progress-rules";
-import { EDI_MILESTONE_DEFS, SFTP_MILESTONE_DEFS } from "./progress-data";
 
 describe("snapPercentToCatalog (SFTP)", () => {
 	it("snaps to highest milestone weight not exceeding input", () => {
@@ -121,7 +121,10 @@ describe("applySftpPercentChange", () => {
 describe("toggleMilestoneCompletion", () => {
 	it("completing a milestone fills earlier and clears later", () => {
 		const defs = SFTP_MILESTONE_DEFS;
-		const base = defs.map((d) => ({ key: d.key, completedAt: null as string | null }));
+		const base = defs.map((d) => ({
+			key: d.key,
+			completedAt: null as string | null,
+		}));
 		const next = toggleMilestoneCompletion(
 			defs,
 			base,
@@ -158,7 +161,10 @@ describe("toggleMilestoneCompletion", () => {
 describe("applyMilestoneDateChange", () => {
 	it("setting a date completes through that index", () => {
 		const defs = SFTP_MILESTONE_DEFS;
-		const base = defs.map((d) => ({ key: d.key, completedAt: null as string | null }));
+		const base = defs.map((d) => ({
+			key: d.key,
+			completedAt: null as string | null,
+		}));
 		const next = applyMilestoneDateChange(
 			defs,
 			base,

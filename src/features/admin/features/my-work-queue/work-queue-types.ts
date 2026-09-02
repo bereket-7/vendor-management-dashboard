@@ -1,3 +1,10 @@
+import type {
+	EscalatedTo,
+	EscalationReason,
+	EscalationWorkflowStatus,
+	IpWhitelistingStatus,
+	OperationalStatus,
+} from "./lib/work-queue-detail-tabs";
 import type { ConnectionProgress } from "./progress-data";
 import type { EscalationStatus } from "./work-queue-analyst-escalation";
 
@@ -54,6 +61,27 @@ export type TpaTpvRow = {
 	sourceSystem?: string;
 	/** From `metadata.last_synced_at` (or aliases) when integration layer sets it. */
 	lastSyncedAt?: string;
+	/** Doc-aligned operational status (metadata or derived from migration status). */
+	operationalStatus?: OperationalStatus;
+	/** Doc-aligned IP whitelisting stage (metadata + whitelist status). */
+	ipWhitelistingStatus?: IpWhitelistingStatus;
+	/** Whether case is escalated per escalation tab rules. */
+	escalated?: boolean;
+	escalationReason?: EscalationReason | "";
+	escalatedTo?: EscalatedTo | "";
+	escalationWorkflowStatus?: EscalationWorkflowStatus;
+	blockerStatus?: string;
+	blockerReason?: string;
+	blockerNotes?: string;
+	escalatedAt?: string;
+	/** Raw case metadata for merge-on-update. */
+	metadata?: Record<string, unknown>;
+	ediAnalystId?: string;
+	ediAnalystName?: string;
+	ediAnalystAssignedAt?: string;
+	ediAnalystAssignedBy?: string;
+	ediAnalystPreviousId?: string;
+	ediAnalystPreviousName?: string;
 };
 
 export const MIGRATION_STATUS_LABEL: Record<MigrationStatus, string> = {
@@ -85,12 +113,6 @@ export const WORK_QUEUE_KPI = [
 		label: "Connected",
 		count: 0,
 		tone: "green" as const,
-	},
-	{
-		id: "migration",
-		label: "In Migration",
-		count: 0,
-		tone: "orange" as const,
 	},
 	{
 		id: "testing",

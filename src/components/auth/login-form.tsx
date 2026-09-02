@@ -40,6 +40,7 @@ import { clearDevSignedOutCookie } from "@/lib/auth/dev-session";
 import { isMockAuthEnabled } from "@/lib/auth/mock-auth";
 import { AUTH_PATHS } from "@/lib/auth/paths";
 import { isNestApiEnabled } from "@/lib/mock-mode";
+import { getPostLoginPath } from "@/lib/post-login-path";
 import { isDjangoShellAuthEnabled } from "@/lib/vendor-core/auth-mode";
 import {
 	VendorCoreApiError,
@@ -91,7 +92,7 @@ export function LoginForm() {
 	function enterDevSession() {
 		clearDevSignedOutCookie();
 		toast.success("Signed in");
-		window.location.assign(`/${locale}`);
+		window.location.assign(getPostLoginPath(locale));
 	}
 
 	async function onSubmit(values: LoginFormValues) {
@@ -113,7 +114,7 @@ export function LoginForm() {
 				if (me.must_change_password) {
 					window.location.assign(`/${locale}${AUTH_PATHS.changePassword}`);
 				} else {
-					window.location.assign(`/${locale}`);
+					window.location.assign(getPostLoginPath(locale));
 				}
 				return;
 			}
@@ -130,7 +131,7 @@ export function LoginForm() {
 
 			clearDevSignedOutCookie();
 			toast.success("Signed in");
-			window.location.assign(`/${locale}`);
+			window.location.assign(getPostLoginPath(locale));
 		} catch (err) {
 			const message =
 				err instanceof VendorCoreApiError

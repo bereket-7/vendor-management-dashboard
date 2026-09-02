@@ -6,7 +6,7 @@ import type { AdminModuleId, ProgramFileType } from "@/types/UI/system.types";
 export const MODULE_HOME_HREF: Record<AdminModuleId, string> = {
 	vendor_management: "/",
 	claim_encounter: "/admin/claim-encounter",
-	eligibility_operations: "/admin/members",
+	eligibility_operations: "/admin/my-work-queue",
 };
 
 interface AdminModuleState {

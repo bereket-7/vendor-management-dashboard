@@ -465,6 +465,13 @@ const claimEncounterNav: SidebarNavItem[] = [
 
 const eligibilityOperationsNav: SidebarNavItem[] = [
 	{
+		title: "TPA/TPV Tracking",
+		href: "/admin/my-work-queue",
+		permission: "dashboard-view",
+		section: "tpa_tpv_tracking",
+		module: "eligibility_operations",
+	},
+	{
 		title: "Member",
 		href: "/admin/members",
 		permission: "vendors-list",
@@ -476,13 +483,6 @@ const eligibilityOperationsNav: SidebarNavItem[] = [
 		href: "/admin/providers",
 		permission: "vendors-list",
 		section: "provider_operations",
-		module: "eligibility_operations",
-	},
-	{
-		title: "TPA/TPV Tracking",
-		href: "/admin/my-work-queue",
-		permission: "dashboard-view",
-		section: "tpa_tpv_tracking",
 		module: "eligibility_operations",
 	},
 ];
@@ -530,7 +530,7 @@ export const siteConfig = {
 		eligibility_operations: {
 			id: "eligibility_operations" as const,
 			label: "Eligibility Operations Dashboard",
-			homeHref: "/admin/members",
+			homeHref: "/admin/my-work-queue",
 			sidebarNav: eligibilityOperationsNav,
 		},
 	},

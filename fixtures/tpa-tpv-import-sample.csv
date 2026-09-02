@@ -1,0 +1,7 @@
+code,name,vendor_type,wave,server_type,notes,primary_contact,primary_email,primary_phone,next_step
+TPA-TEST-001,Horizon Logistics Test,tpa,1,New SFTP,Primary eligibility and claim files — import test row.,Lisa Walker,lisa.w@horizon.com,(410) 555-1122,Awaiting test file from vendor.
+TPA-TEST-002,Apex Benefits Admin Test,tpa,1,Legacy SFTP,Legacy SFTP cutover in progress.,Nina Cruz,nina.c@apexbenefits.com,(202) 555-2201,Validate 837 sample batch.
+TPV-TEST-001,Gateway Management Test,tpv,2,New SFTP,Waiting on IP whitelist confirmation.,Elena Park,elena.p@gatewaymgmt.com,(301) 555-4400,Confirm vendor firewall rules.
+TPA-TEST-003,Summit Care Partners Test,tpa,2,API Feed,API credentials rotated last week.,Jordan Hale,jordan.h@summitcare.com,(703) 555-8810,Schedule production cutover.
+TPA-TEST-004,Northstar TPA Test,tpa,1,Legacy SFTP,Kickoff pending vendor response.,Ruth Allen,ruth.a@northstartpa.com,(240) 555-3000,Send onboarding packet.
+TPV-TEST-002,Coastal Vendor Partners Test,tpv,3,New SFTP,Second TPV row for wave 3 testing.,Dana Brooks,dana.b@coastalvp.com,(919) 555-7700,Request SFTP credentials.

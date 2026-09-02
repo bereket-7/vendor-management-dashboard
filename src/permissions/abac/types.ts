@@ -3,12 +3,32 @@ import { z } from "zod";
 import adminComponentPolicies from "./policies/admin-components.json";
 import documentAccessPolicy from "./policies/document-access.json";
 
+export type AttributeScalar = string | number | boolean | null;
+
+export type AttributeValue =
+	| AttributeScalar
+	| AttributeValue[]
+	| { [key: string]: AttributeValue };
+
+export type AttributeMap = Record<string, AttributeValue>;
+
+export type ContextEntity = {
+	id?: string;
+	attributes?: AttributeMap;
+	[key: string]: AttributeValue | AttributeMap | undefined;
+};
+
 // 1. Enhanced Type Definitions
 export type Condition =
 	| { type: "allOf"; conditions: Condition[] }
 	| { type: "anyOf"; conditions: Condition[] }
 	| { type: "not"; condition: Condition }
-	| { type: "attribute"; attribute: string; operator: string; value?: any }; // `value` is optional
+	| {
+			type: "attribute";
+			attribute: string;
+			operator: string;
+			value?: AttributeValue;
+	  };
 
 export type PolicyTarget = {
 	roles?: string[];
@@ -30,42 +50,22 @@ export type AttributeContext = {
 	user: {
 		id: string;
 		roles: string[];
-		attributes: Record<string, any>;
-		[key: string]: any; // Index signature
-	};
+		attributes: AttributeMap;
+	} & Record<string, AttributeValue | string[] | AttributeMap | undefined>;
 	resource: {
 		type: string;
 		id?: string;
-		attributes: Record<string, any>;
-		[key: string]: any; // Index signature
-	};
+		attributes: AttributeMap;
+	} & Record<string, AttributeValue | AttributeMap | undefined>;
 	environment: {
 		time: string;
 		ip?: string;
 		location?: string;
-		[key: string]: any; // Index signature
-	};
-	// Optional healthcare-specific contexts
-	patient?: {
-		id?: string;
-		attributes?: Record<string, any>;
-		[key: string]: any;
-	};
-	encounter?: {
-		id?: string;
-		attributes?: Record<string, any>;
-		[key: string]: any;
-	};
-	organization?: {
-		id?: string;
-		attributes?: Record<string, any>;
-		[key: string]: any;
-	};
-	consent?: {
-		id?: string;
-		attributes?: Record<string, any>;
-		[key: string]: any;
-	};
+	} & Record<string, AttributeValue | undefined>;
+	patient?: ContextEntity;
+	encounter?: ContextEntity;
+	organization?: ContextEntity;
+	consent?: ContextEntity;
 };
 
 export type EvaluationResult = {
@@ -79,6 +79,17 @@ export type EvaluationResult = {
 	allowedBy?: string;
 	deniedBy?: string;
 };
+
+export const attributeValueSchema: z.ZodType<AttributeValue> = z.lazy(() =>
+	z.union([
+		z.string(),
+		z.number(),
+		z.boolean(),
+		z.null(),
+		z.array(attributeValueSchema),
+		z.record(attributeValueSchema),
+	])
+);
 
 export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
 	z.discriminatedUnion("type", [
@@ -98,7 +109,7 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
 			type: z.literal("attribute"),
 			attribute: z.string(),
 			operator: z.string(),
-			value: z.any(), // `value` is required
+			value: attributeValueSchema.optional(),
 		}),
 	])
 );

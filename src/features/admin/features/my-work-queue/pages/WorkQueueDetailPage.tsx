@@ -7,8 +7,8 @@ import {
 	AlertTriangle,
 	ArrowLeft,
 	Calendar,
-	Clock3,
 	ChevronRight,
+	Clock3,
 	ExternalLink,
 	FileText,
 	History,
@@ -19,20 +19,20 @@ import {
 	Server,
 	ShieldCheck,
 	Trash2,
-	Truck,
 	Upload,
+	UserCog,
 	UserRound,
 	Waves,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -44,29 +44,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
-import { Link, useRouter } from "@/i18n/navigation";
-import { cn } from "@/lib/utils";
-
 import { useVendorCoreUsersQuery } from "@/features/admin/features/users/feature/queries/useUsersQuery";
+import { Link, useRouter } from "@/i18n/navigation";
+import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 import { WorkQueueProgressEditor } from "../components/work-queue-progress";
 import {
-	EscalationStatusPill,
-} from "../components/work-queue-analyst-escalation";
-import {
-	ESCALATION_STATUS_LABEL,
-	ESCALATION_STATUS_SELECT_OPTIONS,
-	isSelectableEscalationStatus,
-	type EscalationStatus,
-} from "../work-queue-analyst-escalation";
-import {
-	CURRENT_STAGE_OPTIONS,
 	dateToApi,
-	stageToApi,
+	formatDisplayDateTime,
 	vendorTypeToApi,
 } from "../feature/mappers/workQueueMappers";
 import {
-	useAssignMigrationCaseMutation,
 	useDeleteMigrationCaseDocumentMutation,
 	useDeleteMigrationCaseMutation,
 	useInvalidateVendorCore,
@@ -78,22 +67,38 @@ import {
 	useMigrationCaseDetailQuery,
 	useMigrationCaseDocumentsQuery,
 	useMigrationCaseHistoryQuery,
-	useSetMigrationCaseEscalationMutation,
-	useSetMigrationCaseStatusMutation,
 	useSetMigrationCaseWhitelistMutation,
+	useTransitionMigrationCaseBlockerMutation,
 	useUpdateMigrationCaseMutation,
 	useUpdateMigrationCaseProgressMutation,
 	useUploadMigrationCaseDocumentMutation,
 } from "../feature/queries/useWorkQueueQuery";
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
 import {
+	ESCALATED_TO_LABEL,
+	ESCALATED_TO_OPTIONS,
+	ESCALATION_REASON_LABEL,
+	ESCALATION_REASON_OPTIONS,
+	ESCALATION_WORKFLOW_LABEL,
+	ESCALATION_WORKFLOW_OPTIONS,
+	type EscalatedTo,
+	type EscalationReason,
+	type EscalationWorkflowStatus,
+	IP_WHITELISTING_LABEL,
+	IP_WHITELISTING_OPTIONS,
+	type IpWhitelistingStatus,
+	OPERATIONAL_STATUS_LABEL,
+	OPERATIONAL_STATUS_OPTIONS,
+	type OperationalStatus,
+	mergeCaseMetadata,
+	whitelistStatusFromIpWhitelisting,
+} from "../lib/work-queue-detail-tabs";
+import type { ConnectionProgress, ProgressTrack } from "../progress-data";
+import {
 	MIGRATION_STATUS_LABEL,
 	type MigrationStatus,
 	type TpaTpvRow,
-	WHITELIST_STATUS_LABEL,
-	type WhitelistStatus,
 } from "../work-queue-types";
-import type { ConnectionProgress, ProgressTrack } from "../progress-data";
 
 type DetailTab =
 	| "overview"
@@ -101,7 +106,10 @@ type DetailTab =
 	| "contacts"
 	| "sftp"
 	| "edi"
-	| "migration"
+	| "escalation"
+	| "status"
+	| "ip_whitelisting"
+	| "edi_analyst"
 	| "documents"
 	| "history";
 
@@ -118,12 +126,16 @@ function tabFromQuery(value: string | null): DetailTab {
 		value === "contacts" ||
 		value === "sftp" ||
 		value === "edi" ||
-		value === "migration" ||
+		value === "escalation" ||
+		value === "status" ||
+		value === "ip_whitelisting" ||
+		value === "edi_analyst" ||
 		value === "documents" ||
 		value === "history"
 	) {
 		return value;
 	}
+	if (value === "migration") return "status";
 	return "overview";
 }
 
@@ -132,8 +144,11 @@ const TABS: { id: DetailTab; label: string; icon: typeof UserRound }[] = [
 	{ id: "info", label: "Information", icon: UserRound },
 	{ id: "contacts", label: "Contacts", icon: Link2 },
 	{ id: "sftp", label: "SFTP Progress", icon: Server },
-	{ id: "edi", label: "EDI Progress", icon: Server },
-	{ id: "migration", label: "Migration/Escalation", icon: Truck },
+	{ id: "edi", label: "EDI", icon: Server },
+	{ id: "escalation", label: "Escalation", icon: AlertTriangle },
+	{ id: "status", label: "Status", icon: Clock3 },
+	{ id: "ip_whitelisting", label: "IP Whitelisting", icon: ShieldCheck },
+	{ id: "edi_analyst", label: "EDI Analyst", icon: UserCog },
 	{ id: "documents", label: "Documents", icon: FileText },
 	{ id: "history", label: "History", icon: History },
 ];
@@ -391,11 +406,9 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 	const documentsQ = useMigrationCaseDocumentsQuery(caseId, true);
 	const usersQ = useVendorCoreUsersQuery();
 	const updateCase = useUpdateMigrationCaseMutation();
-	const assignCase = useAssignMigrationCaseMutation();
 	const updateProgress = useUpdateMigrationCaseProgressMutation();
-	const setStatus = useSetMigrationCaseStatusMutation();
-	const setEscalation = useSetMigrationCaseEscalationMutation();
 	const setWhitelist = useSetMigrationCaseWhitelistMutation();
+	const transitionBlocker = useTransitionMigrationCaseBlockerMutation();
 	const markTesting = useMarkMigrationCaseTestingMutation();
 	const markReady = useMarkMigrationCaseReadyMutation();
 	const markWaiting = useMarkMigrationCaseWaitingOnVendorMutation();
@@ -404,6 +417,8 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 	const deleteCase = useDeleteMigrationCaseMutation();
 	const uploadDoc = useUploadMigrationCaseDocumentMutation();
 	const deleteDoc = useDeleteMigrationCaseDocumentMutation();
+
+	const { data: session } = authClient.useSession();
 
 	const row: TpaTpvRow | null = detailQ.data ?? null;
 
@@ -448,15 +463,21 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 		secondaryPhone: "",
 		lastCommunicationAt: "",
 	});
-	const [migrationForm, setMigrationForm] = useState({
-		status: "not_started" as MigrationStatus,
-		migrationStartDate: "",
-		waitingOnVendorDate: "",
-		currentStage: "data_exchange",
-		nextStep: "",
+	const [escalationForm, setEscalationForm] = useState({
+		escalated: "no" as "yes" | "no",
+		escalationReason: "" as EscalationReason | "",
+		escalatedTo: "" as EscalatedTo | "",
+		escalationWorkflowStatus: "submitted" as EscalationWorkflowStatus,
+		blockerNotes: "",
+	});
+	const [statusForm, setStatusForm] = useState({
+		operationalStatus: "not_started" as OperationalStatus,
+	});
+	const [ipWhitelistingForm, setIpWhitelistingForm] = useState({
+		ipWhitelistingStatus: "not_started" as IpWhitelistingStatus,
+	});
+	const [ediAnalystForm, setEdiAnalystForm] = useState({
 		assignedToId: "",
-		escalationStatus: "none" as EscalationStatus,
-		whitelistStatus: "not_started" as WhitelistStatus,
 	});
 
 	useEffect(() => {
@@ -478,15 +499,21 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 			secondaryPhone: row.secondaryPhone,
 			lastCommunicationAt: row.lastCommunication,
 		});
-		setMigrationForm({
-			status: row.status,
-			migrationStartDate: row.migrationStartDate,
-			waitingOnVendorDate: row.waitingOnVendorDate,
-			currentStage: stageToApi(row.currentStage),
-			nextStep: row.nextStep,
-			assignedToId: row.assignedToId ?? "",
-			escalationStatus: row.escalationStatus ?? "none",
-			whitelistStatus: row.whitelistStatus,
+		setEscalationForm({
+			escalated: row.escalated ? "yes" : "no",
+			escalationReason: row.escalationReason ?? "",
+			escalatedTo: row.escalatedTo ?? "",
+			escalationWorkflowStatus: row.escalationWorkflowStatus ?? "submitted",
+			blockerNotes: row.blockerNotes ?? "",
+		});
+		setStatusForm({
+			operationalStatus: row.operationalStatus ?? "not_started",
+		});
+		setIpWhitelistingForm({
+			ipWhitelistingStatus: row.ipWhitelistingStatus ?? "not_started",
+		});
+		setEdiAnalystForm({
+			assignedToId: row.ediAnalystId ?? "",
 		});
 	}, [row]);
 
@@ -510,9 +537,7 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 				delete next[track];
 				return next;
 			});
-			toast.success(
-				`${track === "sftp" ? "SFTP" : "EDI"} progress saved`
-			);
+			toast.success(`${track === "sftp" ? "SFTP" : "EDI"} progress saved`);
 		} catch (err) {
 			toast.error(workQueueErrorMessage(err, "Failed to save progress"));
 		} finally {
@@ -574,61 +599,211 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 		}
 	}
 
-	async function saveMigration() {
+	async function saveEscalation() {
+		if (!row) return;
+		if (escalationForm.escalated === "yes") {
+			if (!escalationForm.escalationReason) {
+				toast.error("Select an escalation reason");
+				return;
+			}
+			if (!escalationForm.escalatedTo) {
+				toast.error("Select who this was escalated to");
+				return;
+			}
+			if (
+				escalationForm.escalationReason === "other" &&
+				!escalationForm.blockerNotes.trim()
+			) {
+				toast.error("Add notes when escalation reason is Other");
+				return;
+			}
+		}
+		setSaving(true);
+		try {
+			const metadataPatch: Record<string, unknown> = {
+				escalated: escalationForm.escalated === "yes",
+				escalation_workflow_status: escalationForm.escalationWorkflowStatus,
+				escalated_to:
+					escalationForm.escalated === "yes" && escalationForm.escalatedTo
+						? escalationForm.escalatedTo
+						: null,
+				escalation_reason:
+					escalationForm.escalated === "yes" && escalationForm.escalationReason
+						? escalationForm.escalationReason
+						: null,
+			};
+			await updateCase.mutateAsync({
+				id: row.id,
+				body: {
+					metadata: mergeCaseMetadata(row.metadata, metadataPatch),
+				},
+			});
+
+			const currentBlocker = row.blockerStatus ?? "none";
+			if (escalationForm.escalated === "yes") {
+				const reason =
+					escalationForm.escalationReason &&
+					escalationForm.escalationReason !== "other"
+						? escalationForm.escalationReason
+						: null;
+				const notes =
+					escalationForm.escalationReason === "other"
+						? escalationForm.blockerNotes
+						: escalationForm.blockerNotes;
+				if (currentBlocker !== "escalated") {
+					await transitionBlocker.mutateAsync({
+						id: row.id,
+						blocker_status: "escalated",
+						blocker_reason: reason,
+						blocker_notes: notes,
+					});
+				} else if (
+					reason !== (row.blockerReason || null) ||
+					notes !== row.blockerNotes
+				) {
+					await transitionBlocker.mutateAsync({
+						id: row.id,
+						blocker_status: "escalated",
+						blocker_reason: reason,
+						blocker_notes: notes,
+					});
+				}
+			} else if (currentBlocker === "escalated") {
+				await transitionBlocker.mutateAsync({
+					id: row.id,
+					blocker_status: "resolved",
+					blocker_reason: null,
+					blocker_notes: "",
+				});
+			} else if (
+				currentBlocker === "escalation_required" ||
+				currentBlocker === "attention"
+			) {
+				await transitionBlocker.mutateAsync({
+					id: row.id,
+					blocker_status: "none",
+					blocker_reason: null,
+					blocker_notes: "",
+				});
+			}
+
+			await invalidate();
+			await detailQ.refetch();
+			toast.success("Escalation saved");
+		} catch (err) {
+			toast.error(workQueueErrorMessage(err, "Failed to save escalation"));
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	async function saveStatus() {
 		if (!row) return;
 		setSaving(true);
 		try {
 			await updateCase.mutateAsync({
 				id: row.id,
 				body: {
-					migration_start_date: dateToApi(migrationForm.migrationStartDate),
-					waiting_on_vendor_date: dateToApi(migrationForm.waitingOnVendorDate),
-					current_stage: stageToApi(migrationForm.currentStage),
-					next_step: migrationForm.nextStep,
+					metadata: mergeCaseMetadata(row.metadata, {
+						operational_status: statusForm.operationalStatus,
+					}),
 				},
 			});
-			if (migrationForm.status !== row.status) {
-				await setStatus.mutateAsync({
-					id: row.id,
-					migration_status: migrationForm.status,
-				});
-			}
-			const nextAssignedId = migrationForm.assignedToId || null;
-			const currentAssignedId = row.assignedToId ?? null;
-			if (nextAssignedId !== currentAssignedId) {
-				await assignCase.mutateAsync({
-					id: row.id,
-					assigned_to_id: nextAssignedId,
-				});
-			}
-			const nextEscalation = migrationForm.escalationStatus;
-			const currentEscalation = row.escalationStatus ?? "none";
-			if (nextEscalation !== currentEscalation) {
-				await setEscalation.mutateAsync({
-					id: row.id,
-					escalation_status: nextEscalation,
-				});
-			}
-			if (migrationForm.whitelistStatus !== row.whitelistStatus) {
-				await setWhitelist.mutateAsync({
-					id: row.id,
-					whitelist_status: migrationForm.whitelistStatus,
-				});
-			}
 			await invalidate();
 			await detailQ.refetch();
-			toast.success("Migration details saved");
+			toast.success("Status saved");
 		} catch (err) {
-			toast.error(workQueueErrorMessage(err, "Failed to save migration"));
+			toast.error(workQueueErrorMessage(err, "Failed to save status"));
 		} finally {
 			setSaving(false);
 		}
 	}
 
-	async function runQuickMark(
-		label: string,
-		action: () => Promise<unknown>
-	) {
+	async function saveIpWhitelisting() {
+		if (!row) return;
+		setSaving(true);
+		try {
+			const nextWhitelist = whitelistStatusFromIpWhitelisting(
+				ipWhitelistingForm.ipWhitelistingStatus
+			);
+			await updateCase.mutateAsync({
+				id: row.id,
+				body: {
+					metadata: mergeCaseMetadata(row.metadata, {
+						ip_whitelisting_status: ipWhitelistingForm.ipWhitelistingStatus,
+						ip_whitelisting_not_required:
+							ipWhitelistingForm.ipWhitelistingStatus === "not_required",
+					}),
+				},
+			});
+			if (nextWhitelist !== row.whitelistStatus) {
+				await setWhitelist.mutateAsync({
+					id: row.id,
+					whitelist_status: nextWhitelist,
+				});
+			}
+			await invalidate();
+			await detailQ.refetch();
+			toast.success("IP whitelisting saved");
+		} catch (err) {
+			toast.error(workQueueErrorMessage(err, "Failed to save IP whitelisting"));
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	function analystLabelFromId(userId: string): string {
+		const user = (usersQ.data ?? []).find((u) => u.id === userId);
+		if (!user) return "";
+		return (
+			user.full_name?.trim() ||
+			[user.first_name, user.last_name].filter(Boolean).join(" ").trim() ||
+			user.username ||
+			user.email ||
+			""
+		);
+	}
+
+	async function saveEdiAnalyst() {
+		if (!row) return;
+		setSaving(true);
+		try {
+			const nextId = ediAnalystForm.assignedToId || "";
+			const currentId = row.ediAnalystId ?? "";
+			if (nextId !== currentId) {
+				const assignedBy =
+					session?.user?.name?.trim() ||
+					session?.user?.email?.trim() ||
+					"System";
+				const previousName =
+					row.ediAnalystName ||
+					(currentId ? analystLabelFromId(currentId) : "");
+				const nextName = nextId ? analystLabelFromId(nextId) : "";
+				await updateCase.mutateAsync({
+					id: row.id,
+					body: {
+						metadata: mergeCaseMetadata(row.metadata, {
+							edi_analyst_id: nextId || null,
+							edi_analyst_name: nextName || null,
+							edi_analyst_assigned_at: new Date().toISOString(),
+							edi_analyst_assigned_by: assignedBy,
+							edi_analyst_previous_id: currentId || null,
+							edi_analyst_previous_name: previousName || null,
+						}),
+					},
+				});
+			}
+			await invalidate();
+			await detailQ.refetch();
+			toast.success("EDI analyst saved");
+		} catch (err) {
+			toast.error(workQueueErrorMessage(err, "Failed to save EDI analyst"));
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	async function runQuickMark(label: string, action: () => Promise<unknown>) {
 		if (!row) return;
 		setSaving(true);
 		try {
@@ -832,9 +1007,9 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 								variant="outline"
 								size="sm"
 								className="h-9 gap-1.5 rounded-sm border-border/50 bg-background px-3 text-xs font-medium shadow-none"
-								onClick={() => changeTab("migration")}
+								onClick={() => changeTab("status")}
 							>
-								<Truck className="size-3.5" />
+								<Clock3 className="size-3.5" />
 								Update status
 							</Button>
 							<Button
@@ -876,12 +1051,16 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 						sub={MIGRATION_STATUS_LABEL[row.status]}
 					/>
 					<QuickMetric
-						label="Whitelist"
-						value={WHITELIST_STATUS_LABEL[row.whitelistStatus]}
+						label="IP Whitelisting"
+						value={
+							IP_WHITELISTING_LABEL[row.ipWhitelistingStatus ?? "not_started"]
+						}
 						sub={
-							row.lastCommunication
-								? `Last comm ${row.lastCommunication}`
-								: "No recent comm"
+							row.escalated
+								? ESCALATION_WORKFLOW_LABEL[
+										row.escalationWorkflowStatus ?? "submitted"
+									]
+								: "No active escalation"
 						}
 					/>
 				</div>
@@ -935,9 +1114,13 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 							>
 								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 									<StatTile
-										label="Status"
-										icon={Truck}
-										value={<MigrationStatusPill status={row.status} />}
+										label="Operational status"
+										icon={Clock3}
+										value={
+											OPERATIONAL_STATUS_LABEL[
+												row.operationalStatus ?? "not_started"
+											]
+										}
 									/>
 									<StatTile
 										label="Stage"
@@ -945,23 +1128,35 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 										value={row.currentStage || "—"}
 									/>
 									<StatTile
-										label="Analyst"
-										icon={UserRound}
-										value={row.assignedAnalyst || "—"}
+										label="EDI analyst"
+										icon={UserCog}
+										value={
+											row.ediAnalystName ||
+											(row.ediAnalystId
+												? analystLabelFromId(row.ediAnalystId)
+												: "—") ||
+											"—"
+										}
 									/>
 									<StatTile
 										label="Escalation"
 										icon={AlertTriangle}
 										value={
-											<EscalationStatusPill
-												status={row.escalationStatus ?? "none"}
-											/>
+											row.escalated
+												? ESCALATION_WORKFLOW_LABEL[
+														row.escalationWorkflowStatus ?? "submitted"
+													]
+												: "No"
 										}
 									/>
 									<StatTile
-										label="Whitelist"
+										label="IP whitelisting"
 										icon={ShieldCheck}
-										value={WHITELIST_STATUS_LABEL[row.whitelistStatus]}
+										value={
+											IP_WHITELISTING_LABEL[
+												row.ipWhitelistingStatus ?? "not_started"
+											]
+										}
 									/>
 									<StatTile
 										label="Last communication"
@@ -1338,21 +1533,18 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 					</SectionCard>
 				) : null}
 
-				{tab === "migration" ? (
+				{tab === "escalation" ? (
 					<SectionCard
-						title="Migration/Escalation"
-						description="Status, stage, escalation, and timeline"
+						title="Escalation"
+						description="Track escalations when migration progress is blocked"
 						action={
 							<Button
 								size="sm"
 								className="h-8"
 								disabled={
-									saving ||
-									updateCase.isPending ||
-									setStatus.isPending ||
-									setEscalation.isPending
+									saving || updateCase.isPending || transitionBlocker.isPending
 								}
-								onClick={() => void saveMigration()}
+								onClick={() => void saveEscalation()}
 							>
 								<Save className="mr-1.5 size-3.5" />
 								Save
@@ -1361,13 +1553,13 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 					>
 						<div className="grid gap-4 sm:grid-cols-2">
 							<div className="sm:col-span-2">
-								<FieldLabel>Migration Status</FieldLabel>
+								<FieldLabel>Escalated</FieldLabel>
 								<Select
-									value={migrationForm.status}
+									value={escalationForm.escalated}
 									onValueChange={(v) =>
-										setMigrationForm((f) => ({
+										setEscalationForm((f) => ({
 											...f,
-											status: v as MigrationStatus,
+											escalated: v as "yes" | "no",
 										}))
 									}
 								>
@@ -1375,127 +1567,241 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{(
-											Object.keys(MIGRATION_STATUS_LABEL) as MigrationStatus[]
-										).map((key) => (
+										<SelectItem value="no">No</SelectItem>
+										<SelectItem value="yes">Yes</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							{escalationForm.escalated === "yes" ? (
+								<>
+									<div>
+										<FieldLabel>Escalation reason</FieldLabel>
+										<Select
+											value={escalationForm.escalationReason || undefined}
+											onValueChange={(v) =>
+												setEscalationForm((f) => ({
+													...f,
+													escalationReason: v as EscalationReason,
+												}))
+											}
+										>
+											<SelectTrigger className={fieldClass}>
+												<SelectValue placeholder="Select reason" />
+											</SelectTrigger>
+											<SelectContent>
+												{ESCALATION_REASON_OPTIONS.map((key) => (
+													<SelectItem key={key} value={key}>
+														{ESCALATION_REASON_LABEL[key]}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+									<div>
+										<FieldLabel>Escalated to</FieldLabel>
+										<Select
+											value={escalationForm.escalatedTo || undefined}
+											onValueChange={(v) =>
+												setEscalationForm((f) => ({
+													...f,
+													escalatedTo: v as EscalatedTo,
+												}))
+											}
+										>
+											<SelectTrigger className={fieldClass}>
+												<SelectValue placeholder="Select team" />
+											</SelectTrigger>
+											<SelectContent>
+												{ESCALATED_TO_OPTIONS.map((key) => (
+													<SelectItem key={key} value={key}>
+														{ESCALATED_TO_LABEL[key]}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+									<div className="sm:col-span-2">
+										<FieldLabel>Escalation status</FieldLabel>
+										<Select
+											value={escalationForm.escalationWorkflowStatus}
+											onValueChange={(v) =>
+												setEscalationForm((f) => ({
+													...f,
+													escalationWorkflowStatus:
+														v as EscalationWorkflowStatus,
+												}))
+											}
+										>
+											<SelectTrigger className={fieldClass}>
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												{ESCALATION_WORKFLOW_OPTIONS.map((key) => (
+													<SelectItem key={key} value={key}>
+														{ESCALATION_WORKFLOW_LABEL[key]}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+									<div className="sm:col-span-2">
+										<FieldLabel>Notes</FieldLabel>
+										<Textarea
+											value={escalationForm.blockerNotes}
+											onChange={(e) =>
+												setEscalationForm((f) => ({
+													...f,
+													blockerNotes: e.target.value,
+												}))
+											}
+											rows={3}
+											placeholder={
+												escalationForm.escalationReason === "other"
+													? "Describe escalation reason"
+													: "Additional escalation context"
+											}
+											className="min-h-[88px] resize-none rounded-sm border-border bg-background text-sm shadow-none"
+										/>
+									</div>
+								</>
+							) : (
+								<p className="sm:col-span-2 text-xs text-muted-foreground">
+									Set Escalated to Yes when progress is blocked and needs
+									assistance.
+								</p>
+							)}
+						</div>
+					</SectionCard>
+				) : null}
+
+				{tab === "status" ? (
+					<SectionCard
+						title="Status"
+						description="Overall operational status of this TPA/TPV"
+						action={
+							<Button
+								size="sm"
+								className="h-8"
+								disabled={saving || updateCase.isPending}
+								onClick={() => void saveStatus()}
+							>
+								<Save className="mr-1.5 size-3.5" />
+								Save
+							</Button>
+						}
+					>
+						<div className="grid gap-4 sm:grid-cols-2">
+							<div className="sm:col-span-2">
+								<FieldLabel>Status</FieldLabel>
+								<Select
+									value={statusForm.operationalStatus}
+									onValueChange={(v) =>
+										setStatusForm({
+											operationalStatus: v as OperationalStatus,
+										})
+									}
+								>
+									<SelectTrigger className={fieldClass}>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{OPERATIONAL_STATUS_OPTIONS.map((key) => (
 											<SelectItem key={key} value={key}>
-												{MIGRATION_STATUS_LABEL[key]}
+												{OPERATIONAL_STATUS_LABEL[key]}
 											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
 							</div>
-							<div>
-								<FieldLabel>Escalation Status</FieldLabel>
+							<div className="sm:col-span-2 rounded-sm border border-border/50 bg-muted/10 px-3 py-2.5 text-xs text-muted-foreground">
+								Migration workflow status:{" "}
+								<span className="font-medium text-foreground">
+									{MIGRATION_STATUS_LABEL[row.status]}
+								</span>
+								{row.currentStage ? (
+									<>
+										{" "}
+										· Stage:{" "}
+										<span className="font-medium text-foreground">
+											{row.currentStage}
+										</span>
+									</>
+								) : null}
+							</div>
+						</div>
+					</SectionCard>
+				) : null}
+
+				{tab === "ip_whitelisting" ? (
+					<SectionCard
+						title="IP whitelisting"
+						description="Current IP whitelisting stage for this vendor"
+						action={
+							<Button
+								size="sm"
+								className="h-8"
+								disabled={
+									saving || updateCase.isPending || setWhitelist.isPending
+								}
+								onClick={() => void saveIpWhitelisting()}
+							>
+								<Save className="mr-1.5 size-3.5" />
+								Save
+							</Button>
+						}
+					>
+						<div className="grid gap-4 sm:grid-cols-2">
+							<div className="sm:col-span-2">
+								<FieldLabel>IP whitelisting</FieldLabel>
 								<Select
-									value={
-										isSelectableEscalationStatus(
-											migrationForm.escalationStatus
-										)
-											? migrationForm.escalationStatus
-											: undefined
-									}
+									value={ipWhitelistingForm.ipWhitelistingStatus}
 									onValueChange={(v) =>
-										setMigrationForm((f) => ({
-											...f,
-											escalationStatus: v as EscalationStatus,
-										}))
+										setIpWhitelistingForm({
+											ipWhitelistingStatus: v as IpWhitelistingStatus,
+										})
 									}
 								>
 									<SelectTrigger className={fieldClass}>
-										<SelectValue placeholder="Select escalation status" />
+										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{ESCALATION_STATUS_SELECT_OPTIONS.map((key) => (
+										{IP_WHITELISTING_OPTIONS.map((key) => (
 											<SelectItem key={key} value={key}>
-												{ESCALATION_STATUS_LABEL[key]}
+												{IP_WHITELISTING_LABEL[key]}
 											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
 							</div>
-							<div>
-								<FieldLabel>Whitelist Status</FieldLabel>
+						</div>
+					</SectionCard>
+				) : null}
+
+				{tab === "edi_analyst" ? (
+					<SectionCard
+						title="EDI analyst"
+						description="Assign the EDI analyst responsible for this TPA/TPV"
+						action={
+							<Button
+								size="sm"
+								className="h-8"
+								disabled={saving || updateCase.isPending}
+								onClick={() => void saveEdiAnalyst()}
+							>
+								<Save className="mr-1.5 size-3.5" />
+								Save
+							</Button>
+						}
+					>
+						<div className="grid gap-4 sm:grid-cols-2">
+							<div className="sm:col-span-2">
+								<FieldLabel>Assigned EDI analyst</FieldLabel>
 								<Select
-									value={migrationForm.whitelistStatus}
-									onValueChange={(v) =>
-										setMigrationForm((f) => ({
-											...f,
-											whitelistStatus: v as WhitelistStatus,
-										}))
-									}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{(Object.keys(WHITELIST_STATUS_LABEL) as WhitelistStatus[]).map(
-											(key) => (
-												<SelectItem key={key} value={key}>
-													{WHITELIST_STATUS_LABEL[key]}
-												</SelectItem>
-											)
-										)}
-									</SelectContent>
-								</Select>
-							</div>
-							<div>
-								<FieldLabel>Migration Start Date</FieldLabel>
-								<Input
-									value={migrationForm.migrationStartDate}
-									onChange={(e) =>
-										setMigrationForm((f) => ({
-											...f,
-											migrationStartDate: e.target.value,
-										}))
-									}
-									placeholder="MM/DD/YYYY"
-									className={fieldClass}
-								/>
-							</div>
-							<div>
-								<FieldLabel>Waiting on Vendor</FieldLabel>
-								<Input
-									value={migrationForm.waitingOnVendorDate}
-									onChange={(e) =>
-										setMigrationForm((f) => ({
-											...f,
-											waitingOnVendorDate: e.target.value,
-										}))
-									}
-									placeholder="MM/DD/YYYY"
-									className={fieldClass}
-								/>
-							</div>
-							<div>
-								<FieldLabel>Current Stage</FieldLabel>
-								<Select
-									value={migrationForm.currentStage || "data_exchange"}
-									onValueChange={(v) =>
-										setMigrationForm((f) => ({ ...f, currentStage: v }))
-									}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{CURRENT_STAGE_OPTIONS.map((stage) => (
-											<SelectItem key={stage.value} value={stage.value}>
-												{stage.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div>
-								<FieldLabel>Assigned Analyst</FieldLabel>
-								<Select
-									value={migrationForm.assignedToId || "__none__"}
+									value={ediAnalystForm.assignedToId || "__none__"}
 									onValueChange={(value) =>
-										setMigrationForm((f) => ({
-											...f,
+										setEdiAnalystForm({
 											assignedToId: value === "__none__" ? "" : value,
-										}))
+										})
 									}
 								>
 									<SelectTrigger className={fieldClass}>
@@ -1517,18 +1823,38 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 									</SelectContent>
 								</Select>
 							</div>
-							<div className="sm:col-span-2">
-								<FieldLabel>Next Step / Action</FieldLabel>
-								<Textarea
-									value={migrationForm.nextStep}
-									onChange={(e) =>
-										setMigrationForm((f) => ({
-											...f,
-											nextStep: e.target.value,
-										}))
+							<div>
+								<FieldLabel>Assignment date</FieldLabel>
+								<Input
+									readOnly
+									value={
+										row.ediAnalystAssignedAt
+											? formatDisplayDateTime(row.ediAnalystAssignedAt)
+											: "—"
 									}
-									rows={4}
-									className="min-h-[100px] resize-none rounded-sm border-border bg-background text-sm shadow-none"
+									className={cn(fieldClass, "bg-muted/20")}
+								/>
+							</div>
+							<div>
+								<FieldLabel>Assigned by</FieldLabel>
+								<Input
+									readOnly
+									value={row.ediAnalystAssignedBy || "—"}
+									className={cn(fieldClass, "bg-muted/20")}
+								/>
+							</div>
+							<div className="sm:col-span-2">
+								<FieldLabel>Previous analyst</FieldLabel>
+								<Input
+									readOnly
+									value={
+										row.ediAnalystPreviousName ||
+										(row.ediAnalystPreviousId
+											? analystLabelFromId(row.ediAnalystPreviousId)
+											: "—") ||
+										"—"
+									}
+									className={cn(fieldClass, "bg-muted/20")}
 								/>
 							</div>
 						</div>
@@ -1564,7 +1890,9 @@ function WorkQueueDetailBody({ caseId }: { caseId: string }) {
 						}
 					>
 						{documentsQ.isLoading ? (
-							<p className="text-xs text-muted-foreground">Loading documents…</p>
+							<p className="text-xs text-muted-foreground">
+								Loading documents…
+							</p>
 						) : (documentsQ.data ?? []).length === 0 ? (
 							<div className="rounded-sm border border-dashed border-border/60 bg-muted/10 px-4 py-8 text-center">
 								<FileText className="mx-auto size-8 text-muted-foreground/40" />

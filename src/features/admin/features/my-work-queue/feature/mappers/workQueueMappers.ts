@@ -8,6 +8,19 @@ import type {
 	WorkQueueProgressSummaryDto,
 } from "@/lib/vendor-core/types";
 
+import { tabFieldsFromDto } from "../../lib/work-queue-detail-tabs";
+import {
+	type ConnectionProgress,
+	EMPTY_EDI_PROGRESS,
+	EMPTY_SFTP_PROGRESS,
+	type ProgressTrack,
+	progressFromMilestones,
+} from "../../progress-data";
+import {
+	type AnalystProgressRow,
+	type EscalationStatus,
+	type EscalationSummary,
+} from "../../work-queue-analyst-escalation";
 import {
 	type HistoryEvent,
 	type MigrationStatus,
@@ -16,18 +29,6 @@ import {
 	WORK_QUEUE_KPI,
 	type WhitelistStatus,
 } from "../../work-queue-types";
-import {
-	type AnalystProgressRow,
-	type EscalationStatus,
-	type EscalationSummary,
-} from "../../work-queue-analyst-escalation";
-import {
-	EMPTY_EDI_PROGRESS,
-	EMPTY_SFTP_PROGRESS,
-	type ConnectionProgress,
-	type ProgressTrack,
-	progressFromMilestones,
-} from "../../progress-data";
 
 const STAGE_LABEL: Record<string, string> = {
 	not_started: "Not Started",
@@ -103,7 +104,7 @@ function formatDisplayDate(iso: string | null | undefined): string {
 	});
 }
 
-function formatDisplayDateTime(iso: string | null | undefined): string {
+export function formatDisplayDateTime(iso: string | null | undefined): string {
 	if (!iso) return "";
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return iso;
@@ -113,6 +114,17 @@ function formatDisplayDateTime(iso: string | null | undefined): string {
 		year: "numeric",
 		hour: "numeric",
 		minute: "2-digit",
+	});
+}
+
+export function formatDisplayShortDate(iso: string | null | undefined): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return iso;
+	return d.toLocaleDateString("en-US", {
+		month: "short",
+		day: "2-digit",
+		year: "numeric",
 	});
 }
 
@@ -155,7 +167,9 @@ function progressDtoToConnection(
 					key: m.key,
 					label: m.label,
 					weightPercent: m.weight_percent,
-					completedAt: m.completed_at ? formatDisplayDate(m.completed_at) : null,
+					completedAt: m.completed_at
+						? formatDisplayDate(m.completed_at)
+						: null,
 				}))
 			: fallback.milestones;
 
@@ -291,6 +305,11 @@ export function migrationCaseToRow(dto: MigrationCaseDto): TpaTpvRow {
 		ediProgress: progressDtoToConnection(dto.edi_progress, EMPTY_EDI_PROGRESS),
 		escalationStatus: asEscalationStatus(dto.escalation_status),
 		...integrationFieldsFromMetadata(dto.metadata),
+		...tabFieldsFromDto(
+			dto,
+			asMigrationStatus(String(dto.migration_status)),
+			asWhitelistStatus(String(dto.whitelist_status))
+		),
 	};
 	return row;
 }
@@ -299,7 +318,6 @@ export function kpisToCards(kpis: WorkQueueKpisDto) {
 	const counts: Record<string, number> = {
 		assigned: kpis.assigned,
 		connected: kpis.connected,
-		migration: kpis.in_migration,
 		testing: kpis.testing,
 		exceptions: kpis.exceptions,
 		escalations: kpis.escalations ?? 0,

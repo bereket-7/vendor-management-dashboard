@@ -12,6 +12,7 @@ import {
 	Server,
 	X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,9 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
-import type { TpaTpvRow } from "../work-queue-types";
 import {
 	type ConnectionProgress,
 	EDI_MILESTONE_DEFS,
@@ -52,6 +51,7 @@ import {
 	toggleMilestoneCompletion,
 	validateEdiMilestoneSave,
 } from "../progress-rules";
+import type { TpaTpvRow } from "../work-queue-types";
 
 type StatCardColor = "blue" | "green";
 
@@ -140,7 +140,7 @@ export function CompletionStatCard({
 					{safe}%
 				</span>
 				<span className="text-xs text-muted-foreground">
-					{completedCount} of {totalCount} complete
+					{completedCount} of {totalCount} fully complete
 				</span>
 			</div>
 			<div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -291,24 +291,24 @@ export function WorkQueueProgressOverview({
 				</p>
 			) : null}
 			<div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-4">
-			<CompletionStatCard
-				label="Overall SFTP Completion"
-				percentage={summary.sftp.percent}
-				completedCount={summary.sftp.completeCount}
-				totalCount={summary.sftp.totalCount}
-				color="blue"
-				waveFilter={waveFilter}
-				waves={waves}
-				onWaveFilterChange={onWaveFilterChange}
-			/>
-			<CompletionStatCard
-				label="Overall EDI Completion"
-				percentage={summary.edi.percent}
-				completedCount={summary.edi.completeCount}
-				totalCount={summary.edi.totalCount}
-				color="green"
-			/>
-			<MilestoneStepperPanel tracks={tracks} className="lg:col-span-2" />
+				<CompletionStatCard
+					label="Overall SFTP Completion"
+					percentage={summary.sftp.percent}
+					completedCount={summary.sftp.completeCount}
+					totalCount={summary.sftp.totalCount}
+					color="blue"
+					waveFilter={waveFilter}
+					waves={waves}
+					onWaveFilterChange={onWaveFilterChange}
+				/>
+				<CompletionStatCard
+					label="Overall EDI Completion"
+					percentage={summary.edi.percent}
+					completedCount={summary.edi.completeCount}
+					totalCount={summary.edi.totalCount}
+					color="green"
+				/>
+				<MilestoneStepperPanel tracks={tracks} className="lg:col-span-2" />
 			</div>
 		</section>
 	);
@@ -411,9 +411,7 @@ function MilestoneCompleteToggle({
 			onClick={onToggle}
 			className={cn(
 				"flex size-6 shrink-0 items-center justify-center rounded-full transition-colors",
-				disabled
-					? "cursor-not-allowed opacity-40"
-					: "hover:bg-muted/60"
+				disabled ? "cursor-not-allowed opacity-40" : "hover:bg-muted/60"
 			)}
 			aria-label={complete ? "Mark incomplete" : "Mark complete"}
 		>

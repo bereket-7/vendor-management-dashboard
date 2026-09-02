@@ -7,6 +7,7 @@ import {
 	BarChart3,
 	Bell,
 	Brain,
+	Building2,
 	Cable,
 	CalendarDays,
 	CheckCircle2,
@@ -48,7 +49,6 @@ import {
 	Tags,
 	Timer,
 	TrendingUp,
-	Truck,
 	UserPlus,
 	UserRound,
 	Users,
@@ -150,7 +150,7 @@ const NAV_ICONS: Record<string, typeof Home> = {
 	"My Work Queue": Inbox,
 	Member: UserRound,
 	Provider: Stethoscope,
-	"TPA/TPV Tracking": Truck,
+	"TPA/TPV Tracking": Building2,
 };
 
 const VENDOR_SECTION_ORDER = [
@@ -172,9 +172,9 @@ const CLAIM_SECTION_ORDER = [
 ] as const;
 
 const ELIGIBILITY_SECTION_ORDER = [
+	"tpa_tpv_tracking",
 	"member_operations",
 	"provider_operations",
-	"tpa_tpv_tracking",
 ] as const;
 
 function moduleSectionOrder(moduleId: AdminModuleId) {

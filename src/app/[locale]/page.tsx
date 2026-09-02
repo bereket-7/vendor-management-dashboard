@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/AdminShell";
-import { DashboardPage } from "@/features/admin/features/dashboard/pages/DashboardPage";
+import { ModuleAwareHome } from "@/features/admin/components/ModuleAwareHome";
 import { getServerSession } from "@/lib/auth/server-session";
 import { getLoginPath } from "@/lib/routes";
 
-/** Locale home is the procurement dashboard (mock-auth, admin-only). */
+/** Locale home — module-aware (eligibility → TPA/TPV, vendor → dashboard). */
 export default async function Home({
 	params,
 }: {
@@ -19,7 +19,7 @@ export default async function Home({
 
 	return (
 		<AdminShell>
-			<DashboardPage />
+			<ModuleAwareHome />
 		</AdminShell>
 	);
 }

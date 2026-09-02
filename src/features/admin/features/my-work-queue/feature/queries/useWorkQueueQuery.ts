@@ -351,10 +351,7 @@ export function useSetMigrationCaseEscalationMutation() {
 	});
 }
 
-export function useMigrationCaseDocumentsQuery(
-	caseId: string,
-	enabled = true
-) {
+export function useMigrationCaseDocumentsQuery(caseId: string, enabled = true) {
 	return useVendorCoreFeatureQuery(
 		domain,
 		"documents",

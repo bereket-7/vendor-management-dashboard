@@ -149,11 +149,7 @@ export function WorkQueueImportResultDialog({
 				</div>
 
 				<DialogFooter className="border-t border-border px-4 py-3 sm:justify-end">
-					<Button
-						type="button"
-						size="sm"
-						onClick={() => onOpenChange(false)}
-					>
+					<Button type="button" size="sm" onClick={() => onOpenChange(false)}>
 						Close
 					</Button>
 				</DialogFooter>

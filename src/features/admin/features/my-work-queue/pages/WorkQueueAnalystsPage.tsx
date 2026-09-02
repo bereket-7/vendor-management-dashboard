@@ -132,9 +132,7 @@ function SummaryCard({
 			<p className={cn("mt-2 text-2xl font-semibold tabular-nums", tone)}>
 				{value}
 			</p>
-			{sub ? (
-				<p className="mt-1 text-xs text-muted-foreground">{sub}</p>
-			) : null}
+			{sub ? <p className="mt-1 text-xs text-muted-foreground">{sub}</p> : null}
 		</div>
 	);
 }
@@ -155,8 +153,7 @@ function sortAnalysts(rows: AnalystProgressRow[], sort: SortKey) {
 				return b.ediPct - a.ediPct || b.ediComplete - a.ediComplete;
 			case "blocked":
 				return (
-					b.blockedEscalated - a.blockedEscalated ||
-					b.blockedPct - a.blockedPct
+					b.blockedEscalated - a.blockedEscalated || b.blockedPct - a.blockedPct
 				);
 			default:
 				return 0;
@@ -248,9 +245,7 @@ function WorkQueueAnalystsBody() {
 					onClick={() => void handleRefresh()}
 					disabled={refreshing}
 				>
-					<RefreshCw
-						className={cn("size-3.5", refreshing && "animate-spin")}
-					/>
+					<RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
 					Refresh
 				</Button>
 			</div>
@@ -311,9 +306,7 @@ function WorkQueueAnalystsBody() {
 					</div>
 					<div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
 						<Select value={waveFilter} onValueChange={setWaveFilter}>
-							<SelectTrigger
-								className={cn(compactFieldClass, "w-[120px]")}
-							>
+							<SelectTrigger className={cn(compactFieldClass, "w-[120px]")}>
 								<SelectValue placeholder="All waves" />
 							</SelectTrigger>
 							<SelectContent>
@@ -325,13 +318,8 @@ function WorkQueueAnalystsBody() {
 								))}
 							</SelectContent>
 						</Select>
-						<Select
-							value={sort}
-							onValueChange={(v) => setSort(v as SortKey)}
-						>
-							<SelectTrigger
-								className={cn(compactFieldClass, "w-[148px]")}
-							>
+						<Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+							<SelectTrigger className={cn(compactFieldClass, "w-[148px]")}>
 								<ArrowUpDown className="mr-1 size-3.5 opacity-60" />
 								<SelectValue placeholder="Sort by" />
 							</SelectTrigger>
@@ -461,9 +449,7 @@ function WorkQueueAnalystsBody() {
 													<AnalystMetricCell
 														count={row.blockedEscalated}
 														percent={row.blockedPct}
-														tone={
-															row.blockedEscalated > 0 ? "red" : "muted"
-														}
+														tone={row.blockedEscalated > 0 ? "red" : "muted"}
 													/>
 												)}
 											</TableCell>

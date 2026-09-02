@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	AlertTriangle,
 	Beaker,
+	Check,
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
@@ -17,7 +18,6 @@ import {
 	Search,
 	SlidersHorizontal,
 	StickyNote,
-	Truck,
 	Upload,
 	Users,
 } from "lucide-react";
@@ -38,17 +38,17 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-	HoverCard,
-	HoverCardContent,
-	HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import {
 	Select,
 	SelectContent,
@@ -69,16 +69,12 @@ import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { useVendorCoreUsersQuery } from "@/features/admin/features/users/feature/queries/useUsersQuery";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import type {
-	MigrationCaseListQuery,
-	WorkQueueImportResultDto,
-} from "@/lib/vendor-core/types";
+import type { MigrationCaseListQuery } from "@/lib/vendor-core/types";
+import type { WorkQueueFilterQuery } from "@/lib/vendor-core/types";
 
-import { WorkQueueImportResultDialog } from "../components/WorkQueueImportResultDialog";
 import {
 	EdiAnalystProgressSection,
 	EscalationStatusPill,
-	EscalationSummarySection,
 } from "../components/work-queue-analyst-escalation";
 import {
 	ProgressTrackCell,
@@ -87,17 +83,15 @@ import {
 } from "../components/work-queue-progress";
 import {
 	CURRENT_STAGE_OPTIONS,
+	formatDisplayShortDate,
 	kpisToProgressSummary,
 } from "../feature/mappers/workQueueMappers";
 import {
 	useBulkSetMigrationCaseStatusMutation,
-	useImportWorkQueueSpreadsheetMutation,
 	useInvalidateVendorCore,
 	useUpdateMigrationCaseMutation,
 	useUploadMigrationCaseDocumentMutation,
 	useWorkQueueAnalystStatsQuery,
-	useWorkQueueBlockersQuery,
-	useWorkQueueEscalationSummaryQuery,
 	useWorkQueueKpisQuery,
 	useWorkQueueKpisRawQuery,
 	useWorkQueueProgressSummaryQuery,
@@ -106,26 +100,24 @@ import {
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
 import { emptyProgressSummary } from "../progress-data";
 import {
-	type EscalationStatus,
-	ESCALATION_STATUS_SELECT_OPTIONS,
 	ESCALATION_STATUS_LABEL,
+	ESCALATION_STATUS_SELECT_OPTIONS,
+	type EscalationStatus,
 } from "../work-queue-analyst-escalation";
 import {
 	MIGRATION_STATUS_LABEL,
 	type MigrationStatus,
 	type TpaTpvRow,
-	WORK_QUEUE_KPI,
 	WHITELIST_STATUS_LABEL,
+	WORK_QUEUE_KPI,
 	type WhitelistStatus,
 } from "../work-queue-types";
-import type { WorkQueueFilterQuery } from "@/lib/vendor-core/types";
 
 type ActionModal = "contacts" | null;
 
 const KPI_ICON = {
 	blue: Users,
 	green: Link2,
-	orange: Truck,
 	purple: Beaker,
 	red: AlertTriangle,
 	slate: Clock3,
@@ -134,7 +126,6 @@ const KPI_ICON = {
 const KPI_VALUE_TONE = {
 	blue: "text-sky-700 dark:text-sky-400",
 	green: "text-emerald-700 dark:text-emerald-400",
-	orange: "text-orange-700 dark:text-orange-400",
 	purple: "text-violet-700 dark:text-violet-400",
 	red: "text-red-700 dark:text-red-400",
 	slate: "text-muted-foreground",
@@ -145,7 +136,7 @@ const th =
 const td = "px-2 py-2 text-[12px] align-middle text-foreground";
 
 const compactFieldClass = cn(
-	"h-8 rounded-md border border-border bg-background text-xs shadow-none",
+	"h-8 rounded-sm border border-border bg-background text-xs shadow-none transition-colors duration-200",
 	"hover:border-foreground/20",
 	"focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
 );
@@ -304,10 +295,11 @@ export function MyWorkQueuePage() {
 	);
 }
 
+type SyncState = "idle" | "syncing" | "completed";
+
 function MyWorkQueueBody() {
 	const searchParams = useSearchParams();
 	const invalidate = useInvalidateVendorCore();
-	const importInputRef = useRef<HTMLInputElement>(null);
 	const feedInputRef = useRef<HTMLInputElement>(null);
 
 	const [search, setSearch] = useState("");
@@ -322,13 +314,12 @@ function MyWorkQueueBody() {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const [refreshing, setRefreshing] = useState(false);
+	const [syncState, setSyncState] = useState<SyncState>("idle");
+	const syncResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null
+	);
 	const [activeRow, setActiveRow] = useState<TpaTpvRow | null>(null);
 	const [modal, setModal] = useState<ActionModal>(null);
-	const [importResultOpen, setImportResultOpen] = useState(false);
-	const [importResult, setImportResult] =
-		useState<WorkQueueImportResultDto | null>(null);
-	const [importFilename, setImportFilename] = useState<string | undefined>();
 	const [saving, setSaving] = useState(false);
 
 	const [contactsForm, setContactsForm] = useState({
@@ -374,8 +365,7 @@ function MyWorkQueueBody() {
 					? analystIdByName.get(analystFilter)
 					: undefined,
 			wave: waveFilter !== "all" ? Number(waveFilter) : undefined,
-			whitelist_status:
-				whitelistFilter !== "all" ? whitelistFilter : undefined,
+			whitelist_status: whitelistFilter !== "all" ? whitelistFilter : undefined,
 			current_stage: stageFilter !== "all" ? stageFilter : undefined,
 		};
 	}, [
@@ -417,20 +407,12 @@ function MyWorkQueueBody() {
 	const kpisRawQ = useWorkQueueKpisRawQuery(aggregateFilterParams);
 	const progressSummaryQ = useWorkQueueProgressSummaryQuery(
 		aggregateFilterParams,
-		waveFilter !== "all"
+		true
 	);
 	const analystStatsQ = useWorkQueueAnalystStatsQuery(aggregateFilterParams);
-	const escalationSummaryQ = useWorkQueueEscalationSummaryQuery(
-		aggregateFilterParams
-	);
-	const blockersQ = useWorkQueueBlockersQuery(
-		{ ...aggregateFilterParams, limit: 100, offset: 0 },
-		escalationFilter !== "all"
-	);
 
 	const updateCase = useUpdateMigrationCaseMutation();
 	const setStatus = useBulkSetMigrationCaseStatusMutation();
-	const importCsv = useImportWorkQueueSpreadsheetMutation();
 	const uploadDoc = useUploadMigrationCaseDocumentMutation();
 
 	const totalCount = rowsPageQ.data?.count ?? 0;
@@ -445,8 +427,7 @@ function MyWorkQueueBody() {
 		rowsPageQ.isLoading ||
 		kpisQ.isLoading ||
 		kpisRawQ.isLoading ||
-		analystStatsQ.isLoading ||
-		escalationSummaryQ.isLoading;
+		analystStatsQ.isLoading;
 
 	const waves = useMemo(() => {
 		const fromRows = pageRows.map((r) => String(r.wave));
@@ -456,14 +437,32 @@ function MyWorkQueueBody() {
 	}, [pageRows]);
 
 	const progressSummary = useMemo(() => {
-		if (waveFilter === "all" && kpisRawQ.data) {
-			return kpisToProgressSummary(kpisRawQ.data);
-		}
 		if (progressSummaryQ.data) {
 			return progressSummaryQ.data;
 		}
+		if (kpisRawQ.data) {
+			return kpisToProgressSummary(kpisRawQ.data);
+		}
 		return emptyProgressSummary();
-	}, [waveFilter, kpisRawQ.data, progressSummaryQ.data]);
+	}, [progressSummaryQ.data, kpisRawQ.data]);
+
+	const lastSyncTimestamp = useMemo(() => {
+		const stamps = [
+			rowsPageQ.dataUpdatedAt,
+			kpisQ.dataUpdatedAt,
+			kpisRawQ.dataUpdatedAt,
+			progressSummaryQ.dataUpdatedAt,
+			analystStatsQ.dataUpdatedAt,
+		].filter((t) => typeof t === "number" && t > 0) as number[];
+		if (!stamps.length) return null;
+		return new Date(Math.max(...stamps));
+	}, [
+		rowsPageQ.dataUpdatedAt,
+		kpisQ.dataUpdatedAt,
+		kpisRawQ.dataUpdatedAt,
+		progressSummaryQ.dataUpdatedAt,
+		analystStatsQ.dataUpdatedAt,
+	]);
 
 	const hasFilters =
 		Boolean(search.trim()) ||
@@ -532,7 +531,6 @@ function MyWorkQueueBody() {
 		setPage(1);
 		if (id === "assigned") setStatusFilter("all");
 		else if (id === "connected") setStatusFilter("ready");
-		else if (id === "migration") setStatusFilter("waiting_on_vendor");
 		else if (id === "testing") setStatusFilter("testing");
 		else if (id === "exceptions") setStatusFilter("exception");
 		else if (id === "escalations") {
@@ -552,8 +550,23 @@ function MyWorkQueueBody() {
 		setPage(1);
 	}
 
-	async function handleRefresh() {
-		setRefreshing(true);
+	useEffect(() => {
+		return () => {
+			if (syncResetTimeoutRef.current) {
+				clearTimeout(syncResetTimeoutRef.current);
+			}
+		};
+	}, []);
+
+	async function handleSync() {
+		if (syncState === "syncing") return;
+
+		if (syncResetTimeoutRef.current) {
+			clearTimeout(syncResetTimeoutRef.current);
+			syncResetTimeoutRef.current = null;
+		}
+
+		setSyncState("syncing");
 		try {
 			invalidate();
 			await Promise.all([
@@ -562,11 +575,15 @@ function MyWorkQueueBody() {
 				kpisRawQ.refetch(),
 				progressSummaryQ.refetch(),
 				analystStatsQ.refetch(),
-				escalationSummaryQ.refetch(),
-				blockersQ.refetch(),
 			]);
-		} finally {
-			setRefreshing(false);
+			setSyncState("completed");
+			syncResetTimeoutRef.current = setTimeout(() => {
+				setSyncState("idle");
+				syncResetTimeoutRef.current = null;
+			}, 2200);
+		} catch (err) {
+			setSyncState("idle");
+			toast.error(workQueueErrorMessage(err, "Sync failed"));
 		}
 	}
 
@@ -633,28 +650,6 @@ function MyWorkQueueBody() {
 		}
 	}
 
-	async function handleImportFile(file: File | undefined) {
-		if (!file) return;
-		try {
-			const result = await importCsv.mutateAsync(file);
-			setImportResult(result);
-			setImportFilename(file.name);
-			setImportResultOpen(true);
-			if (result.error_count > 0) {
-				toast.warning(
-					`Import finished with ${result.error_count} error(s) — see details`
-				);
-			} else {
-				toast.success(
-					`Import done — created ${result.created_count}, updated ${result.updated_count}`
-				);
-			}
-			invalidate();
-		} catch (err) {
-			toast.error(workQueueErrorMessage(err, "Import failed"));
-		}
-	}
-
 	async function handleFeedFile(file: File | undefined) {
 		if (!file) return;
 		const targetId = selectedIds[0] ?? activeRow?.id ?? pageRows[0]?.id;
@@ -688,11 +683,24 @@ function MyWorkQueueBody() {
 
 	const bulkTargetCount = selectedIds.length || pageRows.length;
 	const toolbarBtn =
-		"h-9 gap-1.5 rounded-md px-3 text-xs font-medium shadow-none";
+		"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
+	const syncBtnClass = cn(
+		toolbarBtn,
+		syncState === "idle" && "border-border bg-background",
+		syncState === "syncing" &&
+			"border-sky-500/45 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 dark:text-sky-400",
+		syncState === "completed" &&
+			"border-emerald-500/45 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400"
+	);
 
 	return (
 		<div className="space-y-4">
-			<div className="flex flex-wrap items-start justify-between gap-3">
+			<div
+				className={cn(
+					"flex flex-wrap items-start justify-between gap-3",
+					lastSyncTimestamp && syncState !== "syncing" && "pb-4"
+				)}
+			>
 				<div className="min-w-0">
 					<h1 className="text-2xl font-semibold tracking-tight text-foreground">
 						My Work Queue
@@ -703,16 +711,6 @@ function MyWorkQueueBody() {
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-1.5">
-					<input
-						ref={importInputRef}
-						type="file"
-						accept=".csv,text/csv"
-						className="hidden"
-						onChange={(e) => {
-							void handleImportFile(e.target.files?.[0]);
-							e.target.value = "";
-						}}
-					/>
 					<input
 						ref={feedInputRef}
 						type="file"
@@ -732,25 +730,56 @@ function MyWorkQueueBody() {
 						variant="outline"
 						size="sm"
 						className={cn(toolbarBtn, "border-border bg-background")}
-						disabled={importCsv.isPending}
-						onClick={() => importInputRef.current?.click()}
+						asChild
 					>
-						<Upload className="size-3.5" />
-						Import
+						<Link href="/admin/my-work-queue/import">
+							<Upload className="size-3.5" />
+							Import
+						</Link>
 					</Button>
 					<span className="mx-0.5 hidden h-5 w-px bg-border sm:inline-block" />
-					<Button
-						variant="outline"
-						size="sm"
-						className={cn(toolbarBtn, "border-border bg-background")}
-						onClick={() => void handleRefresh()}
-						disabled={refreshing}
-					>
-						<RefreshCw
-							className={cn("size-3.5", refreshing && "animate-spin")}
-						/>
-						Refresh
-					</Button>
+					<div className="relative h-9 shrink-0">
+						<Button
+							variant="outline"
+							size="sm"
+							className={syncBtnClass}
+							onClick={() => void handleSync()}
+							disabled={syncState === "syncing"}
+						>
+							{syncState === "completed" ? (
+								<Check
+									className="size-3.5 shrink-0 animate-in zoom-in-50 duration-300"
+									strokeWidth={2.5}
+								/>
+							) : (
+								<RefreshCw
+									className={cn(
+										"size-3.5 shrink-0",
+										syncState === "syncing" && "animate-spin"
+									)}
+								/>
+							)}
+							<span className="transition-opacity duration-200">
+								{syncState === "syncing"
+									? "Syncing…"
+									: syncState === "completed"
+										? "Sync completed"
+										: "Sync"}
+							</span>
+						</Button>
+						{lastSyncTimestamp && syncState !== "syncing" && (
+							<span className="pointer-events-none absolute left-1/2 top-full mt-1.5 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap py-1 text-[10px] leading-snug text-muted-foreground">
+								<span
+									className="size-1.5 shrink-0 rounded-full bg-emerald-500 ring-2 ring-emerald-500/25"
+									aria-hidden
+								/>
+								Last sync{" "}
+								<span className="tabular-nums text-foreground/80">
+									{formatDisplayShortDate(lastSyncTimestamp.toISOString())}
+								</span>
+							</span>
+						)}
+					</div>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button
@@ -825,7 +854,10 @@ function MyWorkQueueBody() {
 				</div>
 			) : null}
 
-			{!listLoadError && !rowsPageQ.isLoading && totalCount === 0 && !hasFilters ? (
+			{!listLoadError &&
+			!rowsPageQ.isLoading &&
+			totalCount === 0 &&
+			!hasFilters ? (
 				<div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
 					No migration cases yet. Use{" "}
 					<span className="font-medium text-foreground">Import</span> or{" "}
@@ -846,7 +878,7 @@ function MyWorkQueueBody() {
 			/>
 
 			<section className="overflow-hidden rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]">
-				<div className="grid grid-cols-2 divide-y divide-border sm:grid-cols-3 sm:divide-x xl:grid-cols-7 xl:divide-y-0">
+				<div className="grid grid-cols-2 divide-y divide-border sm:grid-cols-3 sm:divide-x xl:grid-cols-6 xl:divide-y-0">
 					{kpiCards.map((kpi) => {
 						const Icon = KPI_ICON[kpi.tone];
 						const tone = KPI_VALUE_TONE[kpi.tone];
@@ -855,8 +887,6 @@ function MyWorkQueueBody() {
 								statusFilter === "all" &&
 								escalationFilter === "all") ||
 							(kpi.id === "connected" && statusFilter === "ready") ||
-							(kpi.id === "migration" &&
-								statusFilter === "waiting_on_vendor") ||
 							(kpi.id === "testing" && statusFilter === "testing") ||
 							(kpi.id === "exceptions" && statusFilter === "exception") ||
 							(kpi.id === "escalations" &&
@@ -893,31 +923,17 @@ function MyWorkQueueBody() {
 				</div>
 			</section>
 
-			<div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_min(100%,260px)]">
-				<EdiAnalystProgressSection
-					rows={pageRows}
-					analysts={analystStatsQ.data}
-					loading={analystStatsQ.isLoading}
-					activeAnalyst={analystFilter}
-					statusEstimated={statusEstimatedProgress}
-					onAnalystSelect={(analyst) => {
-						setAnalystFilter(analyst);
-						setPage(1);
-					}}
-				/>
-				<EscalationSummarySection
-					rows={pageRows}
-					summary={escalationSummaryQ.data}
-					blockerRows={blockersQ.data}
-					loading={escalationSummaryQ.isLoading}
-					activeFilter={escalationFilter}
-					onFilterChange={(status) => {
-						setEscalationFilter(status);
-						if (status !== "all") setStatusFilter("all");
-						setPage(1);
-					}}
-				/>
-			</div>
+			<EdiAnalystProgressSection
+				rows={pageRows}
+				analysts={analystStatsQ.data}
+				loading={analystStatsQ.isLoading}
+				activeAnalyst={analystFilter}
+				statusEstimated={statusEstimatedProgress}
+				onAnalystSelect={(analyst) => {
+					setAnalystFilter(analyst);
+					setPage(1);
+				}}
+			/>
 
 			<section className="overflow-hidden rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]">
 				<div className="flex flex-wrap items-center gap-2 border-b border-border/50 px-3 py-2.5">
@@ -1031,9 +1047,7 @@ function MyWorkQueueBody() {
 										<SelectContent>
 											<SelectItem value="all">All whitelist</SelectItem>
 											{(
-												Object.keys(
-													WHITELIST_STATUS_LABEL
-												) as WhitelistStatus[]
+												Object.keys(WHITELIST_STATUS_LABEL) as WhitelistStatus[]
 											).map((key) => (
 												<SelectItem key={key} value={key}>
 													{WHITELIST_STATUS_LABEL[key]}
@@ -1110,17 +1124,15 @@ function MyWorkQueueBody() {
 								<TableHead className={cn(th, "w-[10%]")}>Email</TableHead>
 								<TableHead className={cn(th, "w-[8%]")}>IP Whitelist</TableHead>
 								<TableHead className={cn(th, "w-[8%]")}>Last Comm</TableHead>
-								<TableHead className={cn(th, "w-[10%]")}>Notes</TableHead>
 								<TableHead className={cn(th, "w-[9%]")}>
 									SFTP Progress
 								</TableHead>
-								<TableHead className={cn(th, "w-[9%]")}>
-									EDI Progress
-								</TableHead>
+								<TableHead className={cn(th, "w-[9%]")}>EDI Progress</TableHead>
 								<TableHead className={cn(th, "w-[8%]")}>Status</TableHead>
 								<TableHead className={cn(th, "w-[7%]")}>Analyst</TableHead>
 								<TableHead className={cn(th, "w-[7%]")}>Escalation</TableHead>
 								<TableHead className={cn(th, "w-[7%]")}>Updated</TableHead>
+								<TableHead className={cn(th, "w-[10%]")}>Notes</TableHead>
 								<TableHead className={cn(th, "w-[5%] text-right")}>
 									Actions
 								</TableHead>
@@ -1191,9 +1203,6 @@ function MyWorkQueueBody() {
 										>
 											{row.lastCommunication || "—"}
 										</TableCell>
-										<TableCell className={cn(td, "max-w-[140px]")}>
-											<WorkQueueNotesCell notes={row.notes} />
-										</TableCell>
 										<TableCell className={td}>
 											<ProgressTrackCell
 												progress={row.sftpProgress}
@@ -1228,6 +1237,9 @@ function MyWorkQueueBody() {
 											title={row.lastUpdated}
 										>
 											{row.lastUpdated || "—"}
+										</TableCell>
+										<TableCell className={cn(td, "max-w-[140px]")}>
+											<WorkQueueNotesCell notes={row.notes} />
 										</TableCell>
 										<TableCell className={cn(td, "text-right")}>
 											<WorkQueueRowActions
@@ -1416,13 +1428,6 @@ function MyWorkQueueBody() {
 					</div>
 				</div>
 			</ModalShell>
-
-			<WorkQueueImportResultDialog
-				open={importResultOpen}
-				onOpenChange={setImportResultOpen}
-				result={importResult}
-				filename={importFilename}
-			/>
 		</div>
 	);
 }

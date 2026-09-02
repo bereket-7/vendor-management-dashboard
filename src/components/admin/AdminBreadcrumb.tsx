@@ -147,6 +147,7 @@ const STATIC_LABELS: Record<string, string> = {
 	"master-data-entry": "Master Data Entry",
 	"error-correction": "Error Correction",
 	"my-work-queue": "TPA/TPV Tracking",
+	import: "Import",
 	batches: "Submission Batches",
 	files: "Files",
 	review: "Review",
