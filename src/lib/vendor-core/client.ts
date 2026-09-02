@@ -178,7 +178,12 @@ type RequestOptions = RequestInit & {
 };
 
 function buildUrl(path: string, params?: RequestOptions["params"]) {
-	const normalized = path.startsWith("/") ? path : `/${path}`;
+	let normalized = path.startsWith("/") ? path : `/${path}`;
+	// Next.js api routes 308-redirect trailing slashes; Django needs them upstream.
+	// Strip here so the browser hits the proxy once; proxy re-adds before upstream fetch.
+	if (shouldUseBrowserProxy() && normalized.endsWith("/")) {
+		normalized = normalized.slice(0, -1);
+	}
 	const url = shouldUseBrowserProxy()
 		? new URL(`${BROWSER_PROXY_PREFIX}${normalized}`, window.location.origin)
 		: new URL(normalized, `${getVendorCoreUpstreamUrl()}/`);
@@ -385,6 +390,42 @@ export async function vendorCoreFetch<T>(
 	});
 
 	const data = parseJsonSafe(await response.text());
+
+	// #region agent log
+	if (path.includes("/accounts/")) {
+		fetch("http://127.0.0.1:7619/ingest/2f252828-01b8-43ea-88bb-1263f3c1d386", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-Debug-Session-Id": "6ffff2",
+			},
+			body: JSON.stringify({
+				sessionId: "6ffff2",
+				runId: "pre-fix",
+				hypothesisId: "H4",
+				location: "client.ts:vendorCoreFetch:accounts",
+				message: "accounts API response",
+				data: {
+					path,
+					method: init.method ?? "GET",
+					status: response.status,
+					url: buildUrl(path, params),
+					resultCount:
+						data &&
+						typeof data === "object" &&
+						"result" in data &&
+						data.result &&
+						typeof data.result === "object" &&
+						"results" in data.result &&
+						Array.isArray((data.result as { results?: unknown[] }).results)
+							? (data.result as { results: unknown[] }).results.length
+							: null,
+				},
+				timestamp: Date.now(),
+			}),
+		}).catch(() => {});
+	}
+	// #endregion
 
 	if (
 		response.status === 401 &&

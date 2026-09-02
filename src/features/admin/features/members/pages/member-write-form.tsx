@@ -255,6 +255,32 @@ export function MemberWriteForm({
 							}
 						/>
 					</RecordFormField>
+					<RecordFormField label="NewTech Member ID">
+						<Input
+							className={fieldClass}
+							value={body.newtech_member_id ?? ""}
+							onChange={(e) =>
+								setBody({ ...body, newtech_member_id: e.target.value })
+							}
+							inputMode="numeric"
+							maxLength={8}
+							placeholder="12345678"
+						/>
+					</RecordFormField>
+				</RecordFormRow>
+				<RecordFormRow>
+					<RecordFormField label="NewTech Family ID">
+						<Input
+							className={fieldClass}
+							value={body.newtech_family_id ?? ""}
+							onChange={(e) =>
+								setBody({ ...body, newtech_family_id: e.target.value })
+							}
+							inputMode="numeric"
+							maxLength={8}
+							placeholder="12345678"
+						/>
+					</RecordFormField>
 					<RecordFormField
 						label="Relationship code"
 						required={requireIdentityFields}

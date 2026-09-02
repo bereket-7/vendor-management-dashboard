@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import { CalendarDays, DollarSign, FileText, Timer } from "lucide-react";
+import { CalendarDays, DollarSign, FileText, Plus, Timer } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/PageHeader";
 import { SectionCard, TableShell } from "@/components/admin/SectionCard";
@@ -23,7 +23,8 @@ import { formatDate, formatMoney } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-import { useContractsList } from "../feature/queries/useContractsQuery";
+import { useContractsList, useProcurementDocumentsList } from "../feature/queries/useContractsQuery";
+import { UploadProcurementDocumentDialog } from "../components/UploadProcurementDocumentDialog";
 
 const TERM_STATUS_CLASS: Record<ContractTermStatus, string> = {
 	completed:
@@ -410,21 +411,42 @@ export function ContractsDocumentsPage({
 	vendorId,
 	embedded,
 }: ContractsEmbeddedProps = {}) {
-	const { contracts, isLoading, error } = useContractsList(vendorId);
+	const [uploadOpen, setUploadOpen] = useState(false);
+	const {
+		contracts,
+		isLoading: contractsLoading,
+		error: contractsError,
+	} = useContractsList(vendorId);
+	const {
+		documents,
+		isLoading: documentsLoading,
+		error: documentsError,
+	} = useProcurementDocumentsList(vendorId);
 
-	const rows = useMemo(
-		() =>
-			contracts.flatMap((c) =>
-				(c.documents ?? []).map((doc) => ({
-					...doc,
-					contractId: c.id,
-					contractNumber: c.number,
-					vendorName: c.vendorName,
-					contractStatus: c.status,
-				}))
-			),
-		[contracts]
-	);
+	const isLoading = contractsLoading || documentsLoading;
+	const error = contractsError ?? documentsError;
+
+	const rows = useMemo(() => {
+		if (documents.length > 0) {
+			const defaultContract = vendorId ? contracts[0] : undefined;
+			return documents.map((doc) => ({
+				...doc,
+				contractId: defaultContract?.id ?? "",
+				contractNumber: defaultContract?.number ?? "—",
+				vendorName: defaultContract?.vendorName ?? "—",
+				contractStatus: defaultContract?.status ?? "active",
+			}));
+		}
+		return contracts.flatMap((c) =>
+			(c.documents ?? []).map((doc) => ({
+				...doc,
+				contractId: c.id,
+				contractNumber: c.number,
+				vendorName: c.vendorName,
+				contractStatus: c.status,
+			}))
+		);
+	}, [contracts, documents, vendorId]);
 
 	const summary = useMemo(
 		() => ({
@@ -442,6 +464,14 @@ export function ContractsDocumentsPage({
 					description="Executed agreements, exhibits, and supporting files."
 				/>
 			)}
+			{vendorId ? (
+				<div className="flex justify-end">
+					<Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
+						<Plus className="mr-2 size-4" />
+						Upload document
+					</Button>
+				</div>
+			) : null}
 			<SummaryCardsGrid columns={2}>
 				<SummaryCard
 					label="Documents on file"
@@ -519,6 +549,13 @@ export function ContractsDocumentsPage({
 					</TableShell>
 				</SectionCard>
 			)}
+			{vendorId ? (
+				<UploadProcurementDocumentDialog
+					open={uploadOpen}
+					onOpenChange={setUploadOpen}
+					vendorId={vendorId}
+				/>
+			) : null}
 		</div>
 	);
 }

@@ -8,7 +8,7 @@ import {
 	useVendorCoreFeatureMutation,
 	useVendorCoreFeatureQuery,
 } from "@/features/admin/shared/vendor-core-feature-query";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import type {
 	MemberDashboardStatsQuery,
 	MemberListQuery,
@@ -59,7 +59,7 @@ import {
 } from "../api/membersApi";
 
 const domain = "members";
-const apiOnly = !isMockEnabled();
+const apiOnly = !isMembersMockEnabled();
 
 export function useMemberSummariesQuery(filters?: MemberListQuery) {
 	return useVendorCoreFeatureQuery(
@@ -481,7 +481,7 @@ export function useMemberVendorsQuery() {
 
 export function useMemberSummariesList(filters?: MemberListQuery) {
 	const query = useMemberSummariesQuery(filters);
-	const members = isMockEnabled() ? getMemberSummaries() : (query.data ?? []);
+	const members = isMembersMockEnabled() ? getMemberSummaries() : (query.data ?? []);
 	return { ...query, members };
 }
 

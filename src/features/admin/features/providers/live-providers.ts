@@ -1,21 +1,26 @@
 import type {
-	FeedStatus,
-	ProviderDetail,
-	ProviderStatus,
-	ProviderSummary,
-} from "@/features/admin/features/providers/mock-data";
-import type {
 	ProviderCredentialDto,
 	ProviderDto,
 	ProviderExceptionDto,
 	ProviderIdentifierDto,
 	ProviderLocationDto,
+	ProviderMonthlyVolumeDto,
 	ProviderNetworkDto,
 	ProviderProfileDto,
+	ProviderRecentActivityDto,
+	ProviderRejectionReasonDto,
 	ProviderRosterRef,
 	ProviderSummaryDto,
 	ProviderVendorSourceDto,
 } from "@/lib/vendor-core/types";
+import type {
+	ClaimActivityStatus,
+	FeedStatus,
+	ProviderClaimRow,
+	ProviderDetail,
+	ProviderStatus,
+	ProviderSummary,
+} from "@/features/admin/features/providers/mock-data";
 
 export const TAXONOMY_LABELS: Record<string, string> = {
 	"207R00000X": "Internal Medicine",
@@ -81,6 +86,10 @@ export type ProviderDetailContext = {
 	credentials?: ProviderCredentialDto[];
 	exceptions?: ProviderExceptionDto[];
 	vendorSources?: ProviderVendorSourceDto[];
+	monthlyVolume?: ProviderMonthlyVolumeDto[];
+	rejectionReasons?: ProviderRejectionReasonDto[];
+	recentClaims?: ProviderRecentActivityDto[];
+	recentEncounters?: ProviderRecentActivityDto[];
 };
 
 function mapLocations(
@@ -142,15 +151,90 @@ function mapExceptions(
 function mapVendorSources(
 	rows: ProviderVendorSourceDto[]
 ): ProviderDetail["vendors"] {
+	return rows.map((row) => {
+		const feedStatus = (row.status ?? "active").toLowerCase();
+		const status: FeedStatus =
+			feedStatus === "warning"
+				? "warning"
+				: feedStatus === "inactive"
+					? "inactive"
+					: "active";
+		return {
+			id: row.id,
+			vendor: dash(row.vendor_name),
+			fileType: dash(row.file_type) || "provider_roster",
+			dataSent: dash(row.data_sent) !== "—" ? row.data_sent!.trim() : "Provider roster",
+			frequency: dash(row.frequency),
+			lastReceived: row.received_at?.slice(0, 10) ?? "—",
+			status,
+		};
+	});
+}
+
+function mapMonthlyVolume(
+	rows: ProviderMonthlyVolumeDto[]
+): ProviderDetail["monthlyVolume"] {
+	return rows.map((row) => ({
+		month: row.month,
+		claims: row.claims,
+		encounters: row.encounters,
+		rejectionRate: row.rejection_rate,
+		rejectionCount: row.rejection_count,
+	}));
+}
+
+function mapRejectionReasons(
+	rows: ProviderRejectionReasonDto[]
+): ProviderDetail["rejectionReasons"] {
 	return rows.map((row) => ({
 		id: row.id,
-		vendor: dash(row.vendor_name),
-		fileType: dash(row.file_type) || "provider_roster",
-		dataSent: "Provider roster",
-		frequency: "—",
-		lastReceived: row.received_at?.slice(0, 10) ?? "—",
-		status: "active" satisfies FeedStatus,
+		reason: row.reason,
+		count: row.count,
+		pct: row.pct,
 	}));
+}
+
+function parseActivityStatus(raw: string): ClaimActivityStatus {
+	const value = raw.toLowerCase();
+	if (value === "paid") return "paid";
+	if (value === "denied") return "denied";
+	if (value === "rejected") return "rejected";
+	if (value === "accepted") return "accepted";
+	return "pending";
+}
+
+function parseActivityType(
+	raw: string
+): ProviderClaimRow["type"] {
+	const value = raw.toLowerCase();
+	if (value.includes("institutional")) return "Institutional";
+	if (value.includes("encounter")) return "Encounter";
+	return "Professional";
+}
+
+function mapRecentActivity(
+	rows: ProviderRecentActivityDto[]
+): ProviderClaimRow[] {
+	return rows.map((row) => ({
+		id: row.id,
+		dos: row.dos?.slice(0, 10) ?? "—",
+		receivedDate: row.received_date?.slice(0, 10) ?? "—",
+		claimNumber: row.claim_number || "—",
+		memberId: row.member_id || "—",
+		memberName: row.member_name || "—",
+		type: parseActivityType(row.type),
+		procedureCode: row.procedure_code || "—",
+		billed: Number(row.billed) || 0,
+		paid: Number(row.paid) || 0,
+		status: parseActivityStatus(row.status),
+		vendor: row.vendor || "—",
+	}));
+}
+
+function num(value: unknown, fallback = 0): number {
+	if (value == null || value === "") return fallback;
+	const n = Number(value);
+	return Number.isFinite(n) ? n : fallback;
 }
 
 function buildIdentifierRows(
@@ -361,12 +445,12 @@ export function providersToSummaries(
 				profile?.enrollment_effective?.slice(0, 10) ??
 				provider.effective_date?.slice(0, 10) ??
 				"—",
-			claims12m: 0,
+			claims12m: provider.claims12m ?? 0,
 			encounters12m: 0,
 			billed12m: 0,
-			paid12m: 0,
-			rejectionRate: 0,
-			netPayment12m: 0,
+			paid12m: provider.paid12m ?? 0,
+			rejectionRate: provider.rejection_rate ?? 0,
+			netPayment12m: provider.paid12m ?? 0,
 		};
 	});
 }
@@ -417,6 +501,10 @@ export function providerDtoToDetail(
 		credentials = [],
 		exceptions = [],
 		vendorSources = [],
+		monthlyVolume = [],
+		rejectionReasons = [],
+		recentClaims = [],
+		recentEncounters = [],
 	} = context;
 	const mergedDto =
 		profile && !dto.profile
@@ -521,10 +609,10 @@ export function providerDtoToDetail(
 					: [],
 		networks: mapNetworks(networks),
 		identifiers: buildIdentifierRows(dto, identifiers),
-		monthlyVolume: [],
-		rejectionReasons: [],
-		recentClaims: [],
-		recentEncounters: [],
+		monthlyVolume: mapMonthlyVolume(monthlyVolume),
+		rejectionReasons: mapRejectionReasons(rejectionReasons),
+		recentClaims: mapRecentActivity(recentClaims),
+		recentEncounters: mapRecentActivity(recentEncounters),
 		vendors:
 			mappedVendors.length > 0
 				? mappedVendors
@@ -549,16 +637,16 @@ export function providerDtoToDetail(
 		exceptions: mapExceptions(exceptions),
 		claims12m: summaryDto?.claims12m ?? summary.claims12m,
 		encounters12m: summaryDto?.encounters12m ?? summary.encounters12m,
-		billed12m: summaryDto?.billed12m ?? summary.billed12m,
-		paid12m: summaryDto?.paid12m ?? summary.paid12m,
-		rejectionRate: summaryDto?.rejection_rate ?? summary.rejectionRate,
-		netPayment12m: summaryDto?.net_payment12m ?? summary.netPayment12m,
-		claimsTrendPct: 0,
-		encountersTrendPct: 0,
-		billedTrendPct: 0,
-		paidTrendPct: 0,
-		rejectionTrendPct: 0,
-		netPaymentTrendPct: 0,
+		billed12m: num(summaryDto?.billed12m, summary.billed12m),
+		paid12m: num(summaryDto?.paid12m, summary.paid12m),
+		rejectionRate: num(summaryDto?.rejection_rate, summary.rejectionRate),
+		netPayment12m: num(summaryDto?.net_payment12m, summary.netPayment12m),
+		claimsTrendPct: num(summaryDto?.claims_trend_pct),
+		encountersTrendPct: num(summaryDto?.encounters_trend_pct),
+		billedTrendPct: num(summaryDto?.billed_trend_pct),
+		paidTrendPct: num(summaryDto?.paid_trend_pct),
+		rejectionTrendPct: num(summaryDto?.rejection_trend_pct),
+		netPaymentTrendPct: num(summaryDto?.net_payment_trend_pct),
 		dataAsOf:
 			summaryDto?.data_as_of?.slice(0, 10) ??
 			dto.updated_at?.slice(0, 10) ??

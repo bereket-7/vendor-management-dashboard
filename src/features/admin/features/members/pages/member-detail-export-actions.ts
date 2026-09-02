@@ -11,7 +11,7 @@ import {
 	openBlobInNewTab,
 	stampFilename,
 } from "@/lib/export/csv";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 
 type DocumentKind = "summary" | "eligibility-letter" | "coverage-card";
 
@@ -25,7 +25,7 @@ export async function openMemberDocumentPdf(
 	memberId: string,
 	document: DocumentKind
 ) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		toast.message(`Opening ${MOCK_DOC_LABEL[document]}…`);
 		return;
 	}
@@ -44,7 +44,7 @@ export async function openMemberDocumentPdf(
 }
 
 export async function printMemberProfile(memberId: string) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		toast.success("Print dialog opened");
 		return;
 	}
@@ -67,7 +67,7 @@ export async function printMemberProfile(memberId: string) {
 }
 
 export async function downloadMemberDetailCsv(memberId: string) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		toast.success("Exported CSV");
 		return;
 	}
@@ -81,7 +81,7 @@ export async function downloadMemberDetailCsv(memberId: string) {
 }
 
 export async function downloadMemberDetailPdf(memberId: string) {
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		toast.success("Exported PDF");
 		return;
 	}

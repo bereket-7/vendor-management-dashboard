@@ -50,6 +50,7 @@ import { listAuditRecords } from "@/features/admin/features/audit-trail/feature/
 import {
 	auditRecordToActivity,
 } from "@/features/admin/features/audit-trail/feature/mappers/auditMappers";
+import { VendorCoreErrorBanner } from "@/components/vendor-core/VendorCoreLiveChrome";
 import { cn } from "@/lib/utils";
 
 function ActionBadge({ action }: { action: AuditActionType }) {
@@ -109,21 +110,28 @@ export function AuditTrailView({
 	const [pageSize, setPageSize] = useState(10);
 	const [liveRows, setLiveRows] = useState<AuditActivity[] | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [fetchError, setFetchError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!vendorId) {
 			setLiveRows(null);
+			setFetchError(null);
 			return;
 		}
 		let cancelled = false;
 		setLoading(true);
-		listAuditRecords({ resource_id: vendorId, limit: 100 })
+		setFetchError(null);
+		listAuditRecords({ vendor_id: vendorId, limit: 100 })
 			.then((records) => {
 				if (cancelled) return;
 				setLiveRows(records.map(auditRecordToActivity));
 			})
-			.catch(() => {
-				if (!cancelled) setLiveRows([]);
+			.catch((error) => {
+				if (cancelled) return;
+				setLiveRows([]);
+				setFetchError(
+					error instanceof Error ? error.message : "Unable to load audit trail"
+				);
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
@@ -195,6 +203,7 @@ export function AuditTrailView({
 
 	return (
 		<div className="min-w-0 space-y-5">
+			{fetchError ? <VendorCoreErrorBanner message={fetchError} /> : null}
 			{showPageHeader ? (
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">

@@ -85,6 +85,11 @@ export type AccountCreateInput = {
 	active?: boolean;
 	metadata?: Record<string, unknown>;
 	is_visible?: boolean;
+	health_score?: number;
+	eligibility_feed_status?: string;
+	medical_feed_status?: string;
+	pharmacy_feed_status?: string;
+	accumulator_feed_status?: string;
 };
 
 export type AccountUpdateInput = {
@@ -95,6 +100,11 @@ export type AccountUpdateInput = {
 	active?: boolean;
 	metadata?: Record<string, unknown>;
 	is_visible?: boolean;
+	health_score?: number;
+	eligibility_feed_status?: string;
+	medical_feed_status?: string;
+	pharmacy_feed_status?: string;
+	accumulator_feed_status?: string;
 };
 
 export type VendorInviteCreateInput = {
@@ -146,6 +156,50 @@ export type VendorCategoryListQuery = {
 	offset?: number;
 };
 
+export type VendorCreateInput = {
+	vendor_code: string;
+	legal_name: string;
+	country: string;
+	city: string;
+	trade_name?: string | null;
+	status?: string;
+	description?: string | null;
+	website?: string | null;
+	tax_id?: string | null;
+	risk_level?: string;
+	risk_score?: number | string | null;
+	tags?: string[];
+	standard_payment_terms_days?: number;
+	default_currency?: string;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
+};
+
+export type VendorCategoryAssignmentCreateInput = {
+	vendor_id: string;
+	category_id: string;
+	is_primary?: boolean;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
+};
+
+export type VendorCategoryAssignmentDto = {
+	id: string;
+	vendor_id?: string;
+	category_id?: string;
+	is_primary: boolean;
+	created_at?: string;
+	updated_at?: string;
+};
+
+export type VendorCategoryAssignmentListQuery = {
+	vendor_id?: string;
+	is_visible?: boolean;
+	is_deleted?: boolean;
+	limit?: number;
+	offset?: number;
+};
+
 export type ContractDto = {
 	id: string;
 	vendor_id: string;
@@ -164,6 +218,38 @@ export type ContractDto = {
 	owner_id?: string | null;
 	created_at?: string;
 	updated_at?: string;
+};
+
+export type ContractTermDto = {
+	kind: string;
+	effective_date: string;
+	expiration_date?: string | null;
+	renewal_type?: string | null;
+	amendment_number?: number | null;
+	summary?: string | null;
+};
+
+export type ContractSlaMetricDto = {
+	id: string;
+	description: string;
+	due_date?: string | null;
+	status: string;
+	responsible_party: string;
+};
+
+export type ContractDocumentCompactDto = {
+	id: string;
+	document_type: string;
+	title: string;
+	status: string;
+};
+
+/** GET /api/v1/contracts/{id}/ — detail embeds terms, sla_metrics, documents, rate_schedule. */
+export type ContractDetailDto = ContractDto & {
+	terms?: ContractTermDto[];
+	sla_metrics?: ContractSlaMetricDto[];
+	documents?: ContractDocumentCompactDto[];
+	rate_schedule?: Array<Record<string, unknown>>;
 };
 
 export type ContractListQuery = {
@@ -190,6 +276,46 @@ export type ContractCreateInput = {
 };
 
 export type ContractUpdateInput = Partial<ContractCreateInput>;
+
+export type ProcurementDocumentDto = {
+	id: string;
+	vendor_id: string;
+	document_type: string;
+	title: string;
+	storage_key: string;
+	checksum_sha256: string;
+	mime_type: string;
+	size_bytes: number;
+	status: string;
+	uploaded_by_id?: string | null;
+	reviewed_by_id?: string | null;
+	reviewed_at?: string | null;
+	rejection_reason?: string | null;
+	expires_at?: string | null;
+	version?: number;
+	created_at?: string;
+	updated_at?: string;
+};
+
+export type ProcurementDocumentListQuery = {
+	vendor_id?: string;
+	contract_id?: string;
+	status?: string;
+	limit?: number;
+	offset?: number;
+};
+
+export type ProcurementDocumentCreateInput = {
+	vendor_id: string;
+	document_type: string;
+	title: string;
+	storage_key: string;
+	checksum_sha256: string;
+	mime_type: string;
+	size_bytes: number;
+	status?: string;
+	expires_at?: string | null;
+};
 
 export type VendorContactDto = {
 	id: string;
@@ -218,6 +344,41 @@ export type VendorContactCreateInput = {
 
 export type VendorContactUpdateInput = Partial<VendorContactCreateInput>;
 
+/** GET /api/v1/vendors/{id}/integration-profile/ */
+export type VendorIntegrationProfileDto = {
+	id?: string | null;
+	vendor_id: string;
+	timezone: string;
+	transmission_method?: string | null;
+	encryption?: string | null;
+	file_formats: string[];
+	trading_partner_id?: string | null;
+	protocol?: string | null;
+	avg_processing_time_seconds?: number | null;
+	health: "healthy" | "warning" | "failed" | "in_progress";
+	notes?: string | null;
+	accounts_count: number;
+	jobs_count: number;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
+	created_at?: string | null;
+	updated_at?: string | null;
+};
+
+export type VendorIntegrationProfileUpdateInput = {
+	timezone?: string;
+	transmission_method?: string | null;
+	encryption?: string | null;
+	file_formats?: string[];
+	trading_partner_id?: string | null;
+	protocol?: string | null;
+	avg_processing_time_seconds?: number | null;
+	health?: VendorIntegrationProfileDto["health"];
+	notes?: string | null;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
+};
+
 export type VendorNoteDto = {
 	id: string;
 	vendor_id: string;
@@ -244,11 +405,15 @@ export type AccountOpsSummaryDto = {
 	last_inbound_at?: string | null;
 	last_file_type?: string | null;
 	open_issue_count: number;
-	eligibility_status: string;
-	medical_status: string;
-	pharmacy_status: string;
-	accumulator_status: string;
 	health_score: number;
+	eligibility_status?: string;
+	medical_status?: string;
+	pharmacy_status?: string;
+	accumulator_status?: string;
+	eligibility_feed_status?: string;
+	medical_feed_status?: string;
+	pharmacy_feed_status?: string;
+	accumulator_feed_status?: string;
 };
 
 export type VendorCategoryCompactDto = {
@@ -372,6 +537,8 @@ export type MemberListDto = {
 	cardholder_id?: string;
 	person_code?: string;
 	external_id?: string;
+	newtech_member_id?: string;
+	newtech_family_id?: string;
 	first_name?: string;
 	middle_name?: string;
 	last_name?: string;
@@ -884,6 +1051,8 @@ export type MemberWriteBody = {
 	cardholder_id?: string;
 	person_code?: string;
 	external_id?: string;
+	newtech_member_id?: string;
+	newtech_family_id?: string;
 	relationship_code?: string;
 	first_name?: string;
 	middle_name?: string;
@@ -916,6 +1085,8 @@ export type MemberListQuery = {
 	/** Employment group display name (backend `account_group` filter). */
 	account_group?: string;
 	alternate_id?: string;
+	newtech_member_id?: string;
+	newtech_family_id?: string;
 	first_name?: string;
 	last_name?: string;
 	date_of_birth?: string;
@@ -966,6 +1137,8 @@ export type InboundFileDto = {
 	error_count?: number;
 	parse_result?: Record<string, unknown> | null;
 	duplicate_of?: string | null;
+	record_count?: number | null;
+	duration_seconds?: number | null;
 	created_at?: string;
 	updated_at?: string;
 	vendor_id?: string | null;
@@ -1028,6 +1201,9 @@ export type ProviderDto = {
 	metadata?: Record<string, unknown> | null;
 	profile?: ProviderProfileCompactDto | null;
 	tab_counts?: ProviderTabCountsDto | null;
+	claims12m?: number;
+	paid12m?: number;
+	rejection_rate?: number;
 	created_at?: string;
 	updated_at?: string;
 };
@@ -1209,7 +1385,48 @@ export type ProviderSummaryDto = {
 	paid12m: number;
 	rejection_rate: number;
 	net_payment12m: number;
+	claims_trend_pct?: number;
+	encounters_trend_pct?: number;
+	billed_trend_pct?: number;
+	paid_trend_pct?: number;
+	rejection_trend_pct?: number;
+	net_payment_trend_pct?: number;
 	data_as_of?: string;
+};
+
+export type ProviderMonthlyVolumeDto = {
+	month: string;
+	claims: number;
+	encounters: number;
+	rejection_count: number;
+	rejection_rate: number;
+};
+
+export type ProviderRejectionReasonDto = {
+	id: string;
+	reason: string;
+	count: number;
+	pct: number;
+};
+
+export type ProviderRecentActivityDto = {
+	id: string;
+	dos: string;
+	received_date: string;
+	claim_number: string;
+	member_id: string;
+	member_name: string;
+	type: string;
+	procedure_code: string;
+	billed: number | string;
+	paid: number | string;
+	status: string;
+	vendor: string;
+};
+
+export type ProviderRecentActivityQuery = {
+	kind?: "claim" | "encounter";
+	limit?: number;
 };
 
 export type ProviderLocationDto = {
@@ -1291,6 +1508,9 @@ export type ProviderVendorSourceDto = {
 	file_type?: string;
 	provider_count: number;
 	inbound_file_id?: string | null;
+	data_sent?: string;
+	frequency?: string;
+	status?: string;
 };
 
 /** Work queue / migration cases (My Work Queue). */
@@ -1699,6 +1919,8 @@ export type AuditRecordDto = {
 export type AuditListQuery = {
 	resource_type?: string;
 	resource_id?: string;
+	/** Expands to vendor + child resource IDs on the backend. */
+	vendor_id?: string;
 	action?: string;
 	limit?: number;
 	offset?: number;
@@ -2346,6 +2568,11 @@ export function normalizeProvider(raw: Record<string, unknown>): ProviderDto {
 			raw.tab_counts && typeof raw.tab_counts === "object"
 				? (raw.tab_counts as ProviderTabCountsDto)
 				: null,
+		claims12m:
+			raw.claims12m != null ? Number(raw.claims12m) : undefined,
+		paid12m: raw.paid12m != null ? Number(raw.paid12m) : undefined,
+		rejection_rate:
+			raw.rejection_rate != null ? Number(raw.rejection_rate) : undefined,
 		created_at: pickString(raw, "created_at") || undefined,
 		updated_at: pickString(raw, "updated_at") || undefined,
 	};

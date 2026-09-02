@@ -10,6 +10,11 @@ import {
 	listContracts,
 	updateContracts,
 } from "../api/contractsApi";
+import {
+	createProcurementDocument,
+	listProcurementDocuments,
+	type CreateProcurementDocumentInput,
+} from "../api/documentsApi";
 import type {
 	ContractsCreateDto,
 	ContractsUpdateDto,
@@ -40,8 +45,19 @@ export function useCreateContractsMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: (input: ContractsCreateDto) => createContracts(input),
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: featureQueryKey(domain) }),
+		onSuccess: (_, input) => {
+			queryClient.invalidateQueries({ queryKey: featureQueryKey(domain) });
+			queryClient.invalidateQueries({ queryKey: featureQueryKey("vendors") });
+			if (input.vendorId) {
+				queryClient.invalidateQueries({
+					queryKey: featureQueryKey(
+						"vendors",
+						"detail-bundle",
+						input.vendorId
+					),
+				});
+			}
+		},
 	});
 }
 
@@ -66,6 +82,41 @@ export function useContractsList(vendorId?: string) {
 		? items.filter((contract) => contract.vendorId === vendorId)
 		: items;
 	return { ...query, contracts };
+}
+
+export function useProcurementDocumentsQuery(
+	vendorId?: string,
+	enabled = true
+) {
+	return useQuery({
+		queryKey: featureQueryKey(domain, "documents", vendorId ?? "all"),
+		queryFn: () => listProcurementDocuments(vendorId),
+		enabled,
+	});
+}
+
+export function useProcurementDocumentsList(
+	vendorId?: string,
+	enabled = true
+) {
+	const query = useProcurementDocumentsQuery(vendorId, enabled);
+	return { ...query, documents: query.data ?? [] };
+}
+
+export function useCreateProcurementDocumentMutation() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: CreateProcurementDocumentInput) =>
+			createProcurementDocument(input),
+		onSuccess: (_, input) => {
+			queryClient.invalidateQueries({
+				queryKey: featureQueryKey(domain, "documents"),
+			});
+			queryClient.invalidateQueries({
+				queryKey: featureQueryKey("vendors", "detail-bundle", input.vendorId),
+			});
+		},
+	});
 }
 
 export function useContract(id: string | null | undefined) {

@@ -17,7 +17,7 @@ import {
 } from "@/features/admin/features/members/pages/MemberFormWizard";
 import type { PendingFamilyDependent } from "@/features/admin/features/members/pages/member-family-editor";
 import { useRouter } from "@/i18n/navigation";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 function MemberCreatePageInner() {
@@ -168,7 +168,7 @@ function MemberCreatePageInner() {
 }
 
 export function MemberCreatePage() {
-	if (!isMockEnabled()) {
+	if (!isMembersMockEnabled()) {
 		return (
 			<VendorCoreGate title="Add member">
 				<MemberCreatePageInner />

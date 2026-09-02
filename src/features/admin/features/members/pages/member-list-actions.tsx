@@ -10,41 +10,45 @@ import {
 	useVendorCoreVendors,
 } from "@/features/admin/features/members/feature/queries/useMembersQuery";
 import { Link, useRouter } from "@/i18n/navigation";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 
 export function MemberDirectoryActions() {
 	const seed = useSeedMembersMutation();
 	const vendorsQ = useVendorCoreVendors();
 	const defaultVendorId = vendorsQ.data?.[0]?.id;
+	const useApi = !isMembersMockEnabled();
 
 	return (
 		<>
-			<Button
-				variant="outline"
-				size="sm"
-				className="h-9"
-				disabled={seed.isPending}
-				onClick={() =>
-					seed.mutate(
-						{
-							vendor_id: defaultVendorId,
-							count: 2,
-							force: true,
-						},
-						{
-							onSuccess: (res) =>
-								toast.success(
-									res?.created != null
-										? `Seeded ${res.created} member(s)`
-										: "Seed complete"
-								),
-							onError: (err) =>
-								toast.error(err instanceof Error ? err.message : "Seed failed"),
-						}
-					)
-				}
-			>
-				Seed
-			</Button>
+			{useApi ? (
+				<Button
+					variant="outline"
+					size="sm"
+					className="h-9"
+					disabled={seed.isPending}
+					onClick={() =>
+						seed.mutate(
+							{
+								vendor_id: defaultVendorId,
+								count: 2,
+								force: true,
+							},
+							{
+								onSuccess: (res) =>
+									toast.success(
+										res?.created != null
+											? `Seeded ${res.created} member(s)`
+											: "Seed complete"
+									),
+								onError: (err) =>
+									toast.error(err instanceof Error ? err.message : "Seed failed"),
+							}
+						)
+					}
+				>
+					Seed
+				</Button>
+			) : null}
 			<Button size="sm" className="h-9" asChild>
 				<Link href="/admin/members/new">Add member</Link>
 			</Button>

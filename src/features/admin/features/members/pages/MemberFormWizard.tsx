@@ -715,6 +715,26 @@ function AccountStep({
 						className="h-11 font-mono"
 					/>
 				</Field>
+				<Field label="NewTech Member ID" hint="8-digit numeric.">
+					<Input
+						value={w.newtech_member_id ?? ""}
+						onChange={(e) => onChange({ newtech_member_id: e.target.value })}
+						className="h-11 font-mono"
+						inputMode="numeric"
+						maxLength={8}
+						placeholder="12345678"
+					/>
+				</Field>
+				<Field label="NewTech Family ID" hint="8-digit numeric.">
+					<Input
+						value={w.newtech_family_id ?? ""}
+						onChange={(e) => onChange({ newtech_family_id: e.target.value })}
+						className="h-11 font-mono"
+						inputMode="numeric"
+						maxLength={8}
+						placeholder="12345678"
+					/>
+				</Field>
 				<Field
 					label="Relationship code"
 					required
@@ -1320,6 +1340,8 @@ function ReviewStep({
 				{ label: "Cardholder ID", value: w.cardholder_id || "—" },
 				{ label: "Person code", value: w.person_code || "—" },
 				{ label: "External ID", value: w.external_id || "—" },
+				{ label: "NewTech Member ID", value: w.newtech_member_id || "—" },
+				{ label: "NewTech Family ID", value: w.newtech_family_id || "—" },
 				{ label: "Relationship", value: w.relationship_code || "—" },
 				{ label: "Program", value: w.program || "—" },
 				{ label: "LOB", value: w.lob || "—" },

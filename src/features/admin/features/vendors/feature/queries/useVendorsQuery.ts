@@ -12,15 +12,20 @@ import {
 import {
 	createIntakeJob,
 	createVendorAccount,
+	createVendorContact,
 	createVendorNote,
 	deleteVendorAccount,
+	deleteVendorContact,
 	deleteVendorNote,
 	getVendor,
+	getVendorIntegrationProfile,
 	hardDeleteVendorAccount,
 	listInboundFileEvents,
 	listVendorAccounts,
 	listVendorAccountOpsSummaries,
+	listVendorCategories,
 	listVendorConnections,
+	listVendorContacts,
 	listVendorInboundFiles,
 	listVendorJobs,
 	listVendorNotes,
@@ -32,15 +37,33 @@ import {
 	updateIntakeJob,
 	updateVendorAccount,
 	updateVendorConnection,
+	updateVendorContact,
+	updateVendorIntegrationProfile,
 	updateVendorNote,
 } from "../api/vendorsApi";
-import type { AccountUpdateInput } from "@/lib/vendor-core/types";
+import { getVendorDetailBundle } from "../api/vendorDetailApi";
+import type {
+	AccountCreateInput,
+	AccountUpdateInput,
+	VendorContactCreateInput,
+	VendorContactUpdateInput,
+	VendorIntegrationProfileUpdateInput,
+} from "@/lib/vendor-core/types";
 import type { VendorAccountRow } from "../../vendor-types";
 
 const domain = "vendors";
 
 export function useVendorsQuery() {
 	return useVendorCoreFeatureQuery(domain, "list", listVendors);
+}
+
+export function useVendorCategoriesQuery(enabled = true) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"categories",
+		() => listVendorCategories({ is_active: true }),
+		enabled
+	);
 }
 
 export function useVendorDetailQuery(id: string | null | undefined) {
@@ -50,6 +73,42 @@ export function useVendorDetailQuery(id: string | null | undefined) {
 		() => getVendor(String(id)),
 		Boolean(id),
 		[id ?? ""]
+	);
+}
+
+export function useVendorIntegrationProfileQuery(
+	vendorId?: string,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"integration-profile",
+		() => getVendorIntegrationProfile(String(vendorId)),
+		Boolean(vendorId) && enabled,
+		[vendorId ?? ""]
+	);
+}
+
+export function useVendorContactsQuery(vendorId?: string, enabled = true) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"contacts",
+		() => listVendorContacts(vendorId),
+		Boolean(vendorId) && enabled,
+		[vendorId ?? ""]
+	);
+}
+
+export function useVendorDetailBundleQuery(
+	vendorId?: string,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"detail-bundle",
+		() => getVendorDetailBundle(String(vendorId)),
+		Boolean(vendorId) && enabled,
+		[vendorId ?? ""]
 	);
 }
 
@@ -158,19 +217,15 @@ export function useUpdateVendorAccountMutation() {
 	});
 }
 
-export function useCreateVendorAccountMutation(vendorId: string) {
+export function useCreateVendorAccountMutation() {
 	return useVendorCoreFeatureMutation<
 		Awaited<ReturnType<typeof createVendorAccount>>,
-		{
-			account_code: string;
-			name: string;
-			line_of_business: string;
-			active?: boolean;
-		}
+		AccountCreateInput
 	>(domain, {
 		mutationFn: (body) =>
 			createVendorAccount({
-				vendor_id: vendorId,
+				is_visible: true,
+				health_score: 90,
 				...body,
 			}),
 	});
@@ -273,6 +328,43 @@ export function useUpdateVendorNoteMutation() {
 export function useDeleteVendorNoteMutation() {
 	return useVendorCoreFeatureMutation<void, string>(domain, {
 		mutationFn: (id) => deleteVendorNote(id),
+	});
+}
+
+export function useCreateVendorContactMutation(vendorId: string) {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof createVendorContact>>,
+		Omit<VendorContactCreateInput, "vendor_id">
+	>(domain, {
+		mutationFn: (body) =>
+			createVendorContact({
+				vendor_id: vendorId,
+				...body,
+			}),
+	});
+}
+
+export function useUpdateVendorContactMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof updateVendorContact>>,
+		{ id: string; body: VendorContactUpdateInput }
+	>(domain, {
+		mutationFn: ({ id, body }) => updateVendorContact(id, body),
+	});
+}
+
+export function useDeleteVendorContactMutation() {
+	return useVendorCoreFeatureMutation<void, string>(domain, {
+		mutationFn: (id) => deleteVendorContact(id),
+	});
+}
+
+export function useUpdateVendorIntegrationProfileMutation(vendorId: string) {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof updateVendorIntegrationProfile>>,
+		VendorIntegrationProfileUpdateInput
+	>(domain, {
+		mutationFn: (body) => updateVendorIntegrationProfile(vendorId, body),
 	});
 }
 

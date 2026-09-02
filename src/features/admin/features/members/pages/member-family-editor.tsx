@@ -43,7 +43,7 @@ import {
 } from "@/features/admin/features/members/feature/queries/useMembersQuery";
 import type { MemberSummary } from "@/features/admin/features/members/mock-data";
 import { memberAge } from "@/features/admin/features/members/mock-data";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const fieldClass = "h-8 w-full bg-background text-sm";
@@ -171,7 +171,7 @@ export function MemberFamilyDraftEditor({
 	}, [vendorId, q]);
 
 	const browseEnabled =
-		!isMockEnabled() && subTab === "add" && addMode === "pick";
+		!isMembersMockEnabled() && subTab === "add" && addMode === "pick";
 	const browseQ = useMemberSummariesPageQuery(browseFilters, browseEnabled);
 
 	const linkedIds = useMemo(() => {
@@ -279,7 +279,7 @@ export function MemberFamilyDraftEditor({
 		setSubTab("list");
 	}
 
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return (
 			<SectionShell title="Family members">
 				<p className="text-sm text-muted-foreground">
@@ -947,7 +947,7 @@ export function MemberFamilyEditor({
 	defaultSubTab?: FamilySubTab;
 	flushRef?: React.MutableRefObject<MemberFamilyLiveHandle | null>;
 }) {
-	const enabled = Boolean(memberId) && !isMockEnabled();
+	const enabled = Boolean(memberId) && !isMembersMockEnabled();
 	const detailQ = useMemberDetailQuery(memberId, enabled && !vendorId);
 	const resolvedVendorId = vendorId || detailQ.data?.vendorId || undefined;
 	const linksQ = useMemberFamilyLinksQuery(memberId, enabled);
@@ -1146,7 +1146,7 @@ export function MemberFamilyEditor({
 		};
 	}
 
-	if (isMockEnabled()) {
+	if (isMembersMockEnabled()) {
 		return (
 			<SectionShell title="Family members">
 				<p className="text-sm text-muted-foreground">

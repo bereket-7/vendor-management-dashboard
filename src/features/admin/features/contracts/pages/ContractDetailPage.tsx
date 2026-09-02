@@ -51,8 +51,10 @@ import { cn } from "@/lib/utils";
 
 import {
 	useContract,
+	useProcurementDocumentsList,
 	useUpdateContractMutation,
 } from "../feature/queries/useContractsQuery";
+import { UploadProcurementDocumentDialog } from "../components/UploadProcurementDocumentDialog";
 
 const TABS = [
 	"Contract Details",
@@ -73,9 +75,7 @@ const TAB_QUERY: Record<string, Tab> = {
 };
 
 function formatVendorDisplayId(vendorId: string) {
-	const digits = vendorId.replace(/\D/g, "");
-	const n = Number(digits || "0");
-	return `VND-${String(10000 + n * 1045).padStart(5, "0")}`;
+	return vendorId.slice(0, 8).toUpperCase();
 }
 
 function tabFromQuery(value: string | null): Tab {
@@ -395,14 +395,25 @@ export function ContractDetailPage() {
 	const searchParams = useSearchParams();
 	const { contract, isLoading } = useContract(params.contractId);
 	const updateContract = useUpdateContractMutation();
+	const { documents: procurementDocuments } = useProcurementDocumentsList(
+		contract?.vendorId,
+		Boolean(contract?.vendorId)
+	);
 	const [tab, setTab] = useState<Tab>(() =>
 		tabFromQuery(searchParams.get("tab"))
 	);
+	const [uploadOpen, setUploadOpen] = useState(false);
 
 	const terms = useMemo(() => contract?.terms ?? [], [contract]);
 	const rates = useMemo(() => contract?.rateSchedule ?? [], [contract]);
 	const slaMetrics = useMemo(() => contract?.slaMetrics ?? [], [contract]);
-	const documents = useMemo(() => contract?.documents ?? [], [contract]);
+	const documents = useMemo(
+		() =>
+			procurementDocuments.length > 0
+				? procurementDocuments
+				: (contract?.documents ?? []),
+		[contract, procurementDocuments]
+	);
 
 	async function approve() {
 		if (!contract) return;
@@ -783,18 +794,21 @@ export function ContractDetailPage() {
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() =>
-								toast.message("Upload document", {
-									description:
-										"Document upload will connect in a later cutover.",
-								})
-							}
+							onClick={() => setUploadOpen(true)}
 						>
 							Upload
 						</Button>
 					}
 				>
 					<DocumentsTable documents={documents} />
+					<UploadProcurementDocumentDialog
+						open={uploadOpen}
+						onOpenChange={setUploadOpen}
+						vendorId={contract.vendorId}
+						defaultDocumentType={
+							contract.contractType === "sow" ? "sow" : "msa"
+						}
+					/>
 				</SectionCard>
 			)}
 		</div>

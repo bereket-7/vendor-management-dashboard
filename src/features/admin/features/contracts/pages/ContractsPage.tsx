@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import { useSearchParams } from "next/navigation";
+
 import {
 	AlertTriangle,
 	Banknote,
@@ -38,9 +40,10 @@ import {
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import type { ContractStatus } from "@/features/shared/vms/types";
 import { formatDate, formatMoney } from "@/features/shared/vms/utils";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 
-import { useContractsList } from "../feature/queries/useContractsQuery";
+import { CreateContractDialog } from "../components/CreateContractDialog";
+import { useContractsList, useProcurementDocumentsList } from "../feature/queries/useContractsQuery";
 
 const STATUS_OPTIONS: ContractStatus[] = [
 	"draft",
@@ -53,14 +56,29 @@ const STATUS_OPTIONS: ContractStatus[] = [
 export function ContractsPage({
 	vendorId,
 	embedded,
+	initialCreateOpen = false,
 }: {
 	vendorId?: string;
 	embedded?: boolean;
+	initialCreateOpen?: boolean;
 } = {}) {
+	const router = useRouter();
+	const searchParams = useSearchParams();
 	const { contracts, isLoading, error } = useContractsList(vendorId);
+	const { documents: procurementDocuments } = useProcurementDocumentsList(
+		vendorId
+	);
 	const [search, setSearch] = useState("");
 	const [status, setStatus] = useState("all");
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const [createOpen, setCreateOpen] = useState(initialCreateOpen);
+
+	function handleCreateOpenChange(open: boolean) {
+		setCreateOpen(open);
+		if (!open && searchParams.get("create") === "1") {
+			router.replace("/admin/contracts");
+		}
+	}
 
 	const filtered = useMemo(() => {
 		const query = search.toLowerCase().trim();
@@ -75,6 +93,23 @@ export function ContractsPage({
 		);
 	}, [contracts, search, status]);
 
+	const docsByVendorId = useMemo(() => {
+		const counts = new Map<string, number>();
+		for (const document of procurementDocuments) {
+			if (!document.vendorId) continue;
+			counts.set(
+				document.vendorId,
+				(counts.get(document.vendorId) ?? 0) + 1
+			);
+		}
+		return counts;
+	}, [procurementDocuments]);
+
+	function documentCountForContract(contractVendorId: string) {
+		if (vendorId) return procurementDocuments.length;
+		return docsByVendorId.get(contractVendorId) ?? 0;
+	}
+
 	const summary = useMemo(() => {
 		const active = filtered.filter((c) => c.status === "active");
 		const pending = filtered.filter((c) => c.status === "pending_approval");
@@ -86,7 +121,7 @@ export function ContractsPage({
 		});
 		const totalValue = active.reduce((sum, c) => sum + c.value, 0);
 		const docsCount = filtered.reduce(
-			(sum, c) => sum + (c.documents?.length ?? 0),
+			(sum, contract) => sum + documentCountForContract(contract.vendorId),
 			0
 		);
 		const slaCoverage = filtered.filter(
@@ -101,7 +136,7 @@ export function ContractsPage({
 			docsCount,
 			slaCoverage,
 		};
-	}, [filtered]);
+	}, [filtered, docsByVendorId, procurementDocuments.length, vendorId]);
 
 	const renewalsDue = useMemo(
 		() =>
@@ -160,25 +195,28 @@ export function ContractsPage({
 					title="Contracts Overview"
 					description="Portfolio-level agreement health, renewals, approvals, and activity."
 					actions={
-						<Button asChild>
-							<Link href="/admin/contracts/create">
-								<Plus className="mr-2 size-4" />
-								Create contract
-							</Link>
+						<Button type="button" onClick={() => setCreateOpen(true)}>
+							<Plus className="mr-2 size-4" />
+							Create contract
 						</Button>
 					}
 				/>
 			)}
 			{embedded ? (
 				<div className="flex justify-end">
-					<Button asChild size="sm">
-						<Link href="/admin/contracts/create">
-							<Plus className="mr-2 size-4" />
-							Create contract
-						</Link>
+					<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+						<Plus className="mr-2 size-4" />
+						Create contract
 					</Button>
 				</div>
 			) : null}
+
+			<CreateContractDialog
+				open={createOpen}
+				onOpenChange={handleCreateOpenChange}
+				defaultVendorId={vendorId}
+				lockVendor={Boolean(vendorId)}
+			/>
 
 			<SummaryCardsGrid columns={4}>
 				<SummaryCard
@@ -322,7 +360,7 @@ export function ContractsPage({
 										{formatDate(contract.endDate)}
 									</TableCell>
 									<TableCell className="tabular-nums text-muted-foreground">
-										{contract.documents?.length ?? 0}
+										{documentCountForContract(contract.vendorId)}
 									</TableCell>
 									<TableCell className="pr-4 text-right">
 										<Button asChild variant="outline" size="sm" className="h-8">

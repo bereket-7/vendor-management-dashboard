@@ -51,6 +51,7 @@ export type VendorAccountRow = {
 	status: "healthy" | "warning" | "error" | "inactive";
 	healthScore: number;
 	lastFileReceived: string;
+	lastInboundAt?: string | null;
 	lastFileType: string;
 	eligibility: AccountFileStatus;
 	medical: AccountFileStatus;

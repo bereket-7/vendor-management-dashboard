@@ -91,7 +91,7 @@ import {
 import { MemberFamilyEditor } from "@/features/admin/features/members/pages/member-family-editor";
 import { MemberEditPanel } from "@/features/admin/features/members/pages/member-write-form";
 import { Link } from "@/i18n/navigation";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isMembersMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -757,7 +757,7 @@ function OverviewRecentActivity({
 	member: NonNullable<ReturnType<typeof getMember>>;
 	onViewAll: () => void;
 }) {
-	const useApi = !isMockEnabled();
+	const useApi = !isMembersMockEnabled();
 	const eventsQ = useMemberChangeEventsQuery(memberId, useApi);
 	const eventRows = eventsQ.data ?? [];
 
@@ -1075,7 +1075,7 @@ export function MemberDetailPage({
 	const memberId = decodeURIComponent(
 		Array.isArray(raw) ? (raw[0] ?? "") : String(raw ?? "")
 	);
-	const useApi = !isMockEnabled();
+	const useApi = !isMembersMockEnabled();
 	const detailQuery = useMemberDetailQuery(memberId, useApi);
 	const mockMember = useMemo(
 		() => (!useApi && memberId ? getMember(memberId) : undefined),
@@ -1347,14 +1347,14 @@ function MemberDetailBody({
 								mono
 							/>
 							<HeaderField
-								label="External ID"
-								value={member.externalId ?? "—"}
+								label="NewTech Member ID"
+								value={member.newtechMemberId ?? "—"}
 								accent
 								mono
 							/>
 							<HeaderField
-								label="Alternate ID"
-								value={member.alternateId ?? "—"}
+								label="NewTech Family ID"
+								value={member.newtechFamilyId ?? "—"}
 								accent
 								mono
 							/>
@@ -2483,7 +2483,7 @@ function FamilyDependentsTab({
 				}}
 				bodyClassName="p-0"
 				headerExtra={
-					!isMockEnabled() ? (
+					!isMembersMockEnabled() ? (
 						<Button
 							type="button"
 							variant="outline"
@@ -2575,7 +2575,7 @@ function FamilyDependentsTab({
 				<FamilyRecordFooter count={dependentRows.length} />
 			</DemoSection>
 
-			{showAdd && !isMockEnabled() ? (
+			{showAdd && !isMembersMockEnabled() ? (
 				<div className="overflow-hidden border border-border/70 bg-card">
 					<div className="flex items-center justify-between border-b border-border/50 px-3 py-1.5">
 						<h3 className="text-[13px] font-semibold text-primary">
@@ -3058,6 +3058,24 @@ function TabBody({
 			expirationDate: string;
 		};
 		const idRows: IdRow[] = [];
+		if (member.newtechMemberId?.trim()) {
+			idRows.push({
+				type: "NewTech Member ID",
+				number: member.newtechMemberId.trim(),
+				issuedBy: "NewTech",
+				issueDate: "—",
+				expirationDate: "—",
+			});
+		}
+		if (member.newtechFamilyId?.trim()) {
+			idRows.push({
+				type: "NewTech Family ID",
+				number: member.newtechFamilyId.trim(),
+				issuedBy: "NewTech",
+				issueDate: "—",
+				expirationDate: "—",
+			});
+		}
 		if (member.alternateId?.trim()) {
 			idRows.push({
 				type: "Alternate ID",

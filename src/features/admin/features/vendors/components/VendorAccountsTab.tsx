@@ -17,15 +17,6 @@ import {
 	Search,
 	XCircle,
 } from "lucide-react";
-import {
-	CartesianGrid,
-	Line,
-	LineChart,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from "recharts";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -61,13 +52,25 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { accountRowLobToApi } from "@/features/admin/features/vendors/feature/mappers/accountMappers";
 import {
-	accountRowLobToApi,
-} from "@/features/admin/features/vendors/feature/mappers/accountMappers";
+	buildAccountActivityRows,
+	countVendorInboundFilesOnDay,
+	formatDayOverDayHint,
+	latestAccountLastInboundIso,
+	latestVendorInboundFile,
+	mapInboundFileTypeLabel,
+} from "@/features/admin/features/vendors/feature/mappers/accountInboundMetrics";
 import {
 	type AccountFileStatus,
 	type VendorAccountRow,
 } from "@/features/admin/features/vendors/vendor-types";
+import type {
+	ConnectionDto,
+	InboundFileDto,
+	IntakeJobDto,
+} from "@/lib/vendor-core/types";
+import { VendorCoreApiError } from "@/lib/vendor-core/client";
 import { cn } from "@/lib/utils";
 
 function AccountStatusPill({ status }: { status: VendorAccountRow["status"] }) {
@@ -167,6 +170,11 @@ type AccountDraft = {
 
 type VendorAccountsTabProps = {
 	accounts: VendorAccountRow[];
+	vendorId?: string;
+	inboundFiles?: InboundFileDto[];
+	jobs?: IntakeJobDto[];
+	connections?: ConnectionDto[];
+	onRefresh?: () => Promise<void>;
 	onUpdateAccount: (
 		id: string,
 		patch: Pick<
@@ -179,15 +187,23 @@ type VendorAccountsTabProps = {
 		name: string;
 		line_of_business: string;
 		active?: boolean;
-	}) => Promise<void>;
+	}) => Promise<VendorAccountRow | void>;
 	onDeleteAccount?: (id: string) => Promise<void>;
+	/** Set when GET accounts/list failed — table may be empty despite data in vendor-core. */
+	accountsLoadError?: string | null;
 };
 
 export function VendorAccountsTab({
 	accounts,
+	vendorId,
+	inboundFiles = [],
+	jobs = [],
+	connections = [],
+	onRefresh,
 	onUpdateAccount,
 	onCreateAccount,
 	onDeleteAccount,
+	accountsLoadError = null,
 }: VendorAccountsTabProps) {
 	const [rows, setRows] = useState<VendorAccountRow[]>(accounts);
 	const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
@@ -204,11 +220,20 @@ export function VendorAccountsTab({
 	const [draft, setDraft] = useState<AccountDraft | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [createOpen, setCreateOpen] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
 	const [createDraft, setCreateDraft] = useState({
 		account_code: "",
 		name: "",
 		line_of_business: "commercial",
 	});
+	useEffect(() => {
+		setRows(accounts);
+		setSelectedAccountId(null);
+		setAccountSearch("");
+		setAccountStatus("all");
+		setAccountLob("all");
+		setAccountFileType("all");
+	}, [vendorId]);
 
 	useEffect(() => {
 		setRows(accounts);
@@ -237,6 +262,12 @@ export function VendorAccountsTab({
 		});
 	}, [accountFileType, accountLob, accountSearch, accountStatus, rows]);
 
+	const filtersActive =
+		accountSearch.trim().length > 0 ||
+		accountStatus !== "all" ||
+		accountLob !== "all" ||
+		accountFileType !== "all";
+
 	const selectedAccount =
 		rows.find((account) => account.id === selectedAccountId) ?? null;
 
@@ -248,8 +279,46 @@ export function VendorAccountsTab({
 		const active = rows.filter((a) => a.active).length;
 		const warnings = rows.filter((a) => a.status === "warning").length;
 		const errors = rows.filter((a) => a.status === "error").length;
-		const filesToday = Math.max(24, total * 4);
-		const last = rows[0];
+
+		const today = new Date();
+		const yesterday = new Date();
+		yesterday.setDate(today.getDate() - 1);
+
+		const filesToday = vendorId
+			? countVendorInboundFilesOnDay(inboundFiles, vendorId, today)
+			: 0;
+		const filesYesterday = vendorId
+			? countVendorInboundFilesOnDay(inboundFiles, vendorId, yesterday)
+			: 0;
+		const filesTodayHint = formatDayOverDayHint(filesToday, filesYesterday);
+
+		const latestInbound = vendorId
+			? latestVendorInboundFile(inboundFiles, vendorId)
+			: null;
+		const latestAccountIso = latestAccountLastInboundIso(rows);
+
+		let lastFile = "—";
+		let lastType = "—";
+
+		if (latestInbound?.created_at) {
+			lastFile = new Date(latestInbound.created_at).toLocaleString(undefined, {
+				month: "2-digit",
+				day: "2-digit",
+				year: "numeric",
+				hour: "numeric",
+				minute: "2-digit",
+			});
+			lastType = mapInboundFileTypeLabel(
+				latestInbound.detected_type ?? latestInbound.destination_module
+			);
+		} else if (latestAccountIso) {
+			const match = rows.find((row) => row.lastInboundAt === latestAccountIso);
+			lastFile = match?.lastFileReceived ?? "—";
+			lastType = match?.lastFileType
+				? mapInboundFileTypeLabel(match.lastFileType)
+				: "—";
+		}
+
 		return {
 			total,
 			active,
@@ -259,25 +328,11 @@ export function VendorAccountsTab({
 			errors,
 			errorPct: total ? ((errors / total) * 100).toFixed(1) : "0",
 			filesToday,
-			lastFile: last ? `${last.lastFileReceived.split(",")[0]}, 6:00 AM` : "—",
-			lastType: last?.lastFileType.includes("Eligibility")
-				? "Eligibility (834)"
-				: (last?.lastFileType ?? "—"),
+			filesTodayHint,
+			lastFile,
+			lastType,
 		};
-	}, [rows]);
-
-	const healthTrend = useMemo(() => {
-		const base = selectedAccount?.healthScore ?? 90;
-		return [
-			{ day: "Mon", score: Math.max(70, base - 8) },
-			{ day: "Tue", score: Math.max(70, base - 5) },
-			{ day: "Wed", score: Math.max(70, base - 3) },
-			{ day: "Thu", score: Math.max(70, base - 1) },
-			{ day: "Fri", score: base },
-			{ day: "Sat", score: Math.min(100, base + 1) },
-			{ day: "Sun", score: base },
-		];
-	}, [selectedAccount]);
+	}, [inboundFiles, rows, vendorId]);
 
 	const lobs = useMemo(
 		() => Array.from(new Set(rows.map((a) => a.lineOfBusiness))).sort(),
@@ -376,6 +431,12 @@ export function VendorAccountsTab({
 
 	return (
 		<section className="min-w-0 space-y-4">
+			{accountsLoadError ? (
+				<div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+					Could not load accounts from vendor-core: {accountsLoadError}. The table
+					below may be empty until you sign in again or fix the API connection.
+				</div>
+			) : null}
 			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 				{[
 					{
@@ -409,7 +470,7 @@ export function VendorAccountsTab({
 					{
 						label: "Files Processed Today",
 						value: String(summary.filesToday),
-						hint: "+12% vs yesterday",
+						hint: summary.filesTodayHint,
 						icon: FileText,
 						tone: "text-violet-700 bg-violet-500/15 ring-violet-500/20",
 					},
@@ -540,12 +601,22 @@ export function VendorAccountsTab({
 					variant="outline"
 					size="sm"
 					className="h-9"
+					disabled={refreshing}
 					onClick={() => {
-						setRows(accounts);
-						toast.success("Accounts refreshed.");
+						if (!onRefresh) {
+							setRows(accounts);
+							toast.success("Accounts refreshed.");
+							return;
+						}
+						setRefreshing(true);
+						void onRefresh()
+							.catch(() => toast.error("Could not refresh accounts."))
+							.finally(() => setRefreshing(false));
 					}}
 				>
-					<RefreshCw className="mr-1.5 size-3.5" />
+					<RefreshCw
+						className={cn("mr-1.5 size-3.5", refreshing && "animate-spin")}
+					/>
 					Refresh
 				</Button>
 			</div>
@@ -698,10 +769,23 @@ export function VendorAccountsTab({
 																		onSelect={() => {
 																			void onDeleteAccount(account.id)
 																				.then(() =>
+																					setRows((prev) =>
+																						prev.filter(
+																							(row) => row.id !== account.id
+																						)
+																					)
+																				)
+																				.then(() =>
 																					toast.success("Account deleted.")
 																				)
-																				.catch(() =>
-																					toast.error("Could not delete account.")
+																				.catch((err) =>
+																					toast.error(
+																						err instanceof VendorCoreApiError
+																							? err.message
+																							: err instanceof Error
+																								? err.message
+																								: "Could not delete account."
+																					)
 																				);
 																		}}
 																	>
@@ -858,7 +942,11 @@ export function VendorAccountsTab({
 																				</TableRow>
 																			</TableHeader>
 																			<TableBody>
-																				{(
+																				{buildAccountActivityRows(
+																					account.id,
+																					inboundFiles,
+																					jobs,
+																					connections,
 																					[
 																						[
 																							"Eligibility (834)",
@@ -876,27 +964,33 @@ export function VendorAccountsTab({
 																							"Accumulator",
 																							account.accumulator,
 																						],
-																					] as const
-																				).map(([type, status]) => (
-																					<TableRow key={type}>
+																					],
+																					account.lastFileType,
+																					account.lastFileReceived
+																				).map((row) => (
+																					<TableRow key={row.key}>
 																						<TableCell className="pl-3 font-medium">
-																							{type}
+																							{row.fileType}
 																						</TableCell>
-																						<TableCell>Incoming</TableCell>
+																						<TableCell>{row.direction}</TableCell>
 																						<TableCell>
-																							{status === "success" ? (
+																							{row.status === "success" ? (
 																								<span className="inline-flex items-center gap-1 text-emerald-700">
 																									<CheckCircle2 className="size-3.5" />
 																									Success
 																								</span>
-																							) : status === "none" ? (
+																							) : row.status === "no_data" ? (
 																								<span className="text-muted-foreground">
 																									No Data
 																								</span>
-																							) : status === "warning" ? (
+																							) : row.status === "warning" ? (
 																								<span className="inline-flex items-center gap-1 text-amber-700">
 																									<AlertTriangle className="size-3.5" />
 																									Warning
+																								</span>
+																							) : row.status === "processing" ? (
+																								<span className="text-muted-foreground">
+																									Processing
 																								</span>
 																							) : (
 																								<span className="inline-flex items-center gap-1 text-red-700">
@@ -906,9 +1000,7 @@ export function VendorAccountsTab({
 																							)}
 																						</TableCell>
 																						<TableCell className="pr-3 text-muted-foreground">
-																							{status === "none"
-																								? "—"
-																								: account.lastFileReceived}
+																							{row.timestamp}
 																						</TableCell>
 																					</TableRow>
 																				))}
@@ -957,50 +1049,17 @@ export function VendorAccountsTab({
 																) : null}
 															</div>
 
-															<div className="rounded-xl border border-border bg-card shadow-sm p-3">
+															<div className="rounded-xl border border-border bg-card shadow-sm p-4">
 																<h4 className="text-sm font-semibold tracking-tight text-foreground">
-																	Health Trend (Last 7 Days)
+																	Health Score
 																</h4>
-																<div className="mt-3 h-40">
-																	<ResponsiveContainer
-																		width="100%"
-																		height="100%"
-																	>
-																		<LineChart data={healthTrend}>
-																			<CartesianGrid
-																				strokeDasharray="3 3"
-																				className="stroke-border/50"
-																			/>
-																			<XAxis
-																				dataKey="day"
-																				tick={{ fontSize: 10 }}
-																			/>
-																			<YAxis
-																				domain={[60, 100]}
-																				tick={{ fontSize: 10 }}
-																			/>
-																			<Tooltip />
-																			<Line
-																				type="monotone"
-																				dataKey="score"
-																				stroke="#059669"
-																				strokeWidth={2}
-																				dot={false}
-																			/>
-																		</LineChart>
-																	</ResponsiveContainer>
-																</div>
-																<div className="mt-2">
-																	<p className="text-xs text-muted-foreground">
-																		Current Score
-																	</p>
-																	<p className="text-xl font-semibold tabular-nums">
-																		{account.healthScore}
-																	</p>
-																	<p className="text-xs font-medium text-emerald-700">
-																		+5 pts vs last 7 days
-																	</p>
-																</div>
+																<p className="mt-3 text-3xl font-semibold tabular-nums">
+																	{account.healthScore}
+																</p>
+																<p className="mt-2 text-xs text-muted-foreground">
+																	From account ops summary. Historical trend
+																	data is not available from the API yet.
+																</p>
 															</div>
 														</div>
 													</div>
@@ -1012,11 +1071,23 @@ export function VendorAccountsTab({
 							})}
 							{filteredAccounts.length === 0 && (
 								<TableRow>
-									<TableCell
-										colSpan={11}
-										className="h-20 text-center text-muted-foreground"
-									>
-										No accounts match the current filters.
+									<TableCell colSpan={11} className="h-24 text-center">
+										{rows.length === 0 && !filtersActive ? (
+											<div className="mx-auto max-w-sm space-y-1 py-2">
+												<p className="text-sm font-medium text-foreground">
+													No linked accounts yet
+												</p>
+												<p className="text-xs text-muted-foreground">
+													Use{" "}
+													<span className="font-medium">Add account</span> above
+													to link the first account for this vendor.
+												</p>
+											</div>
+										) : (
+											<p className="text-sm text-muted-foreground">
+												No accounts match the current filters.
+											</p>
+										)}
 									</TableCell>
 								</TableRow>
 							)}
@@ -1251,8 +1322,20 @@ export function VendorAccountsTab({
 									line_of_business: createDraft.line_of_business,
 									active: true,
 								})
-									.then(() => {
-										toast.success("Account created.");
+								.then((created) => {
+									if (!created?.id) {
+										toast.error(
+											"Account may have been created but the response was incomplete. Refresh to verify."
+										);
+										return;
+									}
+									setRows((prev) => {
+										if (prev.some((row) => row.id === created.id)) {
+											return prev;
+										}
+										return [...prev, created];
+									});
+									toast.success("Account saved.");
 										setCreateOpen(false);
 										setCreateDraft({
 											account_code: "",
@@ -1260,7 +1343,13 @@ export function VendorAccountsTab({
 											line_of_business: "commercial",
 										});
 									})
-									.catch(() => toast.error("Could not create account."))
+									.catch((err) =>
+										toast.error(
+											err instanceof Error
+												? err.message
+												: "Could not create account."
+										)
+									)
 									.finally(() => setSaving(false));
 							}}
 						>

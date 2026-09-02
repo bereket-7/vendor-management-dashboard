@@ -29,12 +29,22 @@ function mapLob(raw?: string | null): VendorAccountRow["lineOfBusiness"] {
 
 function mapStatus(
 	raw?: string | null,
-	active?: boolean
+	active?: boolean,
+	healthScore?: number
 ): VendorAccountRow["status"] {
 	if (active === false) return "inactive";
-	const value = (raw ?? "healthy").toLowerCase();
-	if (ACCOUNT_STATUSES.has(value as VendorAccountRow["status"])) {
+	const value = (raw ?? "").toLowerCase();
+	if (
+		value &&
+		value !== "inactive" &&
+		value !== "active" &&
+		ACCOUNT_STATUSES.has(value as VendorAccountRow["status"])
+	) {
 		return value as VendorAccountRow["status"];
+	}
+	if (healthScore != null) {
+		if (healthScore < 60) return "error";
+		if (healthScore < 80) return "warning";
 	}
 	return "healthy";
 }
@@ -64,16 +74,16 @@ function formatWhen(iso?: string | null): string {
 
 /** Map vendor-core account DTO → accounts tab row. */
 export function accountDtoToRow(dto: AccountDto): VendorAccountRow {
-	const status = mapStatus(dto.status, dto.active);
 	const healthScore =
 		dto.health_score ??
-		(status === "inactive"
+		(dto.active === false
 			? 40
-			: status === "error"
+			: dto.status === "error"
 				? 55
-				: status === "warning"
+				: dto.status === "warning"
 					? 72
 					: 90);
+	const status = mapStatus(dto.status, dto.active, healthScore);
 
 	return {
 		id: dto.id,
@@ -83,6 +93,7 @@ export function accountDtoToRow(dto: AccountDto): VendorAccountRow {
 		status,
 		healthScore,
 		lastFileReceived: "—",
+		lastInboundAt: null,
 		lastFileType: "—",
 		eligibility: mapFeedStatus(dto.eligibility_feed_status),
 		medical: mapFeedStatus(dto.medical_feed_status),
@@ -101,15 +112,24 @@ export function mergeAccountOpsSummary(
 	summary?: AccountOpsSummaryDto
 ): VendorAccountRow {
 	if (!summary) return row;
+	const mergedHealthScore = summary.health_score ?? row.healthScore;
 	return {
 		...row,
-		healthScore: summary.health_score ?? row.healthScore,
+		healthScore: mergedHealthScore,
+		status: mapStatus(row.status, row.active, mergedHealthScore),
 		lastFileReceived: formatWhen(summary.last_inbound_at),
+		lastInboundAt: summary.last_inbound_at ?? null,
 		lastFileType: summary.last_file_type ?? row.lastFileType,
-		eligibility: mapFeedStatus(summary.eligibility_status),
-		medical: mapFeedStatus(summary.medical_status),
-		pharmacy: mapFeedStatus(summary.pharmacy_status),
-		accumulator: mapFeedStatus(summary.accumulator_status),
+		eligibility: mapFeedStatus(
+			summary.eligibility_status ?? summary.eligibility_feed_status
+		),
+		medical: mapFeedStatus(summary.medical_status ?? summary.medical_feed_status),
+		pharmacy: mapFeedStatus(
+			summary.pharmacy_status ?? summary.pharmacy_feed_status
+		),
+		accumulator: mapFeedStatus(
+			summary.accumulator_status ?? summary.accumulator_feed_status
+		),
 		openIssues: summary.open_issue_count ?? row.openIssues,
 	};
 }
