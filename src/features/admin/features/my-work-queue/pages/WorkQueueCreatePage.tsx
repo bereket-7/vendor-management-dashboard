@@ -2,35 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Textarea } from "@/components/ui/textarea";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import { useVendorCoreUsersQuery } from "@/features/admin/features/users/feature/queries/useUsersQuery";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { isMockEnabled } from "@/lib/mock-mode";
-import { cn } from "@/lib/utils";
 
-import { vendorTypeToApi } from "../feature/mappers/workQueueMappers";
 import {
-	useAssignMigrationCaseMutation,
+	dateToApi,
+	vendorTypeToApi,
+} from "../feature/mappers/workQueueMappers";
+import {
 	useCreateMigrationCaseMutation,
 	useInvalidateVendorCore,
 	useSetMigrationCaseStatusMutation,
+	useSetMigrationCaseWhitelistMutation,
+	useTransitionMigrationCaseBlockerMutation,
 	useUpdateMigrationCaseProgressMutation,
 } from "../feature/queries/useWorkQueueQuery";
 import { workQueueErrorMessage } from "../feature/workQueueErrors";
+import {
+	mergeCaseMetadata,
+	whitelistStatusFromIpWhitelisting,
+} from "../lib/work-queue-detail-tabs";
 import {
 	EDI_MILESTONE_DEFS,
 	SFTP_MILESTONE_DEFS,
@@ -43,149 +38,33 @@ import {
 	applyEdiPercentChange,
 	applySftpMilestoneStatusChange,
 	applySftpPercentChange,
-	canSetEdiProgress,
 	completedKeysForPercent,
 	completedKeysFromStatuses,
 } from "../progress-rules";
 import {
-	MIGRATION_STATUS_LABEL,
-	type MigrationStatus,
-} from "../work-queue-types";
-
-const FLAT_CARD_CLASS =
-	"overflow-hidden rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
+	EMPTY_WORK_QUEUE_WIZARD,
+	WorkQueueFormWizard,
+	type WorkQueueWizardValues,
+} from "./WorkQueueFormWizard";
 
 const DRAFT_STORAGE_KEY = "work-queue-tpa-tpv-registration-draft";
-
-const WAVE_OPTIONS = ["1", "2", "3", "4"] as const;
-
-const SERVER_OPTIONS = ["New SFTP", "Legacy SFTP", "API Feed"] as const;
-
-function emptyTrackStatuses(
-	defs: typeof SFTP_MILESTONE_DEFS
-): Record<string, MilestoneUiStatus> {
-	return Object.fromEntries(
-		defs.map((m) => [m.key, "not_started" as MilestoneUiStatus])
-	);
-}
-
-const MILESTONE_STATUS_LABEL: Record<MilestoneUiStatus, string> = {
-	not_started: "Not Started",
-	in_progress: "In Progress",
-	complete: "Complete",
-};
-
-type RegistrationForm = {
-	wave: string;
-	name: string;
-	vendorType: "TPA" | "TPV";
-	serverType: string;
-	email: string;
-	sftpProgress: number;
-	ediProgress: number;
-	status: MigrationStatus;
-	analystId: string;
-	notes: string;
-	sftpMilestones: Record<string, MilestoneUiStatus>;
-	ediMilestones: Record<string, MilestoneUiStatus>;
-};
-
-const EMPTY_FORM: RegistrationForm = {
-	wave: "",
-	name: "",
-	vendorType: "TPA",
-	serverType: "",
-	email: "",
-	sftpProgress: 0,
-	ediProgress: 0,
-	status: "not_started",
-	analystId: "",
-	notes: "",
-	sftpMilestones: emptyTrackStatuses(SFTP_MILESTONE_DEFS),
-	ediMilestones: emptyTrackStatuses(EDI_MILESTONE_DEFS),
-};
-
-const fieldClass =
-	"h-9 rounded-sm border-border bg-background text-sm shadow-none hover:border-foreground/20 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15";
-
-function FieldLabel({
-	children,
-	required,
-}: {
-	children: React.ReactNode;
-	required?: boolean;
-}) {
-	return (
-		<label className="mb-1.5 block text-xs font-medium text-foreground">
-			{children}
-			{required ? <span className="ml-0.5 text-destructive">*</span> : null}
-		</label>
-	);
-}
-
-function ProgressSliderField({
-	label,
-	value,
-	onChange,
-	required,
-	disabled,
-	helperText,
-}: {
-	label: string;
-	value: number;
-	onChange: (value: number) => void;
-	required?: boolean;
-	disabled?: boolean;
-	helperText?: string;
-}) {
-	return (
-		<div className={disabled ? "opacity-60" : undefined}>
-			<FieldLabel required={required}>{label}</FieldLabel>
-			<div className="flex items-center gap-3 pt-1">
-				<Slider
-					value={[value]}
-					min={0}
-					max={100}
-					step={1}
-					disabled={disabled}
-					onValueChange={(v) => onChange(v[0] ?? 0)}
-					className="flex-1"
-				/>
-				<div className="flex shrink-0 items-center gap-1">
-					<Input
-						type="number"
-						min={0}
-						max={100}
-						value={value}
-						disabled={disabled}
-						onChange={(e) => {
-							const n = Number(e.target.value);
-							onChange(Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0);
-						}}
-						className={cn(fieldClass, "h-8 w-14 px-2 text-center tabular-nums")}
-					/>
-					<span className="text-xs text-muted-foreground">%</span>
-				</div>
-			</div>
-			{helperText ? (
-				<p className="mt-1.5 text-[11px] text-muted-foreground">{helperText}</p>
-			) : null}
-		</div>
-	);
-}
 
 function WorkQueueCreateBody() {
 	const router = useRouter();
 	const useLive = !isMockEnabled();
 	const invalidate = useInvalidateVendorCore();
 	const createCase = useCreateMigrationCaseMutation();
-	const assignCase = useAssignMigrationCaseMutation();
 	const setStatus = useSetMigrationCaseStatusMutation();
+	const setWhitelist = useSetMigrationCaseWhitelistMutation();
+	const transitionBlocker = useTransitionMigrationCaseBlockerMutation();
 	const updateProgress = useUpdateMigrationCaseProgressMutation();
 	const usersQ = useVendorCoreUsersQuery();
 
-	const [form, setForm] = useState<RegistrationForm>(EMPTY_FORM);
+	const [values, setValues] = useState<WorkQueueWizardValues>(
+		EMPTY_WORK_QUEUE_WIZARD
+	);
 	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
 	const analysts = useMemo(() => {
 		return (usersQ.data ?? [])
@@ -205,27 +84,13 @@ function WorkQueueCreateBody() {
 		try {
 			const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
 			if (!raw) return;
-			const parsed = JSON.parse(raw) as Partial<RegistrationForm> & {
-				milestones?: Record<string, MilestoneUiStatus>;
-			};
-			setForm((prev) => ({
+			const parsed = JSON.parse(raw) as Partial<WorkQueueWizardValues>;
+			setValues((prev) => ({
 				...prev,
 				...parsed,
 				sftpMilestones: {
 					...prev.sftpMilestones,
 					...parsed.sftpMilestones,
-					...(parsed.milestones
-						? (Object.fromEntries(
-								SFTP_MILESTONE_DEFS.filter((m) => {
-									const status = parsed.milestones?.[m.key];
-									return (
-										status === "complete" ||
-										status === "in_progress" ||
-										status === "not_started"
-									);
-								}).map((m) => [m.key, parsed.milestones![m.key]!])
-							) as Record<string, MilestoneUiStatus>)
-						: {}),
 				},
 				ediMilestones: {
 					...prev.ediMilestones,
@@ -237,65 +102,77 @@ function WorkQueueCreateBody() {
 		}
 	}, []);
 
-	function patch(next: Partial<RegistrationForm>) {
-		setForm((prev) => ({ ...prev, ...next }));
-	}
+	function patchValues(patch: Partial<WorkQueueWizardValues>) {
+		setValues((prev) => {
+			let next = { ...prev, ...patch };
 
-	function setSftpPercent(rawPercent: number) {
-		setForm((prev) => ({
-			...prev,
-			...applySftpPercentChange(prev, rawPercent),
-		}));
-	}
-
-	function setEdiPercent(rawPercent: number) {
-		setForm((prev) => {
-			const next = applyEdiPercentChange(
-				prev.sftpProgress,
-				prev.ediMilestones,
-				rawPercent
-			);
-			if (!next) {
-				toast.error(
-					"EDI progress requires SFTP at 100% before any EDI milestone is set."
-				);
-				return prev;
+			if (
+				patch.sftpProgress !== undefined &&
+				patch.sftpMilestones === undefined
+			) {
+				next = {
+					...next,
+					...applySftpPercentChange(prev, patch.sftpProgress),
+				};
 			}
-			return { ...prev, ...next };
-		});
-	}
 
-	function patchSftpMilestone(key: string, status: MilestoneUiStatus) {
-		setForm((prev) => ({
-			...prev,
-			...applySftpMilestoneStatusChange(prev.sftpMilestones, key, status),
-		}));
-	}
-
-	function patchEdiMilestone(key: string, status: MilestoneUiStatus) {
-		setForm((prev) => {
-			const next = applyEdiMilestoneStatusChange(
-				prev.sftpProgress,
-				prev.ediMilestones,
-				key,
-				status
-			);
-			if (!next) {
-				toast.error(
-					"EDI milestones require SFTP at 100% before any EDI milestone is set."
+			if (
+				patch.ediProgress !== undefined &&
+				patch.ediMilestones === undefined
+			) {
+				const applied = applyEdiPercentChange(
+					next.sftpProgress,
+					prev.ediMilestones,
+					patch.ediProgress
 				);
-				return prev;
+				if (!applied) {
+					toast.error(
+						"EDI progress requires SFTP at 100% before any EDI milestone is set."
+					);
+					return prev;
+				}
+				next = { ...next, ...applied };
 			}
-			return { ...prev, ...next };
-		});
-	}
 
-	function validate(): string | null {
-		if (!form.wave) return "Select a wave.";
-		if (!form.name.trim()) return "Enter a TPA/TPV name.";
-		if (!form.serverType) return "Select a server type.";
-		if (!form.status) return "Select a migration status.";
-		return null;
+			if (patch.sftpMilestones) {
+				const changedKey = Object.keys(patch.sftpMilestones).find(
+					(key) => patch.sftpMilestones?.[key] !== prev.sftpMilestones[key]
+				);
+				if (changedKey && patch.sftpMilestones[changedKey]) {
+					next = {
+						...next,
+						...applySftpMilestoneStatusChange(
+							prev.sftpMilestones,
+							changedKey,
+							patch.sftpMilestones[changedKey]!
+						),
+					};
+				}
+			}
+
+			if (patch.ediMilestones) {
+				const changedKey = Object.keys(patch.ediMilestones).find(
+					(key) => patch.ediMilestones?.[key] !== prev.ediMilestones[key]
+				);
+				if (changedKey && patch.ediMilestones[changedKey]) {
+					const applied = applyEdiMilestoneStatusChange(
+						next.sftpProgress,
+						prev.ediMilestones,
+						changedKey,
+						patch.ediMilestones[changedKey]!
+					);
+					if (!applied) {
+						toast.error(
+							"EDI milestones require SFTP at 100% before any EDI milestone is set."
+						);
+						return prev;
+					}
+					next = { ...next, ...applied };
+				}
+			}
+
+			return next;
+		});
 	}
 
 	function buildInitialProgress(
@@ -317,87 +194,157 @@ function WorkQueueCreateBody() {
 		});
 	}
 
-	function buildPayload() {
-		const prefix = form.vendorType === "TPV" ? "TPV" : "TPA";
-		const code = `${prefix}-${Date.now().toString().slice(-6)}`;
-		return {
-			name: form.name.trim(),
-			code,
-			vendor_type: vendorTypeToApi(form.vendorType),
-			wave: Number(form.wave) || 1,
-			server_type: form.serverType,
-			primary_email: form.email.trim(),
-			notes: form.notes.trim(),
-			assigned_to_id: form.analystId || null,
-		};
-	}
-
 	function saveDraft() {
 		try {
-			localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
+			localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(values));
 			toast.success("Draft saved locally");
 		} catch {
 			toast.error("Could not save draft");
 		}
 	}
 
-	async function submit() {
-		const error = validate();
-		if (error) {
-			toast.error(error);
+	async function handleSubmit() {
+		if (!values.wave) {
+			setError("Select a wave.");
+			toast.error("Select a wave");
+			return;
+		}
+		if (!values.name.trim()) {
+			setError("Enter a TPA/TPV name.");
+			toast.error("Enter a TPA/TPV name");
+			return;
+		}
+		if (!values.serverType) {
+			setError("Select a server / connection type.");
+			toast.error("Select a server / connection type");
 			return;
 		}
 
 		setBusy(true);
+		setError(null);
 		try {
 			if (!useLive) {
 				localStorage.removeItem(DRAFT_STORAGE_KEY);
-				toast.success(`${form.name.trim()} registered (mock)`);
+				toast.success(`${values.name.trim()} registered (mock)`);
 				router.push("/admin/my-work-queue");
 				return;
 			}
 
-			const payload = buildPayload();
-			const created = await createCase.mutateAsync(payload);
+			const prefix = values.vendorType === "TPV" ? "TPV" : "TPA";
+			const code =
+				values.code.trim() || `${prefix}-${Date.now().toString().slice(-6)}`;
 
-			if (form.analystId && created.id && !payload.assigned_to_id) {
-				await assignCase.mutateAsync({
-					id: created.id,
-					assigned_to_id: form.analystId,
-				});
+			const ediAnalystLabel =
+				analysts.find((a) => a.id === values.ediAnalystId)?.label ?? "";
+
+			const metadata = mergeCaseMetadata(null, {
+				operational_status: values.operationalStatus,
+				ip_whitelisting_status: values.ipWhitelistingStatus,
+				ip_whitelisting_not_required:
+					values.ipWhitelistingStatus === "not_required",
+				escalated: values.escalated === "yes",
+				escalation_reason: values.escalationReason || null,
+				escalated_to: values.escalatedTo || null,
+				escalation_workflow_status: values.escalationWorkflowStatus,
+				edi_analyst_id: values.ediAnalystId || null,
+				edi_analyst_name: ediAnalystLabel || null,
+				edi_analyst_assigned_at: values.ediAnalystId
+					? new Date().toISOString()
+					: null,
+			});
+
+			const created = await createCase.mutateAsync({
+				name: values.name.trim(),
+				code,
+				vendor_type: vendorTypeToApi(values.vendorType),
+				wave: Number(values.wave) || 1,
+				server_type: values.serverType,
+				notes: values.notes.trim(),
+				next_step: values.nextStep.trim(),
+				current_stage: values.currentStage || "not_started",
+				assigned_to_id: values.analystId || null,
+				migration_start_date: dateToApi(values.migrationStartDate),
+				waiting_on_vendor_date: dateToApi(values.waitingOnVendorDate),
+				last_communication_at: dateToApi(values.lastCommunicationAt),
+				primary_contact: values.primaryContact.trim(),
+				primary_email: values.primaryEmail.trim(),
+				primary_phone: values.primaryPhone.trim(),
+				secondary_contact: values.secondaryContact.trim(),
+				secondary_email: values.secondaryEmail.trim(),
+				secondary_phone: values.secondaryPhone.trim(),
+				metadata,
+			});
+
+			if (formNeedsStatusUpdate(values) && created.id) {
+				try {
+					await setStatus.mutateAsync({
+						id: created.id,
+						migration_status: values.status,
+					});
+				} catch {
+					/* case created; status can be set on detail */
+				}
 			}
 
-			if (form.status !== "not_started" && created.id) {
-				await setStatus.mutateAsync({
-					id: created.id,
-					migration_status: form.status,
-				});
+			const whitelist = whitelistStatusFromIpWhitelisting(
+				values.ipWhitelistingStatus
+			);
+			if (whitelist !== "not_started" && created.id) {
+				try {
+					await setWhitelist.mutateAsync({
+						id: created.id,
+						whitelist_status: whitelist,
+					});
+				} catch {
+					/* optional follow-up */
+				}
+			}
+
+			if (values.escalated === "yes" && created.id) {
+				try {
+					await transitionBlocker.mutateAsync({
+						id: created.id,
+						blocker_status: "escalated",
+						blocker_reason: values.escalationReason || null,
+						blocker_notes: values.blockerNotes.trim(),
+					});
+				} catch {
+					/* metadata already carries escalation flags */
+				}
 			}
 
 			const sftpProgress = buildInitialProgress(
 				SFTP_MILESTONE_DEFS,
-				form.sftpMilestones,
-				form.sftpProgress
+				values.sftpMilestones,
+				values.sftpProgress
 			);
 			if (sftpProgress && created.id) {
-				await updateProgress.mutateAsync({
-					id: created.id,
-					track: "sftp",
-					progress: sftpProgress,
-				});
+				try {
+					await updateProgress.mutateAsync({
+						id: created.id,
+						track: "sftp",
+						progress: sftpProgress,
+					});
+				} catch {
+					/* optional */
+				}
 			}
 
 			const ediProgress = buildInitialProgress(
 				EDI_MILESTONE_DEFS,
-				form.ediMilestones,
-				form.ediProgress
+				values.ediMilestones,
+				values.ediProgress
 			);
 			if (ediProgress && created.id) {
-				await updateProgress.mutateAsync({
-					id: created.id,
-					track: "edi",
-					progress: ediProgress,
-				});
+				try {
+					await updateProgress.mutateAsync({
+						id: created.id,
+						track: "edi",
+						progress: ediProgress,
+					});
+				} catch {
+					/* optional */
+				}
 			}
 
 			localStorage.removeItem(DRAFT_STORAGE_KEY);
@@ -405,7 +352,9 @@ function WorkQueueCreateBody() {
 			toast.success(`${created.name} registered`);
 			router.push(`/admin/my-work-queue/${created.id}`);
 		} catch (err) {
-			toast.error(workQueueErrorMessage(err, "Registration failed"));
+			const message = workQueueErrorMessage(err, "Registration failed");
+			setError(message);
+			toast.error(message);
 		} finally {
 			setBusy(false);
 		}
@@ -414,306 +363,27 @@ function WorkQueueCreateBody() {
 	const pending =
 		busy ||
 		createCase.isPending ||
-		assignCase.isPending ||
 		setStatus.isPending ||
+		setWhitelist.isPending ||
+		transitionBlocker.isPending ||
 		updateProgress.isPending;
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-5 pb-10">
-			<div className="flex flex-wrap items-start justify-between gap-4">
-				<div className="min-w-0">
-					<h1 className="text-2xl font-semibold tracking-tight text-foreground">
-						Add TPV/TPA Registration
-					</h1>
-					<p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
-						Register a new TPV/TPA to begin tracking migration and testing
-						progress.
-					</p>
-				</div>
-				<Button
-					variant="outline"
-					size="sm"
-					className="h-9 shrink-0 gap-1.5 rounded-sm border-border/50 bg-background px-3 text-xs font-medium shadow-none"
-					asChild
-				>
-					<Link href="/admin/my-work-queue">
-						<ArrowLeft className="size-3.5" />
-						Back to TPA/TPV Tracking
-					</Link>
-				</Button>
-			</div>
-
-			<div className={cn(FLAT_CARD_CLASS, "p-5 sm:p-6")}>
-				<div className="space-y-8">
-					<section>
-						<h2 className="text-sm font-semibold text-foreground">
-							Registration Information
-						</h2>
-						<div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-							<div>
-								<FieldLabel required>Wave</FieldLabel>
-								<Select
-									value={form.wave}
-									onValueChange={(v) => patch({ wave: v })}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue placeholder="Select wave" />
-									</SelectTrigger>
-									<SelectContent>
-										{WAVE_OPTIONS.map((w) => (
-											<SelectItem key={w} value={w}>
-												Wave {w}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div>
-								<FieldLabel required>Type</FieldLabel>
-								<Select
-									value={form.vendorType}
-									onValueChange={(v) =>
-										patch({ vendorType: v as RegistrationForm["vendorType"] })
-									}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="TPA">TPA</SelectItem>
-										<SelectItem value="TPV">TPV</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-							<div>
-								<FieldLabel required>TPA/TPV name</FieldLabel>
-								<Input
-									value={form.name}
-									onChange={(e) => patch({ name: e.target.value })}
-									placeholder="Enter TPA/TPV name"
-									className={fieldClass}
-								/>
-							</div>
-							<div>
-								<FieldLabel required>Server</FieldLabel>
-								<Select
-									value={form.serverType}
-									onValueChange={(v) => patch({ serverType: v })}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue placeholder="Enter server or host" />
-									</SelectTrigger>
-									<SelectContent>
-										{SERVER_OPTIONS.map((s) => (
-											<SelectItem key={s} value={s}>
-												{s}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div>
-								<FieldLabel>Email</FieldLabel>
-								<Input
-									type="email"
-									value={form.email}
-									onChange={(e) => patch({ email: e.target.value })}
-									placeholder="Enter contact email"
-									className={fieldClass}
-								/>
-							</div>
-							<div>
-								<ProgressSliderField
-									label="SFTP Progress"
-									value={form.sftpProgress}
-									onChange={setSftpPercent}
-									required
-								/>
-							</div>
-							<div>
-								<ProgressSliderField
-									label="EDI Progress"
-									value={form.ediProgress}
-									onChange={setEdiPercent}
-									disabled={!canSetEdiProgress(form.sftpProgress)}
-									helperText={
-										canSetEdiProgress(form.sftpProgress)
-											? undefined
-											: "Complete SFTP (100%) before setting EDI milestones."
-									}
-									required
-								/>
-							</div>
-							<div>
-								<FieldLabel required>Status</FieldLabel>
-								<Select
-									value={form.status}
-									onValueChange={(v) => patch({ status: v as MigrationStatus })}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{(
-											Object.keys(MIGRATION_STATUS_LABEL) as MigrationStatus[]
-										).map((key) => (
-											<SelectItem key={key} value={key}>
-												{MIGRATION_STATUS_LABEL[key]}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div>
-								<FieldLabel>Analyst</FieldLabel>
-								<Select
-									value={form.analystId || "__none__"}
-									onValueChange={(v) =>
-										patch({ analystId: v === "__none__" ? "" : v })
-									}
-								>
-									<SelectTrigger className={fieldClass}>
-										<SelectValue placeholder="Select analyst" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="__none__">Select analyst</SelectItem>
-										{analysts.map((analyst) => (
-											<SelectItem key={analyst.id} value={analyst.id}>
-												{analyst.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="sm:col-span-2 lg:col-span-1">
-								<FieldLabel>Notes</FieldLabel>
-								<Textarea
-									value={form.notes}
-									onChange={(e) => patch({ notes: e.target.value })}
-									placeholder="Enter any notes or additional information…"
-									rows={4}
-									className="min-h-[108px] resize-none rounded-sm border-border bg-background text-sm shadow-none"
-								/>
-							</div>
-						</div>
-					</section>
-
-					<section className="border-t border-border/50 pt-6">
-						<h2 className="text-sm font-semibold text-foreground">
-							SFTP Milestones{" "}
-							<span className="font-normal text-muted-foreground">
-								(Optional)
-							</span>
-						</h2>
-						<p className="mt-1 text-xs text-muted-foreground">
-							Milestones must be completed in order.
-						</p>
-						<div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-							{SFTP_MILESTONE_DEFS.map((milestone) => (
-								<div key={milestone.key} className="min-w-0">
-									<FieldLabel>{milestone.label}</FieldLabel>
-									<Select
-										value={form.sftpMilestones[milestone.key] ?? "not_started"}
-										onValueChange={(v) =>
-											patchSftpMilestone(milestone.key, v as MilestoneUiStatus)
-										}
-									>
-										<SelectTrigger className={cn(fieldClass, "text-xs")}>
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											{(
-												Object.keys(
-													MILESTONE_STATUS_LABEL
-												) as MilestoneUiStatus[]
-											).map((key) => (
-												<SelectItem key={key} value={key}>
-													{MILESTONE_STATUS_LABEL[key]}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-							))}
-						</div>
-					</section>
-
-					<section className="border-t border-border/50 pt-6">
-						<h2 className="text-sm font-semibold text-foreground">
-							EDI Milestones{" "}
-							<span className="font-normal text-muted-foreground">
-								(Optional)
-							</span>
-						</h2>
-						<p className="mt-1 text-xs text-muted-foreground">
-							Available only after SFTP is 100%.
-						</p>
-						<div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-							{EDI_MILESTONE_DEFS.map((milestone) => (
-								<div key={milestone.key} className="min-w-0">
-									<FieldLabel>{milestone.label}</FieldLabel>
-									<Select
-										value={form.ediMilestones[milestone.key] ?? "not_started"}
-										onValueChange={(v) =>
-											patchEdiMilestone(milestone.key, v as MilestoneUiStatus)
-										}
-										disabled={!canSetEdiProgress(form.sftpProgress)}
-									>
-										<SelectTrigger className={cn(fieldClass, "text-xs")}>
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											{(
-												Object.keys(
-													MILESTONE_STATUS_LABEL
-												) as MilestoneUiStatus[]
-											).map((key) => (
-												<SelectItem key={key} value={key}>
-													{MILESTONE_STATUS_LABEL[key]}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-							))}
-						</div>
-					</section>
-				</div>
-
-				<div className="mt-8 flex flex-wrap items-center justify-end gap-2 border-t border-border/50 pt-5">
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						className="h-9 rounded-sm border-border/50 bg-background px-4 text-xs shadow-none"
-						disabled={pending}
-						asChild
-					>
-						<Link href="/admin/my-work-queue">Cancel</Link>
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						className="h-9 rounded-sm border-border/50 bg-background px-4 text-xs shadow-none"
-						disabled={pending}
-						onClick={saveDraft}
-					>
-						Save Draft
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						className="h-9 rounded-sm px-4 text-xs shadow-none"
-						disabled={pending}
-						onClick={() => void submit()}
-					>
-						Save &amp; Add
-					</Button>
-				</div>
-			</div>
-		</div>
+		<WorkQueueFormWizard
+			values={values}
+			onChange={patchValues}
+			analysts={analysts}
+			busy={pending}
+			error={error}
+			onCancelHref="/admin/my-work-queue"
+			onSaveDraft={saveDraft}
+			onSubmit={handleSubmit}
+		/>
 	);
+}
+
+function formNeedsStatusUpdate(values: WorkQueueWizardValues) {
+	return values.status !== "not_started";
 }
 
 export function WorkQueueCreatePage() {
