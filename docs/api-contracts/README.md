@@ -2,9 +2,12 @@
 
 Frontend–backend contracts for the NestJS API paired with this starter.
 
-| Document                                   | Domain                     |
-| ------------------------------------------ | -------------------------- |
-| [identity-groups.md](./identity-groups.md) | Admin identity groups CRUD |
+| Document                                                                                     | Domain                                     |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| [identity-groups.md](./identity-groups.md)                                                     | Admin identity groups CRUD                 |
+| [members-360.md](./members-360.md)                                                             | Member 360 gaps                            |
+| [work-queue-gaps.md](./work-queue-gaps.md)                                                     | Work queue / TPA-TPV gaps                  |
+| [backend-gaps-members-providers-tpa.md](./backend-gaps-members-providers-tpa.md)               | Backend work needed by Members, Providers, TPA/TPV |
 
 ## NestJS CORS (when backend is ready)
 
