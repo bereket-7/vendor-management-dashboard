@@ -1,8 +1,9 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
 	type ReactNode,
+	Suspense,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -81,10 +82,24 @@ import {
 } from "@/features/admin/features/providers/feature/api/providersApi";
 import {
 	useDeleteProviderMutation,
+	useHardDeleteProviderMutation,
 	useProviderDetailQuery,
+	useRestoreProviderMutation,
 	useSetProviderStatusMutation,
 } from "@/features/admin/features/providers/feature/queries/useProvidersQuery";
-import { Link } from "@/i18n/navigation";
+import {
+	ProviderCreateCredentialButton,
+	ProviderCreateExceptionButton,
+	ProviderCreateIdentifierButton,
+	ProviderCreateLocationButton,
+	ProviderCreateNetworkButton,
+	ProviderCredentialRowActions,
+	ProviderExceptionRowActions,
+	ProviderIdentifierRowActions,
+	ProviderLocationRowActions,
+	ProviderNetworkRowActions,
+} from "@/features/admin/features/providers/pages/provider-detail-actions";
+import { Link, useRouter } from "@/i18n/navigation";
 import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
@@ -272,11 +287,16 @@ function ViewAllLink({
 	);
 }
 
-/** Table chrome — compact rows, dark field headers. */
+/** Table chrome — compact rows, dark field headers. Fixed layout + clamp long text. */
 const DETAIL_TH =
 	"h-6 bg-muted/50 px-2 text-left text-[9px] font-bold uppercase tracking-wide text-foreground";
-const DETAIL_TD = "px-2.5 py-1.5 align-middle text-xs text-foreground";
+const DETAIL_TD =
+	"min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-1.5 align-middle text-xs text-foreground";
 const DETAIL_TD_MUTED = cn(DETAIL_TD, "text-muted-foreground");
+const DETAIL_TD_WRAP =
+	"min-w-0 overflow-hidden break-words whitespace-normal px-2.5 py-1.5 align-middle text-xs text-foreground";
+const DETAIL_TD_ACTIONS =
+	"min-w-0 overflow-visible whitespace-normal px-2.5 py-1.5 align-middle text-xs";
 const DETAIL_ROW =
 	"border-b border-border/30 hover:bg-muted/15 last:border-b-0";
 
@@ -311,7 +331,7 @@ function AttrTable({
 	return (
 		<div
 			className={cn(
-				"overflow-hidden rounded-md border border-border/40",
+				"overflow-x-auto overflow-y-hidden rounded-md border border-border/40",
 				className
 			)}
 		>
@@ -334,20 +354,30 @@ function AttrTable({
 				<TableBody>
 					{rows.map((row, i) => (
 						<TableRow key={i} className={DETAIL_ROW}>
-							{columns.map((col) => (
-								<TableCell
-									key={col.key}
-									className={cn(
-										DETAIL_TD,
-										"font-medium",
-										col.align === "right" && "text-right",
-										col.mono && "font-mono tabular-nums tracking-tight",
-										col.className
-									)}
-								>
-									{row[col.key] ?? "—"}
-								</TableCell>
-							))}
+							{columns.map((col) => {
+								const value = row[col.key] ?? "—";
+								const plain =
+									typeof value === "string" || typeof value === "number";
+								return (
+									<TableCell
+										key={col.key}
+										title={plain ? String(value) : undefined}
+										className={cn(
+											DETAIL_TD,
+											"font-medium",
+											col.align === "right" && "text-right",
+											col.mono && "font-mono tabular-nums tracking-tight",
+											col.className
+										)}
+									>
+										{plain ? (
+											value
+										) : (
+											<span className="block min-w-0 truncate">{value}</span>
+										)}
+									</TableCell>
+								);
+							})}
 						</TableRow>
 					))}
 				</TableBody>
@@ -359,7 +389,7 @@ function AttrTable({
 /** Shared wrapper for multi-row list tables (locations, claims, etc.). */
 function DataTableShell({ children }: { children: ReactNode }) {
 	return (
-		<div className="overflow-hidden rounded-md border border-border/40">
+		<div className="overflow-x-auto overflow-y-hidden rounded-md border border-border/40">
 			{children}
 		</div>
 	);
@@ -555,11 +585,18 @@ function ProviderTabsNav({
 		const el = scrollerRef.current;
 		if (!el) return;
 		const active = el.querySelector<HTMLElement>('[data-active-tab="true"]');
-		active?.scrollIntoView({
-			behavior: "smooth",
-			inline: "nearest",
-			block: "nearest",
-		});
+		if (!active) return;
+		const parentRect = el.getBoundingClientRect();
+		const tabRect = active.getBoundingClientRect();
+		const outLeft = tabRect.left < parentRect.left + 4;
+		const outRight = tabRect.right > parentRect.right - 4;
+		if (outLeft || outRight) {
+			active.scrollIntoView({
+				behavior: "smooth",
+				inline: "nearest",
+				block: "nearest",
+			});
+		}
 		requestAnimationFrame(updateOverflow);
 	}, [tab, updateOverflow]);
 
@@ -648,7 +685,20 @@ export function ProviderDetailPage({
 }: {
 	providerId?: string;
 }) {
+	return (
+		<Suspense fallback={<VendorCoreLoadingRow label="Loading provider…" />}>
+			<ProviderDetailPageInner providerIdProp={providerIdProp} />
+		</Suspense>
+	);
+}
+
+function ProviderDetailPageInner({
+	providerIdProp,
+}: {
+	providerIdProp?: string;
+}) {
 	const params = useParams<{ providerId?: string | string[] }>();
+	const searchParams = useSearchParams();
 	const raw = providerIdProp ?? params.providerId;
 	const providerId = decodeURIComponent(
 		Array.isArray(raw) ? (raw[0] ?? "") : String(raw ?? "")
@@ -663,11 +713,41 @@ export function ProviderDetailPage({
 		[useApi, providerId]
 	);
 	const provider = useApi ? detailQuery.data : mockProvider;
-	const [tab, setTab] = useState<TabId>("Overview");
+	const router = useRouter();
+	const confirm = useConfirm();
+	const tabFromQuery = searchParams.get("tab");
+	const [tab, setTab] = useState<TabId>(() => {
+		if (tabFromQuery && (TABS as readonly string[]).includes(tabFromQuery)) {
+			return tabFromQuery as TabId;
+		}
+		return "Overview";
+	});
+
+	/** Keep tab in sync when arriving from section editor (`?tab=`), not when user clicks tabs. */
+	useEffect(() => {
+		if (tabFromQuery && (TABS as readonly string[]).includes(tabFromQuery)) {
+			setTab(tabFromQuery as TabId);
+		}
+	}, [tabFromQuery]);
+
+	const handleTabChange = useCallback(
+		(next: TabId) => {
+			setTab(next);
+			if (!providerId) return;
+			const qs = new URLSearchParams(searchParams.toString());
+			qs.set("tab", next);
+			router.replace(`/admin/providers/${providerId}?${qs.toString()}`, {
+				scroll: false,
+			});
+		},
+		[providerId, router, searchParams]
+	);
+
 	const setStatusMutation = useSetProviderStatusMutation();
 	const deleteProviderMutation = useDeleteProviderMutation();
+	const restoreProviderMutation = useRestoreProviderMutation();
+	const hardDeleteProviderMutation = useHardDeleteProviderMutation();
 	const [lifecycleBusy, setLifecycleBusy] = useState(false);
-	const confirm = useConfirm();
 
 	async function handleSetStatus(status: ProviderStatus): Promise<void> {
 		if (!providerId) return;
@@ -711,6 +791,57 @@ export function ProviderDetailPage({
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Failed to archive provider.";
+			toast.error(message);
+		} finally {
+			setLifecycleBusy(false);
+		}
+	}
+
+	async function handleRestoreProvider(): Promise<void> {
+		if (!providerId) return;
+		if (!useApi) {
+			toast.info("Live-only action. Enable vendor-core mode.");
+			return;
+		}
+		setLifecycleBusy(true);
+		try {
+			await restoreProviderMutation.mutateAsync({ id: providerId });
+			toast.success("Provider restored.");
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Failed to restore provider.";
+			toast.error(message);
+		} finally {
+			setLifecycleBusy(false);
+		}
+	}
+
+	async function handleHardDeleteProvider(): Promise<void> {
+		if (!providerId) return;
+		if (!useApi) {
+			toast.info("Live-only action. Enable vendor-core mode.");
+			return;
+		}
+		const ok = await confirm({
+			title: "Permanently delete this provider?",
+			description:
+				"Hard delete cannot be undone. Prefer archive unless you need to remove the row entirely.",
+			confirmLabel: "Hard delete",
+			cancelLabel: "Cancel",
+			variant: "destructive",
+			icon: "delete",
+		});
+		if (!ok) return;
+		setLifecycleBusy(true);
+		try {
+			await hardDeleteProviderMutation.mutateAsync({ id: providerId });
+			toast.success("Provider permanently deleted.");
+			router.push("/admin/providers");
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Failed to hard-delete provider.";
 			toast.error(message);
 		} finally {
 			setLifecycleBusy(false);
@@ -854,7 +985,9 @@ export function ProviderDetailPage({
 									disabled={
 										lifecycleBusy ||
 										setStatusMutation.isPending ||
-										deleteProviderMutation.isPending
+										deleteProviderMutation.isPending ||
+										restoreProviderMutation.isPending ||
+										hardDeleteProviderMutation.isPending
 									}
 								>
 									Lifecycle
@@ -882,11 +1015,25 @@ export function ProviderDetailPage({
 								>
 									Set status: Termed
 								</DropdownMenuItem>
+								{provider.isDeleted ? (
+									<DropdownMenuItem
+										onClick={() => void handleRestoreProvider()}
+									>
+										Restore provider
+									</DropdownMenuItem>
+								) : (
+									<DropdownMenuItem
+										className="text-destructive focus:text-destructive"
+										onClick={() => void handleArchiveProvider()}
+									>
+										Archive provider
+									</DropdownMenuItem>
+								)}
 								<DropdownMenuItem
 									className="text-destructive focus:text-destructive"
-									onClick={() => void handleArchiveProvider()}
+									onClick={() => void handleHardDeleteProvider()}
 								>
-									Archive provider
+									Hard delete…
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
@@ -1013,7 +1160,7 @@ export function ProviderDetailPage({
 					/>
 				</section>
 
-				<ProviderTabsNav tab={tab} onTabChange={setTab} />
+				<ProviderTabsNav tab={tab} onTabChange={handleTabChange} />
 
 				{tab === "Overview" ? (
 					<div className="space-y-3">
@@ -1187,9 +1334,12 @@ export function ProviderDetailPage({
 										<TableBody>
 											{provider.locations.map((loc) => (
 												<TableRow key={loc.id} className={DETAIL_ROW}>
-													<TableCell className={DETAIL_TD}>
-														<p className="font-medium">{loc.name}</p>
-														<p className="text-xs leading-relaxed text-muted-foreground">
+													<TableCell
+														className={DETAIL_TD_WRAP}
+														title={`${loc.name} — ${loc.address}`}
+													>
+														<p className="truncate font-medium">{loc.name}</p>
+														<p className="truncate text-xs text-muted-foreground">
 															{loc.address}
 														</p>
 													</TableCell>
@@ -1206,7 +1356,7 @@ export function ProviderDetailPage({
 								</DataTableShell>
 								<ViewAllLink
 									label={`View all (${provider.locations.length})`}
-									onClick={() => setTab("Locations")}
+									onClick={() => handleTabChange("Locations")}
 								/>
 							</Panel>
 							<Panel dense icon={Network} title="Network participation">
@@ -1222,9 +1372,14 @@ export function ProviderDetailPage({
 										<TableBody>
 											{provider.networks.slice(0, 5).map((n) => (
 												<TableRow key={n.id} className={DETAIL_ROW}>
-													<TableCell className={DETAIL_TD}>
-														<p className="font-medium">{n.networkPlan}</p>
-														<p className="text-xs text-muted-foreground">
+													<TableCell
+														className={DETAIL_TD_WRAP}
+														title={`${n.networkPlan} — ${n.payer}`}
+													>
+														<p className="truncate font-medium">
+															{n.networkPlan}
+														</p>
+														<p className="truncate text-xs text-muted-foreground">
 															{n.payer}
 														</p>
 													</TableCell>
@@ -1243,7 +1398,7 @@ export function ProviderDetailPage({
 								</DataTableShell>
 								<ViewAllLink
 									label={`View all (${provider.networks.length})`}
-									onClick={() => setTab("Network Participation")}
+									onClick={() => handleTabChange("Network Participation")}
 								/>
 							</Panel>
 						</div>
@@ -1256,7 +1411,7 @@ export function ProviderDetailPage({
 								<button
 									type="button"
 									className="text-xs font-medium text-primary hover:underline"
-									onClick={() => setTab("Identifiers")}
+									onClick={() => handleTabChange("Identifiers")}
 								>
 									View all →
 								</button>
@@ -1305,7 +1460,7 @@ export function ProviderDetailPage({
 								</div>
 								<ViewAllLink
 									label="View claims & encounters"
-									onClick={() => setTab("Claims & Encounters")}
+									onClick={() => handleTabChange("Claims & Encounters")}
 								/>
 							</Panel>
 							<Panel dense icon={ArrowDownRight} title="Rejection trends">
@@ -1349,7 +1504,7 @@ export function ProviderDetailPage({
 								</div>
 								<ViewAllLink
 									label="View rejection details"
-									onClick={() => setTab("Rejection Trends")}
+									onClick={() => handleTabChange("Rejection Trends")}
 								/>
 							</Panel>
 						</div>
@@ -1403,13 +1558,16 @@ export function ProviderDetailPage({
 										<TableBody>
 											{provider.vendors.map((v) => (
 												<TableRow key={v.id} className={DETAIL_ROW}>
-													<TableCell className={DETAIL_TD}>
-														<p className="font-medium">{v.vendor}</p>
-														<p className="text-xs text-muted-foreground">
+													<TableCell
+														className={DETAIL_TD_WRAP}
+														title={v.vendor}
+													>
+														<p className="truncate font-medium">{v.vendor}</p>
+														<p className="truncate text-xs text-muted-foreground">
 															{v.frequency} · {v.lastReceived}
 														</p>
 													</TableCell>
-													<TableCell className={DETAIL_TD}>
+													<TableCell className={DETAIL_TD} title={v.fileType}>
 														{v.fileType}
 													</TableCell>
 													<TableCell className={DETAIL_TD}>
@@ -1422,7 +1580,7 @@ export function ProviderDetailPage({
 								</DataTableShell>
 								<ViewAllLink
 									label="View all vendors / sources"
-									onClick={() => setTab("Vendors / Sources")}
+									onClick={() => handleTabChange("Vendors / Sources")}
 								/>
 							</Panel>
 							<Panel dense icon={BadgeCheck} title="Credentialing">
@@ -1493,7 +1651,7 @@ export function ProviderDetailPage({
 								</div>
 								<ViewAllLink
 									label="View credentialing details"
-									onClick={() => setTab("Credentialing & Exceptions")}
+									onClick={() => handleTabChange("Credentialing & Exceptions")}
 								/>
 							</Panel>
 						</div>
@@ -1520,11 +1678,14 @@ export function ProviderDetailPage({
 										<TableBody>
 											{provider.exceptions.map((ex) => (
 												<TableRow key={ex.id} className={DETAIL_ROW}>
-													<TableCell className={DETAIL_TD}>
-														<p className="font-medium text-chart-3">
+													<TableCell
+														className={DETAIL_TD_WRAP}
+														title={`${ex.exceptionType}: ${ex.description}`}
+													>
+														<p className="truncate font-medium text-chart-3">
 															{ex.exceptionType}
 														</p>
-														<p className="text-xs text-muted-foreground">
+														<p className="truncate text-xs text-muted-foreground">
 															{ex.description}
 														</p>
 													</TableCell>
@@ -1542,7 +1703,7 @@ export function ProviderDetailPage({
 							)}
 							<ViewAllLink
 								label="View all exceptions"
-								onClick={() => setTab("Credentialing & Exceptions")}
+								onClick={() => handleTabChange("Credentialing & Exceptions")}
 							/>
 						</Panel>
 
@@ -1552,7 +1713,16 @@ export function ProviderDetailPage({
 						</footer>
 					</div>
 				) : (
-					<TabBody tab={tab} provider={provider} />
+					<>
+						{provider.partialLoadErrors?.length ? (
+							<div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+								Some sections failed to load:{" "}
+								{provider.partialLoadErrors.join(", ")}. Empty tables may be
+								errors, not missing data.
+							</div>
+						) : null}
+						<TabBody tab={tab} provider={provider} providerId={providerId} />
+					</>
 				)}
 			</div>
 		);
@@ -1841,9 +2011,12 @@ function ClaimsEncountersTab({
 									<TableCell className={cn(DETAIL_TD, "font-mono text-xs")}>
 										{r.claimNumber}
 									</TableCell>
-									<TableCell className={DETAIL_TD}>
-										<p className="font-medium">{r.memberName}</p>
-										<p className="font-mono text-[11px] text-muted-foreground">
+									<TableCell
+										className={DETAIL_TD_WRAP}
+										title={`${r.memberName} (${r.memberId})`}
+									>
+										<p className="truncate font-medium">{r.memberName}</p>
+										<p className="truncate font-mono text-[11px] text-muted-foreground">
 											{r.memberId}
 										</p>
 									</TableCell>
@@ -1851,7 +2024,9 @@ function ClaimsEncountersTab({
 									<TableCell className={cn(DETAIL_TD, "font-mono text-xs")}>
 										{r.procedureCode}
 									</TableCell>
-									<TableCell className={DETAIL_TD}>{r.vendor}</TableCell>
+									<TableCell className={DETAIL_TD} title={r.vendor}>
+										{r.vendor}
+									</TableCell>
 									<TableCell
 										className={cn(DETAIL_TD, "text-right tabular-nums")}
 									>
@@ -1899,8 +2074,10 @@ function CredStatusPill({ status }: { status: CredentialStatus }) {
 
 function CredentialingTab({
 	provider,
+	providerId,
 }: {
 	provider: NonNullable<ReturnType<typeof getProvider>>;
+	providerId: string;
 }) {
 	const counts = {
 		complete: 0,
@@ -1969,9 +2146,12 @@ function CredentialingTab({
 					title="Credentialing checklist"
 					className="lg:col-span-3"
 					action={
-						<span className="text-[11px] text-muted-foreground">
-							{total} items tracked
-						</span>
+						<div className="flex items-center gap-2">
+							<span className="text-[11px] text-muted-foreground">
+								{total} items tracked
+							</span>
+							<ProviderCreateCredentialButton providerId={providerId} />
+						</div>
 					}
 				>
 					<DataTableShell>
@@ -1983,6 +2163,9 @@ function CredentialingTab({
 									<DetailTableHead>Verified</DetailTableHead>
 									<DetailTableHead>Expires</DetailTableHead>
 									<DetailTableHead>Status</DetailTableHead>
+									<DetailTableHead className="w-36 min-w-36 text-right">
+										Actions
+									</DetailTableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -2002,6 +2185,12 @@ function CredentialingTab({
 										</TableCell>
 										<TableCell className={DETAIL_TD}>
 											<CredStatusPill status={c.status} />
+										</TableCell>
+										<TableCell className={DETAIL_TD_ACTIONS}>
+											<ProviderCredentialRowActions
+												providerId={providerId}
+												row={c}
+											/>
 										</TableCell>
 									</TableRow>
 								))}
@@ -2107,9 +2296,12 @@ function CredentialingTab({
 				icon={ClipboardList}
 				title="Credentialing & enrollment exceptions"
 				action={
-					<span className="text-[11px] text-muted-foreground">
-						{provider.exceptions.length} total
-					</span>
+					<div className="flex items-center gap-2">
+						<span className="text-[11px] text-muted-foreground">
+							{provider.exceptions.length} total
+						</span>
+						<ProviderCreateExceptionButton providerId={providerId} />
+					</div>
 				}
 			>
 				{provider.exceptions.length === 0 ? (
@@ -2125,6 +2317,9 @@ function CredentialingTab({
 									<DetailTableHead>Description</DetailTableHead>
 									<DetailTableHead>Status</DetailTableHead>
 									<DetailTableHead>Identified</DetailTableHead>
+									<DetailTableHead className="w-36 min-w-36 text-right">
+										Actions
+									</DetailTableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -2135,7 +2330,10 @@ function CredentialingTab({
 										>
 											{ex.exceptionType}
 										</TableCell>
-										<TableCell className={cn(DETAIL_TD, "leading-relaxed")}>
+										<TableCell
+											className={cn(DETAIL_TD_WRAP, "leading-relaxed")}
+											title={ex.description}
+										>
 											{ex.description}
 										</TableCell>
 										<TableCell className={DETAIL_TD}>
@@ -2143,6 +2341,12 @@ function CredentialingTab({
 										</TableCell>
 										<TableCell className={cn(DETAIL_TD, "tabular-nums")}>
 											{formatDate(ex.dateIdentified)}
+										</TableCell>
+										<TableCell className={DETAIL_TD_ACTIONS}>
+											<ProviderExceptionRowActions
+												providerId={providerId}
+												row={ex}
+											/>
 										</TableCell>
 									</TableRow>
 								))}
@@ -2161,9 +2365,11 @@ function CredentialingTab({
 function TabBody({
 	tab,
 	provider,
+	providerId,
 }: {
 	tab: TabId;
 	provider: NonNullable<ReturnType<typeof getProvider>>;
+	providerId: string;
 }) {
 	if (tab === "Demographics") {
 		const age = providerAge(provider.dob);
@@ -2425,19 +2631,54 @@ function TabBody({
 
 	if (tab === "Identifiers") {
 		return (
-			<Panel dense icon={BadgeCheck} title="Identifier details">
-				<AttrTable
-					columns={provider.identifiers.map((id) => ({
-						key: id.id,
-						label: id.label,
-						mono: true,
-					}))}
-					rows={[
-						Object.fromEntries(
-							provider.identifiers.map((id) => [id.id, id.value])
-						),
-					]}
-				/>
+			<Panel
+				dense
+				icon={BadgeCheck}
+				title="Identifier details"
+				action={<ProviderCreateIdentifierButton providerId={providerId} />}
+			>
+				<DataTableShell>
+					<Table className="w-full table-fixed">
+						<TableHeader>
+							<TableRow className="hover:bg-transparent">
+								<DetailTableHead>Label</DetailTableHead>
+								<DetailTableHead>Value</DetailTableHead>
+								<DetailTableHead className="w-36 min-w-36 text-right">
+									Actions
+								</DetailTableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{provider.identifiers.map((id) => (
+								<TableRow key={id.id} className={DETAIL_ROW}>
+									<TableCell
+										className={cn(DETAIL_TD, "font-medium")}
+										title={id.label}
+									>
+										{id.label}
+										{id.synthetic ? (
+											<span className="ml-1 text-[10px] text-muted-foreground">
+												(core)
+											</span>
+										) : null}
+									</TableCell>
+									<TableCell
+										className={cn(DETAIL_TD, "font-mono text-xs")}
+										title={id.value}
+									>
+										{id.value}
+									</TableCell>
+									<TableCell className={DETAIL_TD_ACTIONS}>
+										<ProviderIdentifierRowActions
+											providerId={providerId}
+											row={id}
+										/>
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</DataTableShell>
 			</Panel>
 		);
 	}
@@ -2467,7 +2708,12 @@ function TabBody({
 
 	if (tab === "Network Participation") {
 		return (
-			<Panel dense icon={Network} title="Network Participation">
+			<Panel
+				dense
+				icon={Network}
+				title="Network Participation"
+				action={<ProviderCreateNetworkButton providerId={providerId} />}
+			>
 				<DataTableShell>
 					<Table className="w-full table-fixed">
 						<TableHeader>
@@ -2477,15 +2723,23 @@ function TabBody({
 								<DetailTableHead>Status</DetailTableHead>
 								<DetailTableHead>Effective</DetailTableHead>
 								<DetailTableHead>End</DetailTableHead>
+								<DetailTableHead className="w-36 min-w-36 text-right">
+									Actions
+								</DetailTableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{provider.networks.map((n) => (
 								<TableRow key={n.id} className={DETAIL_ROW}>
-									<TableCell className={cn(DETAIL_TD, "font-medium")}>
+									<TableCell
+										className={cn(DETAIL_TD, "font-medium")}
+										title={n.networkPlan}
+									>
 										{n.networkPlan}
 									</TableCell>
-									<TableCell className={DETAIL_TD}>{n.payer}</TableCell>
+									<TableCell className={DETAIL_TD} title={n.payer}>
+										{n.payer}
+									</TableCell>
 									<TableCell className={DETAIL_TD}>
 										<NetworkPill status={n.status} />
 									</TableCell>
@@ -2494,6 +2748,12 @@ function TabBody({
 									</TableCell>
 									<TableCell className={cn(DETAIL_TD, "tabular-nums")}>
 										{formatDate(n.endDate)}
+									</TableCell>
+									<TableCell className={DETAIL_TD_ACTIONS}>
+										<ProviderNetworkRowActions
+											providerId={providerId}
+											row={n}
+										/>
 									</TableCell>
 								</TableRow>
 							))}
@@ -2506,31 +2766,52 @@ function TabBody({
 
 	if (tab === "Locations") {
 		return (
-			<Panel dense icon={MapPin} title="Locations">
+			<Panel
+				dense
+				icon={MapPin}
+				title="Locations"
+				action={<ProviderCreateLocationButton providerId={providerId} />}
+			>
 				<DataTableShell>
 					<Table className="w-full table-fixed">
 						<TableHeader>
 							<TableRow className="hover:bg-transparent">
-								<DetailTableHead>Location</DetailTableHead>
-								<DetailTableHead>Address</DetailTableHead>
-								<DetailTableHead>Phone</DetailTableHead>
-								<DetailTableHead>Status</DetailTableHead>
-								<DetailTableHead>Primary</DetailTableHead>
+								<DetailTableHead className="w-[18%]">Location</DetailTableHead>
+								<DetailTableHead className="w-[34%]">Address</DetailTableHead>
+								<DetailTableHead className="w-[16%]">Phone</DetailTableHead>
+								<DetailTableHead className="w-[12%]">Status</DetailTableHead>
+								<DetailTableHead className="w-[8%]">Primary</DetailTableHead>
+								<DetailTableHead className="w-36 min-w-36 text-right">
+									Actions
+								</DetailTableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{provider.locations.map((loc) => (
 								<TableRow key={loc.id} className={DETAIL_ROW}>
-									<TableCell className={cn(DETAIL_TD, "font-medium")}>
+									<TableCell
+										className={cn(DETAIL_TD, "font-medium")}
+										title={loc.name}
+									>
 										{loc.name}
 									</TableCell>
-									<TableCell className={DETAIL_TD}>{loc.address}</TableCell>
-									<TableCell className={DETAIL_TD}>{loc.phone}</TableCell>
+									<TableCell className={DETAIL_TD} title={loc.address}>
+										{loc.address}
+									</TableCell>
+									<TableCell className={DETAIL_TD} title={loc.phone}>
+										{loc.phone}
+									</TableCell>
 									<TableCell className={DETAIL_TD}>
 										<StatusPill status={loc.status} />
 									</TableCell>
 									<TableCell className={DETAIL_TD}>
 										{loc.isPrimary ? "Yes" : "No"}
+									</TableCell>
+									<TableCell className={DETAIL_TD_ACTIONS}>
+										<ProviderLocationRowActions
+											providerId={providerId}
+											row={loc}
+										/>
 									</TableCell>
 								</TableRow>
 							))}
@@ -2643,5 +2924,5 @@ function TabBody({
 		);
 	}
 
-	return <CredentialingTab provider={provider} />;
+	return <CredentialingTab provider={provider} providerId={providerId} />;
 }

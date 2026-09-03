@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -23,6 +23,10 @@ import {
 	type ProviderWizardValues,
 	wizardValuesToPayload,
 } from "@/features/admin/features/providers/pages/ProviderFormWizard";
+import {
+	ProviderSectionEditor,
+	isProviderSectionId,
+} from "@/features/admin/features/providers/pages/provider-section-editor";
 import { Link, useRouter } from "@/i18n/navigation";
 import { isMockEnabled } from "@/lib/mock-mode";
 
@@ -31,14 +35,45 @@ export function ProviderEditPage({
 }: {
 	providerId?: string;
 }) {
+	return (
+		<Suspense fallback={<VendorCoreLoadingRow label="Loading editor…" />}>
+			<ProviderEditPageInner providerIdProp={providerIdProp} />
+		</Suspense>
+	);
+}
+
+function ProviderEditPageInner({
+	providerIdProp,
+}: {
+	providerIdProp?: string;
+}) {
 	const params = useParams<{ providerId?: string | string[] }>();
 	const raw = providerIdProp ?? params.providerId;
 	const providerId = decodeURIComponent(
 		Array.isArray(raw) ? (raw[0] ?? "") : String(raw ?? "")
 	);
-	const body = <ProviderEditForm providerId={providerId} />;
+	const searchParams = useSearchParams();
+	const sectionParam = searchParams.get("section");
+	const itemId = searchParams.get("itemId");
+	const section = isProviderSectionId(sectionParam) ? sectionParam : null;
+
+	const body =
+		section && providerId ? (
+			<ProviderSectionEditor
+				providerId={providerId}
+				section={section}
+				itemId={itemId}
+			/>
+		) : (
+			<ProviderEditForm providerId={providerId} />
+		);
+
 	if (!isMockEnabled()) {
-		return <VendorCoreGate title="Edit provider">{body}</VendorCoreGate>;
+		return (
+			<VendorCoreGate title={section ? "Edit section" : "Edit provider"}>
+				{body}
+			</VendorCoreGate>
+		);
 	}
 	return body;
 }
@@ -89,7 +124,7 @@ function ProviderEditForm({ providerId }: { providerId: string }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [live, providerId]);
+	}, [live, providerId, rostersQ.data]);
 
 	function patch(next: Partial<ProviderWizardValues>) {
 		setValues((prev) => ({ ...prev, ...next }));

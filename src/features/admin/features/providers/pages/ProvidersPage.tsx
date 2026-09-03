@@ -78,6 +78,7 @@ import {
 	useRecountProviderRosterMutation,
 	useRestoreProviderMutation,
 	useRestoreProviderRosterMutation,
+	useSeedProvidersMutation,
 	useSetProviderStatusMutation,
 } from "@/features/admin/features/providers/feature/queries/useProvidersQuery";
 import { providersToSummaries } from "@/features/admin/features/providers/live-providers";
@@ -255,12 +256,36 @@ function ProvidersBody({ useLive }: { useLive: boolean }) {
 	const setStatusMutation = useSetProviderStatusMutation();
 	const deleteProviderMutation = useDeleteProviderMutation();
 	const restoreProviderMutation = useRestoreProviderMutation();
+	const seedProvidersMutation = useSeedProvidersMutation();
 	const createRosterMutation = useCreateProviderRosterMutation();
 	const deleteRosterMutation = useDeleteProviderRosterMutation();
 	const recountRosterMutation = useRecountProviderRosterMutation();
 	const confirm = useConfirm();
 	const restoreRosterMutation = useRestoreProviderRosterMutation();
 
+	async function handleSeedProviders(): Promise<void> {
+		if (!useLive) {
+			toast.info("Live-only action. Enable vendor-core mode.");
+			return;
+		}
+		try {
+			const result = await seedProvidersMutation.mutateAsync({ force: false });
+			const created =
+				typeof result === "object" && result && "created" in result
+					? Number((result as { created?: number }).created) || 0
+					: 0;
+			toast.success(
+				created > 0
+					? `Seeded ${created} demo provider(s).`
+					: "Seed finished (nothing new created)."
+			);
+			await invalidate();
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to seed providers."
+			);
+		}
+	}
 	const programScoped = useMemo((): ProviderSummary[] => {
 		if (useLive) {
 			return providersToSummaries(
@@ -547,6 +572,18 @@ function ProvidersBody({ useLive }: { useLive: boolean }) {
 							New provider
 						</Link>
 					</Button>
+					{useLive ? (
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-9"
+							onClick={() => void handleSeedProviders()}
+							disabled={seedProvidersMutation.isPending}
+						>
+							<Database className="mr-1.5 size-3.5" />
+							{seedProvidersMutation.isPending ? "Seeding…" : "Seed demo"}
+						</Button>
+					) : null}
 					<Button
 						variant="outline"
 						size="sm"
@@ -574,7 +611,9 @@ function ProvidersBody({ useLive }: { useLive: boolean }) {
 
 			{useLive && !providersQ.isLoading && programScoped.length === 0 ? (
 				<div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-					No providers returned from vendor-core yet. Run{" "}
+					No providers returned from vendor-core yet. Use{" "}
+					<strong className="font-medium text-foreground">Seed demo</strong>{" "}
+					above, or run{" "}
 					<code className="rounded bg-muted px-1 py-0.5 text-xs">
 						pnpm seed:providers
 					</code>
