@@ -1204,6 +1204,8 @@ export type ProviderDto = {
 	claims12m?: number;
 	paid12m?: number;
 	rejection_rate?: number;
+	is_deleted?: boolean;
+	deleted_at?: string | null;
 	created_at?: string;
 	updated_at?: string;
 };
@@ -1292,6 +1294,10 @@ export type ProviderProfileCompactDto = {
 	enrollment_effective?: string | null;
 	practice_name?: string;
 	accepting_new_patients?: boolean;
+	preferred_name?: string;
+	preferred_language?: string;
+	race?: string;
+	ethnicity?: string;
 };
 
 export type ProviderTabCountsDto = {
@@ -1358,6 +1364,10 @@ export type ProviderProfileUpdateInput = Partial<{
 	graduation_year: number | null;
 	state_license: string;
 	dea_number: string;
+	preferred_name: string;
+	preferred_language: string;
+	race: string;
+	ethnicity: string;
 	is_visible: boolean;
 }>;
 
@@ -1445,6 +1455,20 @@ export type ProviderLocationDto = {
 	updated_at?: string;
 };
 
+export type ProviderLocationCreateInput = {
+	name?: string;
+	address_line1?: string;
+	address_line2?: string;
+	city?: string;
+	state?: string;
+	postal_code?: string;
+	phone?: string;
+	status?: string;
+	is_primary?: boolean;
+};
+
+export type ProviderLocationUpdateInput = Partial<ProviderLocationCreateInput>;
+
 export type ProviderIdentifierDto = {
 	id: string;
 	reference_id?: string;
@@ -1476,6 +1500,16 @@ export type ProviderNetworkDto = {
 	updated_at?: string;
 };
 
+export type ProviderNetworkCreateInput = {
+	network_plan?: string;
+	payer?: string;
+	status?: "in_network" | "out_of_network" | "pending" | string;
+	effective_date?: string | null;
+	end_date?: string | null;
+};
+
+export type ProviderNetworkUpdateInput = Partial<ProviderNetworkCreateInput>;
+
 export type ProviderCredentialDto = {
 	id: string;
 	reference_id?: string;
@@ -1488,6 +1522,17 @@ export type ProviderCredentialDto = {
 	updated_at?: string;
 };
 
+export type ProviderCredentialCreateInput = {
+	label?: string;
+	status?: "complete" | "expiring" | "expired" | "pending" | string;
+	issuer?: string;
+	verified_date?: string | null;
+	expiration_date?: string | null;
+};
+
+export type ProviderCredentialUpdateInput =
+	Partial<ProviderCredentialCreateInput>;
+
 export type ProviderExceptionDto = {
 	id: string;
 	reference_id?: string;
@@ -1498,6 +1543,16 @@ export type ProviderExceptionDto = {
 	created_at?: string;
 	updated_at?: string;
 };
+
+export type ProviderExceptionCreateInput = {
+	exception_type?: string;
+	description?: string;
+	status?: "open" | "in_progress" | "resolved" | string;
+	date_identified?: string | null;
+};
+
+export type ProviderExceptionUpdateInput =
+	Partial<ProviderExceptionCreateInput>;
 
 export type ProviderVendorSourceDto = {
 	id: string;

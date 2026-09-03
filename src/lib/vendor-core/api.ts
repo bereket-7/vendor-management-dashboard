@@ -48,10 +48,11 @@ import type {
 	MigrationCaseBulkStatusInput,
 	MigrationCaseBulkStatusResultDto,
 	MigrationCaseCreateInput,
-	MigrationCaseDocumentDto,
 	MigrationCaseDto,
+	MigrationCaseEscalationInput,
 	MigrationCaseEventDto,
 	MigrationCaseListQuery,
+	MigrationCaseProgressUpdateInput,
 	MigrationCaseUpdateInput,
 	MigrationStatusDto,
 	MonitoringDashboardDto,
@@ -67,18 +68,26 @@ import type {
 	ProcurementDocumentDto,
 	ProcurementDocumentListQuery,
 	ProviderCreateInput,
+	ProviderCredentialCreateInput,
 	ProviderCredentialDto,
+	ProviderCredentialUpdateInput,
 	ProviderDashboardStatsDto,
 	ProviderDashboardStatsQuery,
 	ProviderDto,
+	ProviderExceptionCreateInput,
 	ProviderExceptionDto,
+	ProviderExceptionUpdateInput,
 	ProviderIdentifierCreateInput,
 	ProviderIdentifierDto,
 	ProviderIdentifierUpdateInput,
 	ProviderListQuery,
+	ProviderLocationCreateInput,
 	ProviderLocationDto,
+	ProviderLocationUpdateInput,
 	ProviderMonthlyVolumeDto,
+	ProviderNetworkCreateInput,
 	ProviderNetworkDto,
+	ProviderNetworkUpdateInput,
 	ProviderProfileDto,
 	ProviderProfileUpdateInput,
 	ProviderRecentActivityDto,
@@ -117,11 +126,8 @@ import type {
 	VendorNoteUpdateInput,
 	VendorTeamMemberDto,
 	WhitelistStatusDto,
-	WorkQueueAnalystStatsRowDto,
-	WorkQueueBlockerRowDto,
 	WorkQueueFilterQuery,
 	WorkQueueImportResultDto,
-	WorkQueueProgressSummaryDto,
 	WorkQueueSeedInput,
 	WorkQueueSeedResultDto,
 } from "@/lib/vendor-core/types";
@@ -1650,7 +1656,7 @@ export const vendorCoreApi = {
 			{ method: "DELETE" }
 		),
 
-	createProviderLocation: (id: string, body: Record<string, unknown>) =>
+	createProviderLocation: (id: string, body: ProviderLocationCreateInput) =>
 		vendorCoreFetch<ProviderLocationDto>(
 			vendorCoreEndpoints.providerLocationCreate(id),
 			{ method: "POST", body: JSON.stringify(body) }
@@ -1659,7 +1665,7 @@ export const vendorCoreApi = {
 	updateProviderLocation: (
 		id: string,
 		locationId: string,
-		body: Record<string, unknown>
+		body: ProviderLocationUpdateInput
 	) =>
 		vendorCoreFetch<ProviderLocationDto>(
 			vendorCoreEndpoints.providerLocationUpdate(id, locationId),
@@ -1672,7 +1678,7 @@ export const vendorCoreApi = {
 			{ method: "DELETE" }
 		),
 
-	createProviderNetwork: (id: string, body: Record<string, unknown>) =>
+	createProviderNetwork: (id: string, body: ProviderNetworkCreateInput) =>
 		vendorCoreFetch<ProviderNetworkDto>(
 			vendorCoreEndpoints.providerNetworkCreate(id),
 			{ method: "POST", body: JSON.stringify(body) }
@@ -1681,7 +1687,7 @@ export const vendorCoreApi = {
 	updateProviderNetwork: (
 		id: string,
 		networkId: string,
-		body: Record<string, unknown>
+		body: ProviderNetworkUpdateInput
 	) =>
 		vendorCoreFetch<ProviderNetworkDto>(
 			vendorCoreEndpoints.providerNetworkUpdate(id, networkId),
@@ -1694,7 +1700,7 @@ export const vendorCoreApi = {
 			{ method: "DELETE" }
 		),
 
-	createProviderCredential: (id: string, body: Record<string, unknown>) =>
+	createProviderCredential: (id: string, body: ProviderCredentialCreateInput) =>
 		vendorCoreFetch<ProviderCredentialDto>(
 			vendorCoreEndpoints.providerCredentialCreate(id),
 			{ method: "POST", body: JSON.stringify(body) }
@@ -1703,7 +1709,7 @@ export const vendorCoreApi = {
 	updateProviderCredential: (
 		id: string,
 		credentialId: string,
-		body: Record<string, unknown>
+		body: ProviderCredentialUpdateInput
 	) =>
 		vendorCoreFetch<ProviderCredentialDto>(
 			vendorCoreEndpoints.providerCredentialUpdate(id, credentialId),
@@ -1716,7 +1722,7 @@ export const vendorCoreApi = {
 			{ method: "DELETE" }
 		),
 
-	createProviderException: (id: string, body: Record<string, unknown>) =>
+	createProviderException: (id: string, body: ProviderExceptionCreateInput) =>
 		vendorCoreFetch<ProviderExceptionDto>(
 			vendorCoreEndpoints.providerExceptionCreate(id),
 			{ method: "POST", body: JSON.stringify(body) }
@@ -1725,7 +1731,7 @@ export const vendorCoreApi = {
 	updateProviderException: (
 		id: string,
 		exceptionId: string,
-		body: Record<string, unknown>
+		body: ProviderExceptionUpdateInput
 	) =>
 		vendorCoreFetch<ProviderExceptionDto>(
 			vendorCoreEndpoints.providerExceptionUpdate(id, exceptionId),
@@ -2550,7 +2556,7 @@ export const vendorCoreApi = {
 
 	updateMigrationCaseSftpProgress: async (
 		id: string,
-		body: import("./types").MigrationCaseProgressUpdateInput
+		body: MigrationCaseProgressUpdateInput
 	) => {
 		const raw = await vendorCoreFetch<Record<string, unknown>>(
 			vendorCoreEndpoints.migrationCaseSftpProgressUpdate(id),
@@ -2561,7 +2567,7 @@ export const vendorCoreApi = {
 
 	updateMigrationCaseEdiProgress: async (
 		id: string,
-		body: import("./types").MigrationCaseProgressUpdateInput
+		body: MigrationCaseProgressUpdateInput
 	) => {
 		const raw = await vendorCoreFetch<Record<string, unknown>>(
 			vendorCoreEndpoints.migrationCaseEdiProgressUpdate(id),
@@ -2572,7 +2578,7 @@ export const vendorCoreApi = {
 
 	setMigrationCaseEscalation: async (
 		id: string,
-		body: import("./types").MigrationCaseEscalationInput
+		body: MigrationCaseEscalationInput
 	) => {
 		const raw = await vendorCoreFetch<Record<string, unknown>>(
 			vendorCoreEndpoints.migrationCaseEscalation(id),
