@@ -3,10 +3,20 @@ import { vendorCoreApi } from "@/lib/vendor-core/api";
 import { VendorCoreApiError } from "@/lib/vendor-core/client";
 import type {
 	ProviderCreateInput,
+	ProviderCredentialCreateInput,
+	ProviderCredentialUpdateInput,
 	ProviderDashboardStatsQuery,
 	ProviderDto,
+	ProviderExceptionCreateInput,
+	ProviderExceptionUpdateInput,
+	ProviderIdentifierCreateInput,
 	ProviderIdentifierDto,
+	ProviderIdentifierUpdateInput,
 	ProviderListQuery,
+	ProviderLocationCreateInput,
+	ProviderLocationUpdateInput,
+	ProviderNetworkCreateInput,
+	ProviderNetworkUpdateInput,
 	ProviderRosterCreateInput,
 	ProviderRosterListQuery,
 	ProviderRosterUpdateInput,
@@ -102,6 +112,14 @@ export async function getProviderDetail(
 	const programCode = program ?? "DHCF";
 
 	async function loadById(id: string) {
+		const partialLoadErrors: string[] = [];
+		function track<T>(label: string, fallback: T) {
+			return (_err: unknown): T => {
+				partialLoadErrors.push(label);
+				return fallback;
+			};
+		}
+
 		const [
 			dto,
 			profile,
@@ -118,24 +136,38 @@ export async function getProviderDetail(
 			recentEncounters,
 		] = await Promise.all([
 			getProviderDto(id),
-			vendorCoreApi.getProviderProfile(id).catch(() => null),
-			vendorCoreApi.getProviderSummary(id).catch(() => null),
-			vendorCoreApi.listProviderLocations(id).catch(() => ({ results: [] })),
-			vendorCoreApi.listProviderIdentifiers(id).catch(() => ({ results: [] })),
-			vendorCoreApi.listProviderNetworks(id).catch(() => ({ results: [] })),
-			vendorCoreApi.listProviderCredentials(id).catch(() => ({ results: [] })),
-			vendorCoreApi.listProviderExceptions(id).catch(() => ({ results: [] })),
+			vendorCoreApi.getProviderProfile(id).catch(track("profile", null)),
+			vendorCoreApi.getProviderSummary(id).catch(track("summary", null)),
+			vendorCoreApi
+				.listProviderLocations(id)
+				.catch(track("locations", { results: [] })),
+			vendorCoreApi
+				.listProviderIdentifiers(id)
+				.catch(track("identifiers", { results: [] })),
+			vendorCoreApi
+				.listProviderNetworks(id)
+				.catch(track("networks", { results: [] })),
+			vendorCoreApi
+				.listProviderCredentials(id)
+				.catch(track("credentials", { results: [] })),
+			vendorCoreApi
+				.listProviderExceptions(id)
+				.catch(track("exceptions", { results: [] })),
 			vendorCoreApi
 				.listProviderVendorSources(id)
-				.catch(() => ({ results: [] })),
-			vendorCoreApi.listProviderMonthlyVolume(id).catch(() => []),
-			vendorCoreApi.listProviderRejectionReasons(id).catch(() => []),
+				.catch(track("vendor-sources", { results: [] })),
+			vendorCoreApi
+				.listProviderMonthlyVolume(id)
+				.catch(track("monthly-volume", [])),
+			vendorCoreApi
+				.listProviderRejectionReasons(id)
+				.catch(track("rejection-reasons", [])),
 			vendorCoreApi
 				.listProviderRecentActivity(id, { kind: "claim", limit: 25 })
-				.catch(() => []),
+				.catch(track("recent-claims", [])),
 			vendorCoreApi
 				.listProviderRecentActivity(id, { kind: "encounter", limit: 25 })
-				.catch(() => []),
+				.catch(track("recent-encounters", [])),
 		]);
 		if (!dto) return null;
 		return providerDtoToDetail(dto, programCode, {
@@ -151,6 +183,7 @@ export async function getProviderDetail(
 			rejectionReasons,
 			recentClaims,
 			recentEncounters,
+			partialLoadErrors,
 		});
 	}
 
@@ -297,6 +330,109 @@ export async function deleteProviderIdentifier(
 	identifierId: string
 ) {
 	return vendorCoreApi.deleteProviderIdentifier(providerId, identifierId);
+}
+
+export async function createProviderIdentifier(
+	providerId: string,
+	body: ProviderIdentifierCreateInput
+) {
+	return vendorCoreApi.createProviderIdentifier(providerId, body);
+}
+
+export async function updateProviderIdentifier(
+	providerId: string,
+	identifierId: string,
+	body: ProviderIdentifierUpdateInput
+) {
+	return vendorCoreApi.updateProviderIdentifier(providerId, identifierId, body);
+}
+
+export async function createProviderLocation(
+	providerId: string,
+	body: ProviderLocationCreateInput
+) {
+	return vendorCoreApi.createProviderLocation(providerId, body);
+}
+
+export async function updateProviderLocation(
+	providerId: string,
+	locationId: string,
+	body: ProviderLocationUpdateInput
+) {
+	return vendorCoreApi.updateProviderLocation(providerId, locationId, body);
+}
+
+export async function deleteProviderLocation(
+	providerId: string,
+	locationId: string
+) {
+	return vendorCoreApi.deleteProviderLocation(providerId, locationId);
+}
+
+export async function createProviderNetwork(
+	providerId: string,
+	body: ProviderNetworkCreateInput
+) {
+	return vendorCoreApi.createProviderNetwork(providerId, body);
+}
+
+export async function updateProviderNetwork(
+	providerId: string,
+	networkId: string,
+	body: ProviderNetworkUpdateInput
+) {
+	return vendorCoreApi.updateProviderNetwork(providerId, networkId, body);
+}
+
+export async function deleteProviderNetwork(
+	providerId: string,
+	networkId: string
+) {
+	return vendorCoreApi.deleteProviderNetwork(providerId, networkId);
+}
+
+export async function createProviderCredential(
+	providerId: string,
+	body: ProviderCredentialCreateInput
+) {
+	return vendorCoreApi.createProviderCredential(providerId, body);
+}
+
+export async function updateProviderCredential(
+	providerId: string,
+	credentialId: string,
+	body: ProviderCredentialUpdateInput
+) {
+	return vendorCoreApi.updateProviderCredential(providerId, credentialId, body);
+}
+
+export async function deleteProviderCredential(
+	providerId: string,
+	credentialId: string
+) {
+	return vendorCoreApi.deleteProviderCredential(providerId, credentialId);
+}
+
+export async function createProviderException(
+	providerId: string,
+	body: ProviderExceptionCreateInput
+) {
+	return vendorCoreApi.createProviderException(providerId, body);
+}
+
+export async function updateProviderException(
+	providerId: string,
+	exceptionId: string,
+	body: ProviderExceptionUpdateInput
+) {
+	return vendorCoreApi.updateProviderException(providerId, exceptionId, body);
+}
+
+export async function deleteProviderException(
+	providerId: string,
+	exceptionId: string
+) {
+	return vendorCoreApi.deleteProviderException(providerId, exceptionId);
 }
 
 export async function listProviderRosters(params?: ProviderRosterListQuery) {

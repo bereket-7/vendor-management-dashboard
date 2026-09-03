@@ -34,12 +34,18 @@ export type ProviderSummary = {
 	paid12m: number;
 	rejectionRate: number;
 	netPayment12m: number;
+	isDeleted?: boolean;
 };
 
 export type ProviderLocation = {
 	id: string;
 	name: string;
 	address: string;
+	addressLine1?: string;
+	addressLine2?: string;
+	city?: string;
+	state?: string;
+	postalCode?: string;
 	phone: string;
 	status: ProviderStatus;
 	isPrimary: boolean;
@@ -58,6 +64,8 @@ export type ProviderIdentifier = {
 	id: string;
 	label: string;
 	value: string;
+	/** True for NPI/reference/taxonomy rows synthesized client-side (not API-editable). */
+	synthetic?: boolean;
 };
 
 export type MonthlyVolume = {
@@ -169,6 +177,8 @@ export type ProviderDetail = ProviderSummary &
 		rejectionTrendPct: number;
 		netPaymentTrendPct: number;
 		dataAsOf: string;
+		/** Sections that failed to load from vendor-core (empty vs error). */
+		partialLoadErrors?: string[];
 	};
 
 const SPECIALTIES = [

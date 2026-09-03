@@ -90,6 +90,7 @@ export type ProviderDetailContext = {
 	rejectionReasons?: ProviderRejectionReasonDto[];
 	recentClaims?: ProviderRecentActivityDto[];
 	recentEncounters?: ProviderRecentActivityDto[];
+	partialLoadErrors?: string[];
 };
 
 function mapLocations(
@@ -103,6 +104,11 @@ function mapLocations(
 			row.address_line2,
 			[row.city, row.state, row.postal_code].filter(Boolean).join(" "),
 		]),
+		addressLine1: row.address_line1 ?? "",
+		addressLine2: row.address_line2 ?? "",
+		city: row.city ?? "",
+		state: row.state ?? "",
+		postalCode: row.postal_code ?? "",
 		phone: dash(row.phone),
 		status: parseStatus(row.status),
 		isPrimary: row.is_primary,
@@ -241,21 +247,24 @@ function buildIdentifierRows(
 	identifiers: ProviderIdentifierDto[] | undefined
 ): ProviderDetail["identifiers"] {
 	const rows: ProviderDetail["identifiers"] = [
-		{ id: "npi", label: "NPI", value: dash(provider.npi) },
+		{ id: "npi", label: "NPI", value: dash(provider.npi), synthetic: true },
 		{
 			id: "reference",
 			label: "Reference ID",
 			value: dash(provider.reference_id),
+			synthetic: true,
 		},
 		{
 			id: "taxonomy",
 			label: "Taxonomy",
 			value: dash(provider.taxonomy),
+			synthetic: true,
 		},
 		{
 			id: "entity",
 			label: "Entity type",
 			value: dash(provider.entity_type),
+			synthetic: true,
 		},
 	];
 	const seen = new Set(rows.map((row) => row.label.toLowerCase()));
@@ -265,7 +274,7 @@ function buildIdentifierRows(
 		const key = label.toLowerCase();
 		if (seen.has(key)) continue;
 		seen.add(key);
-		rows.push({ id: row.id, label, value: dash(row.value) });
+		rows.push({ id: row.id, label, value: dash(row.value), synthetic: false });
 	}
 	const metadataExtras: Array<[string, string]> = [
 		["tax_id", "Tax ID"],
@@ -277,7 +286,7 @@ function buildIdentifierRows(
 	for (const [key, label] of metadataExtras) {
 		if (seen.has(label.toLowerCase())) continue;
 		const value = metaString(provider.metadata, key);
-		if (value) rows.push({ id: key, label, value });
+		if (value) rows.push({ id: key, label, value, synthetic: true });
 	}
 	return rows;
 }
@@ -450,6 +459,7 @@ export function providersToSummaries(
 			paid12m: provider.paid12m ?? 0,
 			rejectionRate: provider.rejection_rate ?? 0,
 			netPayment12m: provider.paid12m ?? 0,
+			isDeleted: Boolean(provider.is_deleted),
 		};
 	});
 }
@@ -481,10 +491,6 @@ function splitPersonName(displayName: string): {
 	};
 }
 
-function identifierRows(provider: ProviderDto): ProviderDetail["identifiers"] {
-	return buildIdentifierRows(provider, undefined);
-}
-
 /** Map a vendor-core provider into the admin detail shell from live API data. */
 export function providerDtoToDetail(
 	dto: ProviderDto,
@@ -504,6 +510,7 @@ export function providerDtoToDetail(
 		rejectionReasons = [],
 		recentClaims = [],
 		recentEncounters = [],
+		partialLoadErrors,
 	} = context;
 	const mergedDto =
 		profile && !dto.profile
@@ -554,13 +561,13 @@ export function providerDtoToDetail(
 	return {
 		...summary,
 		...person,
-		preferredName: null,
+		preferredName: profile?.preferred_name?.trim() || null,
 		suffix: profile?.suffix?.trim() || summary.credentials || null,
 		email: dash(profile?.email),
 		fax: dash(profile?.fax),
-		preferredLanguage: "—",
-		race: "—",
-		ethnicity: "—",
+		preferredLanguage: profile?.preferred_language?.trim() || "—",
+		race: profile?.race?.trim() || "—",
+		ethnicity: profile?.ethnicity?.trim() || "—",
 		taxonomyCode: dash(dto.taxonomy),
 		taxonomyDescription,
 		boardCertification: dash(profile?.board_certification),
@@ -650,6 +657,9 @@ export function providerDtoToDetail(
 			summaryDto?.data_as_of?.slice(0, 10) ??
 			dto.updated_at?.slice(0, 10) ??
 			new Date().toISOString().slice(0, 10),
+		partialLoadErrors: partialLoadErrors?.length
+			? partialLoadErrors
+			: undefined,
 	};
 }
 
