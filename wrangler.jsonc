@@ -4,7 +4,8 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "vendor-management-dashboard",
+	"account_id": "aaf626c401196a5414f30a7f3c54dfd9",
+	"name": "eligibility-operation",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2025-09-27",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -23,7 +24,7 @@
 			// Required for OpenNext incremental caching.
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "vendor-management-dashboard",
+			"service": "eligibility-operation",
 		},
 	],
 	"observability": {
@@ -43,7 +44,7 @@
 	 *   wrangler secret put NEXT_PUBLIC_API_URL
 	 */
 	"vars": {
-		"NEXT_PUBLIC_APP_URL": "https://vm.tillahealth.com",
+		"NEXT_PUBLIC_APP_URL": "https://eligibility-operation.3c-health.workers.dev",
 		"NEXT_PUBLIC_VENDOR_CORE_API_URL": "https://api.vm.tillahealth.com",
 		// NEXT_PUBLIC_API_URL — set via: wrangler secret put NEXT_PUBLIC_API_URL
 	},
