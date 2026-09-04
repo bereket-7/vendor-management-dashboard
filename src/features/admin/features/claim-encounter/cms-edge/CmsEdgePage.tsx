@@ -16,15 +16,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CmsEdgeClaimsTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeClaimsTab";
 import { CmsEdgeConfigurationTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeConfigurationTab";
-import { CmsEdgeExceptionsTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeExceptionsTab";
 import { CmsEdgeFileGenerationTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeFileGenerationTab";
 import { CmsEdgeMembersEnrollmentTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeMembersEnrollmentTab";
 import { CmsEdgeOverviewTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeOverviewTab";
 import { CmsEdgeProvidersTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeProvidersTab";
-import { CmsEdgeReconciliationTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeReconciliationTab";
-import { CmsEdgeResponsesTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeResponsesTab";
 import { CMS_EDGE_TAB_TRIGGER_CLASS } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
-import { CmsEdgeSubmissionsTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeSubmissionsTab";
 import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_TABS,
@@ -124,18 +120,6 @@ export function CmsEdgePage() {
 					</TabsContent>
 					<TabsContent value="file-generation" className="mt-0 space-y-0">
 						<CmsEdgeFileGenerationTab />
-					</TabsContent>
-					<TabsContent value="submissions" className="mt-0 space-y-0">
-						<CmsEdgeSubmissionsTab />
-					</TabsContent>
-					<TabsContent value="cms-responses" className="mt-0 space-y-0">
-						<CmsEdgeResponsesTab />
-					</TabsContent>
-					<TabsContent value="exceptions" className="mt-0 space-y-0">
-						<CmsEdgeExceptionsTab />
-					</TabsContent>
-					<TabsContent value="reconciliation" className="mt-0 space-y-0">
-						<CmsEdgeReconciliationTab />
 					</TabsContent>
 					<TabsContent value="configuration" className="mt-0 space-y-0">
 						<CmsEdgeConfigurationTab />
