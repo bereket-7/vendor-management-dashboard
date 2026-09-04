@@ -132,6 +132,7 @@ const NAV_ICONS: Record<string, typeof Home> = {
 	"Acceptance Analytics": CheckCircle2,
 	"Exceptions / Rejections": FileWarning,
 	"CMS EDGE": ShieldCheck,
+	"CMS EDGE Reporting": FileBarChart2,
 	"Medicaid Encounter Reporting": FileBarChart2,
 	"Medicare Reporting": Stethoscope,
 	"Risk Adjustment": Scale,

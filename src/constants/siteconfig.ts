@@ -305,6 +305,13 @@ const claimEncounterNav: SidebarNavItem[] = [
 		module: "claim_encounter",
 	},
 	{
+		title: "CMS EDGE Reporting",
+		href: "/admin/claim-encounter/regulatory/cms-edge-reporting",
+		permission: "dashboard-view",
+		section: "regulatory_compliance",
+		module: "claim_encounter",
+	},
+	{
 		title: "Medicare & Medicaid Reporting",
 		href: "/admin/claim-encounter/regulatory/program-reporting",
 		permission: "dashboard-view",
