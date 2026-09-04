@@ -32,6 +32,16 @@ import {
 	type CmsEdgeTabId,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { ClaimPageHeader } from "@/features/admin/features/claim-encounter/components/ClaimPageChrome";
+import { cn } from "@/lib/utils";
+
+const toolbarBtn =
+	"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
+
+const toolbarField = cn(
+	"h-9 w-[148px] rounded-sm border-border bg-background text-xs shadow-none",
+	"hover:border-foreground/20",
+	"focus:ring-2 focus:ring-primary/15"
+);
 
 export function CmsEdgePage() {
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
@@ -40,42 +50,37 @@ export function CmsEdgePage() {
 
 	return (
 		<div className="space-y-0">
-			<div className="space-y-4 pb-4">
+			<div className="pb-3">
 				<ClaimPageHeader
 					title={tabMeta.title}
 					description={tabMeta.description}
 					actions={
-						<>
-							<div className="flex items-center gap-2">
-								<span className="text-xs font-medium text-muted-foreground">
-									Reporting Period
-								</span>
-								<Select
-									value={reportingPeriod}
-									onValueChange={setReportingPeriod}
-								>
-									<SelectTrigger className="h-9 w-[280px] border-border/70 bg-card shadow-sm">
-										<CalendarDays className="mr-2 size-3.5 text-muted-foreground" />
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{CMS_EDGE_REPORTING_PERIODS.map((option) => (
-											<SelectItem key={option.value} value={option.value}>
-												{option.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
+						<div className="flex items-center gap-1.5">
+							<Select
+								value={reportingPeriod}
+								onValueChange={setReportingPeriod}
+							>
+								<SelectTrigger className={toolbarField}>
+									<CalendarDays className="size-3.5 text-muted-foreground" />
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{CMS_EDGE_REPORTING_PERIODS.map((option) => (
+										<SelectItem key={option.value} value={option.value}>
+											{option.label.split(" (")[0]}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 							<Button
 								variant="outline"
 								size="sm"
-								className="h-9 border-border/70 bg-card shadow-sm"
+								className={cn(toolbarBtn, "border-border bg-background")}
 							>
-								<SlidersHorizontal className="mr-1.5 size-3.5" />
+								<SlidersHorizontal className="size-3.5" />
 								Filters
 							</Button>
-						</>
+						</div>
 					}
 				/>
 			</div>

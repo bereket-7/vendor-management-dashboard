@@ -373,52 +373,44 @@ export const CMS_EDGE_TAB_META: Record<
 	{ title: string; description: string }
 > = {
 	overview: {
-		title: "CMS EDGE Reporting – Overview",
-		description:
-			"Monitor CMS EDGE submission health, validation outcomes, and reporting activity.",
+		title: "Overview",
+		description: "Submission health, validations, and reporting activity.",
 	},
 	"members-enrollment": {
-		title: "CMS EDGE Reporting – Members & Enrollment",
-		description:
-			"Review enrollee records and enrollment periods staged for EDGE reporting.",
+		title: "Members & Enrollment",
+		description: "Enrollee records staged for EDGE reporting.",
 	},
 	providers: {
-		title: "CMS EDGE Reporting – Providers",
-		description:
-			"Review provider records and identifiers referenced by EDGE claim submissions.",
+		title: "Providers",
+		description: "Provider identifiers referenced by EDGE claims.",
 	},
 	claims: {
-		title: "CMS EDGE Reporting – Claims",
-		description:
-			"Review medical and pharmacy claims staged for EDGE claim and supplemental files.",
+		title: "Claims",
+		description: "Medical and pharmacy claims staged for EDGE files.",
 	},
 	"file-generation": {
-		title: "CMS EDGE Reporting – File Generation",
-		description:
-			"Generate and stage EDGE enrollment, medical, pharmacy, and supplemental files.",
+		title: "File Generation",
+		description: "Enrollment, medical, pharmacy, and supplemental files.",
 	},
 	submissions: {
-		title: "CMS EDGE Reporting – Submissions",
-		description: "Track EDGE submission batches and submission readiness.",
+		title: "Submission Tracking",
+		description: "Monitor submissions across Test, Validation, and Production.",
 	},
 	"cms-responses": {
-		title: "CMS EDGE Reporting – CMS Responses",
-		description: "Review CMS responses and issuer return files.",
+		title: "CMS Responses",
+		description: "CMS responses and issuer return files.",
 	},
 	exceptions: {
-		title: "CMS EDGE Reporting – Exceptions",
-		description:
-			"Triage rejected records, validation errors, and exception resolution work.",
+		title: "Exceptions",
+		description: "Rejected records and validation errors.",
 	},
 	reconciliation: {
-		title: "CMS EDGE Reporting – Reconciliation",
-		description:
-			"Reconcile submitted volumes against CMS-accepted counts and outstanding variances.",
+		title: "Reconciliation",
+		description: "Submitted volumes vs CMS-accepted counts.",
 	},
 	configuration: {
-		title: "CMS EDGE Reporting – Configuration",
-		description:
-			"Manage issuer IDs, reporting calendars, file specs, and submission settings.",
+		title: "Configuration",
+		description: "Issuer IDs, calendars, and submission settings.",
 	},
 };
 
@@ -811,13 +803,19 @@ export const CMS_RESPONSE_STATUS_STYLES: Record<CmsResponseStatus, string> = {
 
 // ─── Submissions tab ────────────────────────────────────────────────────────
 
-export type SubmissionStatus = "Accepted" | "Pending" | "Rejected";
+export type SubmissionStatus = "Accepted" | "Processing" | "Failed";
+export type SubmissionFileType =
+	| "Enrollment"
+	| "Medical"
+	| "Pharmacy"
+	| "Supplemental Diagnosis";
+export type SubmissionEnvironment = "Test" | "Validation" | "Production";
 
 export type SubmissionHistoryRow = {
 	id: string;
-	submissionType: string;
+	fileType: SubmissionFileType;
+	environment: SubmissionEnvironment;
 	reportingPeriod: string;
-	fileName: string;
 	submittedDateTime: string;
 	status: SubmissionStatus;
 	records: number;
@@ -836,116 +834,181 @@ export type SubmissionNoteRow = {
 	note: string;
 };
 
+export type SubmissionProcessStep = {
+	id: string;
+	title: string;
+	description: string;
+};
+
+export const CMS_EDGE_SUBMISSION_FILE_TYPES: SubmissionFileType[] = [
+	"Enrollment",
+	"Medical",
+	"Pharmacy",
+	"Supplemental Diagnosis",
+];
+
+export const CMS_EDGE_SUBMISSION_ENVIRONMENTS: SubmissionEnvironment[] = [
+	"Test",
+	"Validation",
+	"Production",
+];
+
+export const CMS_EDGE_SUBMISSION_STATUSES: SubmissionStatus[] = [
+	"Accepted",
+	"Processing",
+	"Failed",
+];
+
 export const CMS_EDGE_SUBMISSION_KPIS = {
 	total: 12,
-	accepted: { count: 11, percent: 91.7 },
-	pending: { count: 1, percent: 8.3 },
-	rejected: { count: 0, percent: 0 },
-	lastSubmissionDate: "Jul 25, 2027",
-	lastSubmissionTime: "02:35 PM ET",
-	overallStatus: "On Track",
+	accepted: 8,
+	inProgress: 1,
+	failed: 3,
 };
 
 export const CMS_EDGE_SUBMISSION_HISTORY: SubmissionHistoryRow[] = [
 	{
-		id: "sub-h-1",
-		submissionType: "Final Submission",
+		id: "SUB-2027-000001",
+		fileType: "Enrollment",
+		environment: "Test",
 		reportingPeriod: "Q2 2027",
-		fileName: "EDGE_Q2_2027_Final.xml",
-		submittedDateTime: "Jul 21, 2027 09:45 AM",
+		submittedDateTime: "05/01/2027 09:15 AM",
 		status: "Accepted",
-		records: 41_260,
-		submittedBy: "Admin User",
+		records: 12_524,
+		submittedBy: "jdoe@bhphealth.com",
 	},
 	{
-		id: "sub-h-2",
-		submissionType: "Correction 2",
+		id: "SUB-2027-000002",
+		fileType: "Medical",
+		environment: "Validation",
 		reportingPeriod: "Q2 2027",
-		fileName: "EDGE_Q2_2027_Correction2.xml",
-		submittedDateTime: "Jul 25, 2027 02:35 PM",
+		submittedDateTime: "05/02/2027 11:42 AM",
 		status: "Accepted",
-		records: 12_340,
-		submittedBy: "Jane Smith",
+		records: 48_210,
+		submittedBy: "asmith@bhphealth.com",
 	},
 	{
-		id: "sub-h-3",
-		submissionType: "Correction 1",
+		id: "SUB-2027-000003",
+		fileType: "Pharmacy",
+		environment: "Production",
 		reportingPeriod: "Q2 2027",
-		fileName: "EDGE_Q2_2027_Correction1.xml",
-		submittedDateTime: "Jul 23, 2027 11:20 AM",
-		status: "Accepted",
-		records: 12_355,
-		submittedBy: "Jane Smith",
+		submittedDateTime: "05/03/2027 02:18 PM",
+		status: "Failed",
+		records: 31_045,
+		submittedBy: "jdoe@bhphealth.com",
 	},
 	{
-		id: "sub-h-4",
-		submissionType: "Preliminary Submission",
+		id: "SUB-2027-000004",
+		fileType: "Supplemental Diagnosis",
+		environment: "Test",
 		reportingPeriod: "Q2 2027",
-		fileName: "EDGE_Q2_2027_Prelim.xml",
-		submittedDateTime: "Jul 14, 2027 02:30 PM",
+		submittedDateTime: "05/04/2027 08:05 AM",
 		status: "Accepted",
-		records: 41_180,
-		submittedBy: "Admin User",
+		records: 6_812,
+		submittedBy: "mlee@bhphealth.com",
 	},
 	{
-		id: "sub-h-5",
-		submissionType: "Final Submission",
+		id: "SUB-2027-000005",
+		fileType: "Enrollment",
+		environment: "Production",
+		reportingPeriod: "Q2 2027",
+		submittedDateTime: "05/05/2027 10:30 AM",
+		status: "Processing",
+		records: 12_640,
+		submittedBy: "asmith@bhphealth.com",
+	},
+	{
+		id: "SUB-2027-000006",
+		fileType: "Medical",
+		environment: "Test",
+		reportingPeriod: "Q2 2027",
+		submittedDateTime: "05/06/2027 01:12 PM",
+		status: "Accepted",
+		records: 47_980,
+		submittedBy: "jdoe@bhphealth.com",
+	},
+	{
+		id: "SUB-2027-000007",
+		fileType: "Pharmacy",
+		environment: "Validation",
+		reportingPeriod: "Q2 2027",
+		submittedDateTime: "05/07/2027 03:45 PM",
+		status: "Failed",
+		records: 30_922,
+		submittedBy: "mlee@bhphealth.com",
+	},
+	{
+		id: "SUB-2027-000008",
+		fileType: "Enrollment",
+		environment: "Validation",
+		reportingPeriod: "Q2 2027",
+		submittedDateTime: "05/08/2027 09:20 AM",
+		status: "Accepted",
+		records: 12_588,
+		submittedBy: "asmith@bhphealth.com",
+	},
+	{
+		id: "SUB-2027-000009",
+		fileType: "Medical",
+		environment: "Production",
+		reportingPeriod: "Q2 2027",
+		submittedDateTime: "05/09/2027 11:05 AM",
+		status: "Accepted",
+		records: 49_104,
+		submittedBy: "jdoe@bhphealth.com",
+	},
+	{
+		id: "SUB-2027-000010",
+		fileType: "Supplemental Diagnosis",
+		environment: "Production",
+		reportingPeriod: "Q2 2027",
+		submittedDateTime: "05/10/2027 04:22 PM",
+		status: "Failed",
+		records: 7_015,
+		submittedBy: "mlee@bhphealth.com",
+	},
+	{
+		id: "SUB-2027-000011",
+		fileType: "Pharmacy",
+		environment: "Test",
 		reportingPeriod: "Q1 2027",
-		fileName: "EDGE_Q1_2027_Final.xml",
-		submittedDateTime: "Apr 28, 2027 10:15 AM",
+		submittedDateTime: "04/18/2027 10:48 AM",
 		status: "Accepted",
-		records: 39_880,
-		submittedBy: "System User",
+		records: 29_774,
+		submittedBy: "asmith@bhphealth.com",
 	},
 	{
-		id: "sub-h-6",
-		submissionType: "Correction 1",
+		id: "SUB-2027-000012",
+		fileType: "Enrollment",
+		environment: "Production",
 		reportingPeriod: "Q1 2027",
-		fileName: "EDGE_Q1_2027_Correction1.xml",
-		submittedDateTime: "Apr 26, 2027 04:10 PM",
-		status: "Pending",
-		records: 11_920,
-		submittedBy: "Admin User",
+		submittedDateTime: "04/22/2027 02:55 PM",
+		status: "Accepted",
+		records: 12_301,
+		submittedBy: "jdoe@bhphealth.com",
+	},
+];
+
+export const CMS_EDGE_SUBMISSION_PROCESS_STEPS: SubmissionProcessStep[] = [
+	{
+		id: "generated",
+		title: "Generated",
+		description: "File generated successfully",
 	},
 	{
-		id: "sub-h-7",
-		submissionType: "Preliminary Submission",
-		reportingPeriod: "Q1 2027",
-		fileName: "EDGE_Q1_2027_Prelim.xml",
-		submittedDateTime: "Apr 21, 2027 11:00 AM",
-		status: "Accepted",
-		records: 39_750,
-		submittedBy: "Admin User",
+		id: "submitted",
+		title: "Submitted",
+		description: "File submitted to CMS EDGE",
 	},
 	{
-		id: "sub-h-8",
-		submissionType: "Final Submission",
-		reportingPeriod: "Q4 2026",
-		fileName: "EDGE_Q4_2026_Final.xml",
-		submittedDateTime: "Jan 28, 2027 09:30 AM",
-		status: "Accepted",
-		records: 38_420,
-		submittedBy: "System User",
+		id: "cms-processing",
+		title: "CMS Processing",
+		description: "File is being processed by CMS",
 	},
 	{
-		id: "sub-h-9",
-		submissionType: "Preliminary Submission",
-		reportingPeriod: "Q4 2026",
-		fileName: "EDGE_Q4_2026_Prelim.xml",
-		submittedDateTime: "Jan 21, 2027 03:45 PM",
-		status: "Accepted",
-		records: 38_390,
-		submittedBy: "Admin User",
-	},
-	{
-		id: "sub-h-10",
-		submissionType: "Correction 1",
-		reportingPeriod: "Q4 2026",
-		fileName: "EDGE_Q4_2026_Correction1.xml",
-		submittedDateTime: "Jan 25, 2027 10:00 AM",
-		status: "Accepted",
-		records: 12_110,
-		submittedBy: "Jane Smith",
+		id: "response-received",
+		title: "Response Received",
+		description: "CMS response received",
 	},
 ];
 
@@ -967,17 +1030,17 @@ export const CMS_EDGE_SUBMISSION_DETAILS: Record<
 		cmsResponses: SubmissionCmsResponseItem[];
 	}
 > = {
-	"sub-h-2": {
-		submissionType: "Correction 2",
+	"SUB-2027-000001": {
+		submissionType: "Enrollment",
 		reportingPeriod: "Q2 2027",
-		fileName: "EDGE_Q2_2027_Correction2.xml",
-		submittedDateTime: "Jul 25, 2027 02:35 PM ET",
-		submittedBy: "Jane Smith",
+		fileName: "EDGE_Q2_2027_Enrollment.xml",
+		submittedDateTime: "05/01/2027 09:15 AM ET",
+		submittedBy: "jdoe@bhphealth.com",
 		status: "Accepted",
-		totalRecords: 12_340,
-		acceptedRecords: 12_298,
+		totalRecords: 12_524,
+		acceptedRecords: 12_490,
 		acceptedPercent: 99.7,
-		rejectedRecords: 42,
+		rejectedRecords: 34,
 		rejectedPercent: 0.3,
 		warnings: 0,
 		cmsResponses: [
@@ -991,37 +1054,30 @@ export const CMS_EDGE_SUBMISSION_DETAILS: Record<
 export const CMS_EDGE_SUBMISSION_NOTES: SubmissionNoteRow[] = [
 	{
 		id: "note-1",
-		dateTime: "Jul 25, 2027 02:36 PM",
+		dateTime: "05/01/2027 09:16 AM",
 		source: "System",
-		note: "Correction 2 submission received and queued for validation.",
+		note: "Enrollment file queued for CMS EDGE Test environment.",
 	},
 	{
 		id: "note-2",
-		dateTime: "Jul 25, 2027 03:10 PM",
-		source: "System",
-		note: "Validation completed. Acceptance report received from CMS EDGE.",
+		dateTime: "05/01/2027 10:02 AM",
+		source: "jdoe@bhphealth.com",
+		note: "Member counts reconciled against enrollment snapshot.",
 	},
 	{
 		id: "note-3",
-		dateTime: "Jul 25, 2027 04:22 PM",
-		source: "Jane Smith",
-		note: "Reviewed validation results — 42 rejected records flagged for follow-up.",
-	},
-	{
-		id: "note-4",
-		dateTime: "Jul 26, 2027 09:15 AM",
+		dateTime: "05/01/2027 11:40 AM",
 		source: "System",
-		note: "Submission status updated to Accepted.",
+		note: "CMS acceptance report received for SUB-2027-000001.",
 	},
 ];
 
 export const SUBMISSION_STATUS_STYLES: Record<SubmissionStatus, string> = {
 	Accepted:
-		"border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-	Pending:
-		"border-amber-200/80 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
-	Rejected:
-		"border-red-200/80 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
+		"bg-emerald-500/15 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300",
+	Processing:
+		"bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200",
+	Failed: "bg-red-500/15 text-red-800 dark:bg-red-500/20 dark:text-red-300",
 };
 
 export const SUBMISSION_CMS_RESPONSE_STYLES = {
