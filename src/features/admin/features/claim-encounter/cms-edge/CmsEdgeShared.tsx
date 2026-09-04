@@ -218,6 +218,28 @@ export const CMS_EDGE_TAB_TRIGGER_CLASS = cn(
 	"data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
 );
 
+/** Blank-tab scaffold — one wrapper per not-yet-built CMS EDGE tab */
+export function CmsEdgeBlankTab({
+	title,
+	description = "This section will mirror the CMS EDGE reporting workspace.",
+}: {
+	title: string;
+	description?: string;
+}) {
+	return (
+		<div className={CMS_EDGE_PAGE_STACK}>
+			<div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-card px-6 py-12 text-center shadow-sm">
+				<p className="text-sm font-semibold text-foreground">{title}</p>
+				<p className="mt-1 max-w-md text-sm text-muted-foreground">
+					{description}
+				</p>
+			</div>
+
+			<CmsEdgePageFooter />
+		</div>
+	);
+}
+
 export function CmsEdgePageFooter() {
 	return (
 		<div className="relative pt-1 text-[11px] text-muted-foreground">

@@ -1,20 +1,26 @@
 export type CmsEdgeTabId =
 	| "overview"
+	| "members-enrollment"
+	| "providers"
+	| "claims"
+	| "file-generation"
 	| "submissions"
-	| "responses"
-	| "validations"
-	| "financial-management"
-	| "audit"
-	| "documents";
+	| "cms-responses"
+	| "exceptions"
+	| "reconciliation"
+	| "configuration";
 
 export const CMS_EDGE_TABS: { id: CmsEdgeTabId; label: string }[] = [
 	{ id: "overview", label: "Overview" },
+	{ id: "members-enrollment", label: "Members & Enrollment" },
+	{ id: "providers", label: "Providers" },
+	{ id: "claims", label: "Claims" },
+	{ id: "file-generation", label: "File Generation" },
 	{ id: "submissions", label: "Submissions" },
-	{ id: "responses", label: "Responses" },
-	{ id: "validations", label: "Validations" },
-	{ id: "financial-management", label: "Financial Management" },
-	{ id: "audit", label: "Audit" },
-	{ id: "documents", label: "Documents" },
+	{ id: "cms-responses", label: "CMS Responses" },
+	{ id: "exceptions", label: "Exceptions" },
+	{ id: "reconciliation", label: "Reconciliation" },
+	{ id: "configuration", label: "Configuration" },
 ];
 
 export const CMS_EDGE_REPORTING_PERIODS = [
@@ -371,32 +377,48 @@ export const CMS_EDGE_TAB_META: Record<
 		description:
 			"Monitor CMS EDGE submission health, validation outcomes, and reporting activity.",
 	},
+	"members-enrollment": {
+		title: "CMS EDGE Reporting – Members & Enrollment",
+		description:
+			"Review enrollee records and enrollment periods staged for EDGE reporting.",
+	},
+	providers: {
+		title: "CMS EDGE Reporting – Providers",
+		description:
+			"Review provider records and identifiers referenced by EDGE claim submissions.",
+	},
+	claims: {
+		title: "CMS EDGE Reporting – Claims",
+		description:
+			"Review medical and pharmacy claims staged for EDGE claim and supplemental files.",
+	},
+	"file-generation": {
+		title: "CMS EDGE Reporting – File Generation",
+		description:
+			"Generate and stage EDGE enrollment, medical, pharmacy, and supplemental files.",
+	},
 	submissions: {
 		title: "CMS EDGE Reporting – Submissions",
 		description: "Track EDGE submission batches and submission readiness.",
 	},
-	responses: {
-		title: "CMS EDGE Reporting – Responses",
+	"cms-responses": {
+		title: "CMS EDGE Reporting – CMS Responses",
 		description: "Review CMS responses and issuer return files.",
 	},
-	validations: {
-		title: "CMS EDGE Reporting – Validations",
-		description: "Analyze validation results and exception trends.",
-	},
-	"financial-management": {
-		title: "CMS EDGE Reporting – Financial Management",
+	exceptions: {
+		title: "CMS EDGE Reporting – Exceptions",
 		description:
-			"Review financial management (FM) results including payments, withholds, and adjustments returned by CMS.",
+			"Triage rejected records, validation errors, and exception resolution work.",
 	},
-	audit: {
-		title: "CMS EDGE Reporting – Audit",
+	reconciliation: {
+		title: "CMS EDGE Reporting – Reconciliation",
 		description:
-			"Review audit requests, audit reports, and issuer responses returned by CMS.",
+			"Reconcile submitted volumes against CMS-accepted counts and outstanding variances.",
 	},
-	documents: {
-		title: "CMS EDGE Reporting – Documents",
+	configuration: {
+		title: "CMS EDGE Reporting – Configuration",
 		description:
-			"Access, download, and manage all CMS EDGE reporting documents.",
+			"Manage issuer IDs, reporting calendars, file specs, and submission settings.",
 	},
 };
 
