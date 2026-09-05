@@ -18,7 +18,6 @@ import {
 	type LucideIcon,
 	Scale,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,18 +42,21 @@ import {
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
-	CMS_EDGE_RECON_DATASETS,
 	CMS_EDGE_RECON_ENVIRONMENTS,
 	CMS_EDGE_RECON_FLOW,
-	CMS_EDGE_RECON_KPIS,
 	CMS_EDGE_RECON_VARIANCE_REASONS,
 	CMS_EDGE_REPORTING_PERIODS,
 	RECON_STATUS_DOT,
 	type ReconciliationEnvironment,
 	type ReconciliationStatus,
+	useCmsEdgeReconciliationWorkbench,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+
+const RECON_DETAIL_BASE =
+	"/admin/claim-encounter/regulatory/cms-edge-reporting/reconciliation";
 
 const PANEL_SHADOW =
 	"rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
@@ -76,7 +78,7 @@ const th =
 const td = "px-3 py-2.5 text-[12px] align-middle text-foreground";
 
 const KPI_META: {
-	key: keyof typeof CMS_EDGE_RECON_KPIS;
+	key: "sourceRecords" | "submitted" | "cmsAccepted" | "variance";
 	label: string;
 	hint: string;
 	icon: LucideIcon;
@@ -189,9 +191,16 @@ function ReconFilterBar({
 	);
 }
 
-function ReconKpiCards() {
-	const counts = CMS_EDGE_RECON_KPIS;
-
+function ReconKpiCards({
+	counts,
+}: {
+	counts: {
+		sourceRecords: number;
+		submitted: number;
+		cmsAccepted: number;
+		variance: number;
+	};
+}) {
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 			{KPI_META.map((kpi) => {
@@ -314,7 +323,22 @@ function ReconciliationFlow() {
 	);
 }
 
-function VarianceReasons() {
+function VarianceReasons({ totalVariance }: { totalVariance: number }) {
+	const reasons = useMemo(() => {
+		if (totalVariance <= 0) return [];
+		const weightTotal = CMS_EDGE_RECON_VARIANCE_REASONS.reduce(
+			(sum, item) => sum + item.count,
+			0
+		);
+		return CMS_EDGE_RECON_VARIANCE_REASONS.map((reason) => {
+			const share = weightTotal ? reason.count / weightTotal : 0;
+			return {
+				...reason,
+				count: Math.max(1, Math.round(totalVariance * share)),
+			};
+		});
+	}, [totalVariance]);
+
 	return (
 		<section className={cn(PANEL_SHADOW, "overflow-hidden")}>
 			<div className="border-b border-border/50 px-4 py-2.5">
@@ -322,61 +346,59 @@ function VarianceReasons() {
 					Variance reasons
 				</p>
 			</div>
-			<ul className="divide-y divide-border/40">
-				{CMS_EDGE_RECON_VARIANCE_REASONS.map((reason) => {
-					const meta = VARIANCE_ICON[reason.tone];
-					const Icon = meta.icon;
+			{reasons.length === 0 ? (
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					No open variance for this filter.
+				</p>
+			) : (
+				<ul className="divide-y divide-border/40">
+					{reasons.map((reason) => {
+						const meta = VARIANCE_ICON[reason.tone];
+						const Icon = meta.icon;
 
-					return (
-						<li
-							key={reason.id}
-							className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/20"
-						>
-							<span
-								className={cn(
-									"flex size-9 shrink-0 items-center justify-center rounded-full shadow-sm",
-									meta.well
-								)}
+						return (
+							<li
+								key={reason.id}
+								className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/20"
 							>
-								<Icon className="size-4 text-white" />
-							</span>
-							<p className="min-w-0 flex-1 text-sm font-medium text-foreground">
-								{reason.label}
-							</p>
-							<p className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-								{formatCount(reason.count)}
-							</p>
-						</li>
-					);
-				})}
-			</ul>
+								<span
+									className={cn(
+										"flex size-9 shrink-0 items-center justify-center rounded-full shadow-sm",
+										meta.well
+									)}
+								>
+									<Icon className="size-4 text-white" />
+								</span>
+								<p className="min-w-0 flex-1 text-sm font-medium text-foreground">
+									{reason.label}
+								</p>
+								<p className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+									{formatCount(reason.count)}
+								</p>
+							</li>
+						);
+					})}
+				</ul>
+			)}
 		</section>
 	);
 }
 
-function periodValueToLabel(value: string) {
-	const match = CMS_EDGE_REPORTING_PERIODS.find(
-		(option) => option.value === value
-	);
-	return match?.label.split(" (")[0] ?? "Q2 2027";
-}
-
 export function CmsEdgeReconciliationTab() {
+	const router = useRouter();
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
 	const [environment, setEnvironment] = useState<
 		ReconciliationEnvironment | "all"
 	>("Production");
 
-	const periodLabel = periodValueToLabel(reportingPeriod);
+	const { rows, kpis, isLoading, isError } = useCmsEdgeReconciliationWorkbench({
+		reportingPeriod,
+		environment,
+	});
 
-	const rows = useMemo(() => {
-		return CMS_EDGE_RECON_DATASETS.filter((row) => {
-			if (row.reportingPeriod !== periodLabel) return false;
-			if (environment !== "all" && row.environment !== environment)
-				return false;
-			return true;
-		});
-	}, [periodLabel, environment]);
+	function openRecon(id: string) {
+		router.push(`${RECON_DETAIL_BASE}/${encodeURIComponent(id)}`);
+	}
 
 	return (
 		<div className={CMS_EDGE_PAGE_STACK}>
@@ -387,13 +409,16 @@ export function CmsEdgeReconciliationTab() {
 				onEnvironmentChange={setEnvironment}
 			/>
 
-			<ReconKpiCards />
+			<ReconKpiCards counts={kpis} />
 
 			<section className={cn(PANEL_SHADOW, "overflow-hidden")}>
 				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
 					<p className="text-sm font-semibold text-foreground">
-						{rows.length.toLocaleString()}{" "}
-						{rows.length === 1 ? "dataset" : "datasets"}
+						{isLoading
+							? "Loading datasets…"
+							: `${rows.length.toLocaleString()} ${
+									rows.length === 1 ? "dataset" : "datasets"
+								}`}
 					</p>
 					{environment !== "all" ? (
 						<Button
@@ -406,6 +431,12 @@ export function CmsEdgeReconciliationTab() {
 						</Button>
 					) : null}
 				</div>
+
+				{isError ? (
+					<div className="px-4 py-8 text-center text-sm text-destructive">
+						Failed to load reconciliation datasets.
+					</div>
+				) : null}
 
 				<CmsEdgeTableScroll>
 					<Table
@@ -439,7 +470,16 @@ export function CmsEdgeReconciliationTab() {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{rows.length === 0 ? (
+							{isLoading && rows.length === 0 ? (
+								<TableRow className="hover:bg-transparent">
+									<TableCell
+										colSpan={10}
+										className="px-4 py-12 text-center text-sm text-muted-foreground"
+									>
+										Loading reconciliation…
+									</TableCell>
+								</TableRow>
+							) : rows.length === 0 ? (
 								<TableRow className="hover:bg-transparent">
 									<TableCell
 										colSpan={10}
@@ -463,7 +503,12 @@ export function CmsEdgeReconciliationTab() {
 											{index + 1}
 										</TableCell>
 										<TableCell className={cn(td, "font-semibold")}>
-											{row.dataset}
+											<Link
+												href={`${RECON_DETAIL_BASE}/${encodeURIComponent(row.id)}`}
+												className="text-primary hover:underline"
+											>
+												{row.dataset}
+											</Link>
 										</TableCell>
 										<TableCell
 											className={cn(
@@ -521,9 +566,7 @@ export function CmsEdgeReconciliationTab() {
 												variant="outline"
 												size="sm"
 												className="h-7 rounded-sm border-primary/30 px-2.5 text-[11px] font-medium text-primary shadow-none hover:bg-primary/5"
-												onClick={() =>
-													toast.message(`View details · ${row.dataset}`)
-												}
+												onClick={() => openRecon(row.id)}
 											>
 												View Details
 											</Button>
@@ -560,7 +603,7 @@ export function CmsEdgeReconciliationTab() {
 
 			<div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
 				<ReconciliationFlow />
-				<VarianceReasons />
+				<VarianceReasons totalVariance={kpis.variance} />
 			</div>
 
 			<CmsEdgePageFooter />
