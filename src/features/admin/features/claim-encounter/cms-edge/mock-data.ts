@@ -3,6 +3,8 @@ export type CmsEdgeTabId =
 	| "members-enrollment"
 	| "providers"
 	| "claims"
+	| "pharmacy-claims"
+	| "supplemental-diagnoses"
 	| "file-generation"
 	| "configuration";
 
@@ -18,6 +20,8 @@ export const CMS_EDGE_TABS: { id: CmsEdgeTabId; label: string }[] = [
 	{ id: "members-enrollment", label: "Members & Enrollment" },
 	{ id: "providers", label: "Providers" },
 	{ id: "claims", label: "Claims" },
+	{ id: "pharmacy-claims", label: "Pharmacy Claims" },
+	{ id: "supplemental-diagnoses", label: "Supplemental Diagnoses" },
 	{ id: "file-generation", label: "File Generation" },
 	{ id: "configuration", label: "Configuration" },
 ];
@@ -383,8 +387,9 @@ export const CMS_EDGE_TAB_META: Record<
 	{ title: string; description: string }
 > = {
 	overview: {
-		title: "Overview",
-		description: "Submission health, validations, and reporting activity.",
+		title: "BHP - CMS EDGE Reporting",
+		description:
+			"Prepare, validate, submit, and reconcile BHP enrollment and claims data with CMS EDGE.",
 	},
 	"members-enrollment": {
 		title: "Members & Enrollment",
@@ -396,7 +401,18 @@ export const CMS_EDGE_TAB_META: Record<
 	},
 	claims: {
 		title: "Claims",
-		description: "Medical and pharmacy claims staged for EDGE files.",
+		description:
+			"Review medical claims staged for EDGE medical claim file submission.",
+	},
+	"pharmacy-claims": {
+		title: "Pharmacy Claims",
+		description:
+			"Review prescription claims, dispensing providers, financial values, and CMS EDGE validation.",
+	},
+	"supplemental-diagnoses": {
+		title: "Supplemental Diagnoses",
+		description:
+			"Review diagnosis records submitted separately from medical claims and validate linkage to original claims.",
 	},
 	"file-generation": {
 		title: "File Generation",
@@ -596,255 +612,2308 @@ export const CMS_EDGE_REPORTING_TAB_BADGES: Partial<
 
 // ─── Overview tab ───────────────────────────────────────────────────────────
 
-export type OverviewSubmissionStatus = "Accepted" | "Pending" | "Rejected";
-export type OverviewResponseStatus = "Received" | "Pending" | "Processed";
+export type OverviewWorkflowState = "completed" | "in_progress" | "pending";
+export type OverviewExceptionSeverity = "High" | "Medium";
+export type OverviewActivityStatus = "Completed" | "In Progress";
 
-export const CMS_EDGE_OVERVIEW_KPIS = {
-	reportingPeriod: "Q2 2027",
-	reportingPeriodRange: "Apr 1 – Jun 30, 2027",
-	submissionStatus: "Accepted" as OverviewSubmissionStatus,
-	lastCmsResponse: "Jul 27, 2027 11:44 AM ET",
-	responsesReceived: 5,
-	fmStatus: "In Progress",
-	auditStatus: "2 Open",
-};
+/** Overview KPI strip — always an array (not the legacy object shape). */
+export const CMS_EDGE_OVERVIEW_KPI_CARDS = [
+	{
+		id: "period",
+		label: "Reporting Period",
+		value: "Q2 2027",
+		hint: "Apr 1 - Jun 30, 2027",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "",
+		hintClassName: "",
+		icon: "calendar" as const,
+	},
+	{
+		id: "readiness",
+		label: "Data Readiness",
+		value: "98.7%",
+		hint: "High",
+		tone: "text-emerald-700 bg-emerald-500/10",
+		valueClassName: "",
+		hintClassName: "font-semibold text-emerald-700",
+		icon: "pie" as const,
+	},
+	{
+		id: "files-required",
+		label: "Files Required",
+		value: "4",
+		hint: "Submission Files",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "",
+		hintClassName: "",
+		icon: "file" as const,
+	},
+	{
+		id: "files-generated",
+		label: "Files Generated",
+		value: "3",
+		hint: "Ready for Review",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "",
+		hintClassName: "",
+		icon: "fileOut" as const,
+	},
+	{
+		id: "submission",
+		label: "Submission Status",
+		value: "In Progress",
+		hint: "File Generation",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-700",
+		hintClassName: "font-medium text-sky-700",
+		icon: "send" as const,
+	},
+	{
+		id: "errors",
+		label: "Critical Errors",
+		value: "912",
+		hint: "Require Attention",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		hintClassName: "font-medium text-red-600",
+		icon: "shield" as const,
+	},
+	{
+		id: "reconciliation",
+		label: "Reconciliation",
+		value: "Pending",
+		hint: "Awaiting CMS Response",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-600",
+		hintClassName: "font-medium text-amber-700",
+		icon: "hourglass" as const,
+	},
+] as const;
 
-export const CMS_EDGE_OVERVIEW_SUBMISSION_HISTORY = [
-	{
-		id: "sub-1",
-		submissionType: "Final Submission",
-		reportingPeriod: "Q2 2027",
-		submittedDate: "Jul 21, 2027 09:45 AM",
-		status: "Accepted" as OverviewSubmissionStatus,
-		cmsResponse: "Yes",
-		submittedBy: "Admin User",
-	},
-	{
-		id: "sub-2",
-		submissionType: "Preliminary Submission",
-		reportingPeriod: "Q2 2027",
-		submittedDate: "Jul 14, 2027 02:30 PM",
-		status: "Accepted" as OverviewSubmissionStatus,
-		cmsResponse: "Yes",
-		submittedBy: "Admin User",
-	},
-	{
-		id: "sub-3",
-		submissionType: "Final Submission",
-		reportingPeriod: "Q1 2027",
-		submittedDate: "Apr 28, 2027 10:15 AM",
-		status: "Accepted" as OverviewSubmissionStatus,
-		cmsResponse: "Yes",
-		submittedBy: "System User",
-	},
-	{
-		id: "sub-4",
-		submissionType: "Preliminary Submission",
-		reportingPeriod: "Q1 2027",
-		submittedDate: "Apr 21, 2027 11:00 AM",
-		status: "Pending" as OverviewSubmissionStatus,
-		cmsResponse: "No",
-		submittedBy: "Admin User",
-	},
-];
+/** @deprecated Prefer CMS_EDGE_OVERVIEW_KPI_CARDS */
+export const CMS_EDGE_OVERVIEW_KPIS = CMS_EDGE_OVERVIEW_KPI_CARDS;
 
-export const CMS_EDGE_OVERVIEW_CMS_RESPONSES = [
+export const CMS_EDGE_OVERVIEW_ENTITIES = [
 	{
-		id: "resp-1",
-		responseFile: "EDGE_Q2_2027_Validation",
-		responseType: "Validation Response",
-		dateReceived: "Jul 21, 2027 10:02 AM",
-		status: "Processed" as OverviewResponseStatus,
+		id: "members",
+		title: "Members & Enrollment",
+		description: "Enrollment records and coverage periods",
+		icon: "members" as const,
+		stats: [
+			{ label: "Total Records", value: "2,451,890", tone: "default" as const },
+			{ label: "Ready", value: "2,441,022", tone: "success" as const },
+			{ label: "Errors", value: "386", tone: "danger" as const },
+		],
+		cta: "View Members",
+		tabId: "members-enrollment" as CmsEdgeTabId,
 	},
 	{
-		id: "resp-2",
-		responseFile: "EDGE_Q2_2027_Acceptance",
-		responseType: "Acceptance Report",
-		dateReceived: "Jul 27, 2027 11:44 AM",
-		status: "Received" as OverviewResponseStatus,
+		id: "providers",
+		title: "Providers",
+		description: "Billing, rendering, and dispensing identifiers",
+		icon: "providers" as const,
+		stats: [
+			{ label: "Total Providers", value: "215,667", tone: "default" as const },
+			{ label: "Validated", value: "213,201", tone: "success" as const },
+			{ label: "Invalid NPI", value: "93", tone: "danger" as const },
+		],
+		cta: "View Providers",
+		tabId: "providers" as CmsEdgeTabId,
 	},
 	{
-		id: "resp-3",
-		responseFile: "EDGE_Q2_2027_Payment",
-		responseType: "Payment Report",
-		dateReceived: "Jul 27, 2027 11:44 AM",
-		status: "Received" as OverviewResponseStatus,
+		id: "claims",
+		title: "Claims",
+		description: "Medical, pharmacy, and supplemental diagnosis records",
+		icon: "claims" as const,
+		stats: [
+			{ label: "Medical", value: "9,842,113", tone: "default" as const },
+			{ label: "Pharmacy", value: "6,318,774", tone: "default" as const },
+			{ label: "Claim Errors", value: "701", tone: "danger" as const },
+		],
+		cta: "View Claims",
+		tabId: "claims" as CmsEdgeTabId,
 	},
-	{
-		id: "resp-4",
-		responseFile: "EDGE_Q1_2027_Validation",
-		responseType: "Validation Response",
-		dateReceived: "Apr 28, 2027 09:20 AM",
-		status: "Processed" as OverviewResponseStatus,
-	},
-];
+] as const;
 
-export const CMS_EDGE_OVERVIEW_VALIDATION = [
+export const CMS_EDGE_OVERVIEW_WORKFLOW = [
 	{
-		recordType: "Member Enrollment",
-		accepted: 12_450,
-		rejected: 23,
-		warnings: 87,
+		id: "source",
+		label: "Source Data",
+		status: "Completed",
+		state: "completed" as OverviewWorkflowState,
+		icon: "database" as const,
 	},
 	{
-		recordType: "Risk Adjustment",
-		accepted: 8_920,
-		rejected: 12,
-		warnings: 45,
+		id: "validation",
+		label: "CMS Validation",
+		status: "Completed",
+		state: "completed" as OverviewWorkflowState,
+		icon: "shieldCheck" as const,
 	},
 	{
-		recordType: "Payment Data",
-		accepted: 15_680,
-		rejected: 8,
-		warnings: 32,
+		id: "generation",
+		label: "File Generation",
+		status: "In Progress",
+		state: "in_progress" as OverviewWorkflowState,
+		icon: "fileUp" as const,
 	},
 	{
-		recordType: "Provider Data",
-		accepted: 4_210,
-		rejected: 5,
-		warnings: 18,
-	},
-];
-
-export const CMS_EDGE_OVERVIEW_FM_ITEMS = [
-	{
-		label: "FM Requests",
-		count: 2,
+		id: "submission",
+		label: "Submission",
 		status: "Pending",
-		statusStyle: "border-amber-200/80 bg-amber-50 text-amber-900",
-		icon: "request" as const,
+		state: "pending" as OverviewWorkflowState,
+		icon: "send" as const,
 	},
 	{
-		label: "FM Responses",
-		count: 5,
-		status: "Open",
-		statusStyle: "border-sky-200/80 bg-sky-50 text-sky-900",
-		icon: "response" as const,
-	},
-	{
-		label: "Payment Reconciliation",
-		count: 1,
+		id: "response",
+		label: "CMS Response",
 		status: "Pending",
-		statusStyle: "border-amber-200/80 bg-amber-50 text-amber-900",
-		icon: "reconcile" as const,
+		state: "pending" as OverviewWorkflowState,
+		icon: "mail" as const,
 	},
 	{
-		label: "Archive Status",
-		count: 0,
-		status: "Not Archived",
-		statusStyle: "border-red-200/80 bg-red-50 text-red-800",
-		icon: "archive" as const,
+		id: "reconciliation",
+		label: "Reconciliation",
+		status: "Pending",
+		state: "pending" as OverviewWorkflowState,
+		icon: "scale" as const,
 	},
-];
+] as const;
 
-export const CMS_EDGE_OVERVIEW_AUDIT_SUMMARY = [
+export const CMS_EDGE_OVERVIEW_EXCEPTIONS = [
 	{
-		auditType: "EDGE Data Validation",
-		status: "Completed" as AuditRequestStatus,
-		dueDate: "Aug 20, 2027",
-		owner: "CMS EDGE System",
+		id: "ex-1",
+		type: "Member Not Found",
+		count: 386,
+		severity: "High" as OverviewExceptionSeverity,
+		owner: "Data Ops",
 	},
 	{
-		auditType: "Payment Accuracy",
-		status: "In Progress" as AuditRequestStatus,
-		dueDate: "Aug 20, 2027",
-		owner: "Admin User",
+		id: "ex-2",
+		type: "Invalid Provider NPI",
+		count: 178,
+		severity: "High" as OverviewExceptionSeverity,
+		owner: "Provider Ops",
 	},
 	{
-		auditType: "Risk Adjustment",
-		status: "Overdue" as AuditRequestStatus,
-		dueDate: "Aug 20, 2027",
-		owner: "Admin User",
+		id: "ex-3",
+		type: "Coverage Period Mismatch",
+		count: 87,
+		severity: "Medium" as OverviewExceptionSeverity,
+		owner: "Enrollment",
 	},
-];
+	{
+		id: "ex-4",
+		type: "Claim Total Mismatch",
+		count: 47,
+		severity: "Medium" as OverviewExceptionSeverity,
+		owner: "Claims Ops",
+	},
+] as const;
 
-export const CMS_EDGE_OVERVIEW_REPORTING_CYCLE = [
+export const CMS_EDGE_OVERVIEW_ACTIVITY = [
 	{
-		quarter: "Q2 2027",
-		requiredFiles: 4,
-		submitted: 4,
-		outstanding: 0,
-		lastActivity: "Jul 27, 2027",
-		owner: "Admin User",
+		id: "act-1",
+		activity: "Medical Claims File Generated",
+		fileType: "Medical Claims",
+		environment: "Production",
+		status: "Completed" as OverviewActivityStatus,
+		date: "Jul 25, 2027 02:35 PM",
+		owner: "Jane Smith",
 	},
 	{
-		quarter: "Q1 2027",
-		requiredFiles: 4,
-		submitted: 3,
-		outstanding: 1,
-		lastActivity: "Apr 28, 2027",
-		owner: "Admin User",
+		id: "act-2",
+		activity: "Pharmacy Claims Validation",
+		fileType: "Pharmacy Claims",
+		environment: "Production",
+		status: "In Progress" as OverviewActivityStatus,
+		date: "Jul 25, 2027 01:12 PM",
+		owner: "System",
 	},
 	{
-		quarter: "Q4 2026",
-		requiredFiles: 4,
-		submitted: 4,
-		outstanding: 0,
-		lastActivity: "Jan 28, 2027",
-		owner: "System User",
+		id: "act-3",
+		activity: "Enrollment File Generated",
+		fileType: "Enrollment",
+		environment: "Production",
+		status: "Completed" as OverviewActivityStatus,
+		date: "Jul 24, 2027 06:48 PM",
+		owner: "Alex Rivera",
 	},
-];
+	{
+		id: "act-4",
+		activity: "Supplemental Diagnosis Export",
+		fileType: "Supplemental",
+		environment: "Production",
+		status: "In Progress" as OverviewActivityStatus,
+		date: "Jul 24, 2027 04:05 PM",
+		owner: "System",
+	},
+] as const;
 
-export type TimelineStageState = "done" | "current" | "pending" | "future";
+export const CMS_EDGE_OVERVIEW_CONFIG = [
+	{
+		id: "hios",
+		label: "HIOS Issuer ID",
+		value: "16696",
+		icon: "hash" as const,
+	},
+	{
+		id: "zone",
+		label: "Execution Zone",
+		value: "Production",
+		icon: "globe" as const,
+	},
+	{
+		id: "year",
+		label: "Benefit Year",
+		value: "2027",
+		icon: "calendar" as const,
+	},
+	{
+		id: "plans",
+		label: "Active Plan IDs",
+		value: "4",
+		icon: "list" as const,
+	},
+] as const;
 
-export const CMS_EDGE_OVERVIEW_TIMELINE = [
-	{
-		label: "Initial Submission",
-		date: "Jul 21, 2027",
-		state: "done" as TimelineStageState,
-	},
-	{
-		label: "Validation Report",
-		date: "Jul 21, 2027",
-		state: "done" as TimelineStageState,
-	},
-	{
-		label: "Acceptance Report",
-		date: "Jul 27, 2027",
-		state: "current" as TimelineStageState,
-	},
-	{
-		label: "Financial Management",
-		date: "Pending",
-		state: "pending" as TimelineStageState,
-	},
-	{
-		label: "Archive",
-		date: "—",
-		state: "future" as TimelineStageState,
-	},
-];
-
-export const CMS_EDGE_OVERVIEW_DOCUMENT_COUNTS = [
-	{ label: "Submission Reports", count: 12 },
-	{ label: "Validation Responses", count: 8 },
-	{ label: "Payment Reports", count: 5 },
-	{ label: "Audit Reports", count: 6 },
-	{ label: "Supporting Documents", count: 24 },
-];
-
-export const OVERVIEW_SUBMISSION_STATUS_STYLES: Record<
-	OverviewSubmissionStatus,
+export const OVERVIEW_SEVERITY_STYLES: Record<
+	OverviewExceptionSeverity,
 	string
 > = {
-	Accepted:
-		"border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-	Pending:
-		"border-amber-200/80 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
-	Rejected:
-		"border-red-200/80 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
+	High: "border-red-200/80 bg-red-50 text-red-700",
+	Medium: "border-amber-200/80 bg-amber-50 text-amber-800",
 };
 
-export const OVERVIEW_RESPONSE_STATUS_STYLES: Record<
-	OverviewResponseStatus,
+export const OVERVIEW_ACTIVITY_STATUS_STYLES: Record<
+	OverviewActivityStatus,
 	string
 > = {
-	Received:
-		"border-sky-200/80 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200",
-	Pending:
-		"border-amber-200/80 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
-	Processed:
-		"border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+	Completed: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	"In Progress": "border-sky-200/80 bg-sky-50 text-sky-800",
+};
+
+// ─── Members & Enrollment tab ───────────────────────────────────────────────
+
+export type MemberCmsStatus =
+	| "CMS Ready"
+	| "Accepted"
+	| "Accepted (Terminated)"
+	| "Needs Review"
+	| "Error"
+	| "Validation Error"
+	| "Coverage Mismatch"
+	| "Unmapped Plan ID";
+
+export type MemberValidationResult =
+	| "Passed"
+	| "Warning"
+	| "Corrected"
+	| "Failed";
+
+export type MemberRelationship = "Subscriber" | "Spouse" | "Child";
+
+export type CmsEdgeMemberListRow = {
+	id: string;
+	name: string;
+	uniqueEnrolleeId: string;
+	subscriberId: string;
+	relationship: MemberRelationship;
+	dateOfBirth: string;
+	sex: "M" | "F";
+	zipCode: string;
+	hiosIssuerId: string;
+	planId: string;
+	coveragePeriod: string;
+	premium: number;
+	cmsStatus: MemberCmsStatus;
+	coverageType: string;
+	errorType: string | null;
+};
+
+export const CMS_EDGE_MEMBERS_KPIS = [
+	{
+		id: "total",
+		label: "Total Members",
+		value: "2,451,890",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-foreground",
+		icon: "users" as const,
+	},
+	{
+		id: "ready",
+		label: "CMS Ready",
+		value: "2,441,022",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-800",
+		icon: "check" as const,
+	},
+	{
+		id: "errors",
+		label: "Validation Errors",
+		value: "386",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "alert" as const,
+	},
+	{
+		id: "mismatch",
+		label: "Coverage Mismatches",
+		value: "87",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "circleAlert" as const,
+	},
+	{
+		id: "unmapped",
+		label: "Unmapped Plan IDs",
+		value: "214",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "link" as const,
+	},
+] as const;
+
+export const CMS_EDGE_MEMBERS_VALIDATION_SUMMARY = [
+	{
+		id: "missing-sub",
+		label: "Missing Subscriber ID",
+		value: "126",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "userX" as const,
+	},
+	{
+		id: "invalid-dates",
+		label: "Invalid Coverage Dates",
+		value: "142",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "calendar" as const,
+	},
+	{
+		id: "invalid-plan",
+		label: "Invalid Plan ID",
+		value: "68",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "tag" as const,
+	},
+	{
+		id: "duplicate",
+		label: "Duplicate Enrollment",
+		value: "50",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-700",
+		icon: "copy" as const,
+	},
+] as const;
+
+export const CMS_EDGE_MEMBER_FILTER_OPTIONS = {
+	status: [
+		"All",
+		"CMS Ready",
+		"Validation Error",
+		"Coverage Mismatch",
+		"Unmapped Plan ID",
+	],
+	coverageType: ["All", "Medical", "Pharmacy", "Dental"],
+	planId: ["All", "P***001", "P***002", "P***003"],
+	relationship: ["All", "Subscriber", "Spouse", "Child"],
+	errorType: [
+		"All",
+		"Missing Subscriber ID",
+		"Invalid Coverage Dates",
+		"Invalid Plan ID",
+		"Duplicate Enrollment",
+	],
+} as const;
+
+export const CMS_EDGE_MEMBERS_LIST: CmsEdgeMemberListRow[] = [
+	{
+		id: "mbr-jordan",
+		name: "Jordan M.",
+		uniqueEnrolleeId: "U***45D6K9",
+		subscriberId: "S***82H7L3",
+		relationship: "Subscriber",
+		dateOfBirth: "04/12/1962",
+		sex: "M",
+		zipCode: "02115",
+		hiosIssuerId: "88888",
+		planId: "P***001",
+		coveragePeriod: "04/01/2027 - 06/30/2027",
+		premium: 528.42,
+		cmsStatus: "CMS Ready",
+		coverageType: "Medical",
+		errorType: null,
+	},
+	{
+		id: "mbr-taylor",
+		name: "Taylor M.",
+		uniqueEnrolleeId: "U***91B7K3",
+		subscriberId: "S***82H7L3",
+		relationship: "Spouse",
+		dateOfBirth: "09/03/1964",
+		sex: "F",
+		zipCode: "02115",
+		hiosIssuerId: "88888",
+		planId: "P***001",
+		coveragePeriod: "04/01/2027 - 06/30/2027",
+		premium: 412.1,
+		cmsStatus: "CMS Ready",
+		coverageType: "Medical",
+		errorType: null,
+	},
+	{
+		id: "mbr-casey",
+		name: "Casey M.",
+		uniqueEnrolleeId: "U***17C4P8",
+		subscriberId: "S***82H7L3",
+		relationship: "Child",
+		dateOfBirth: "01/22/2008",
+		sex: "F",
+		zipCode: "02115",
+		hiosIssuerId: "88888",
+		planId: "P***001",
+		coveragePeriod: "04/01/2027 - 06/30/2027",
+		premium: 186.0,
+		cmsStatus: "Validation Error",
+		coverageType: "Medical",
+		errorType: "Missing Subscriber ID",
+	},
+	{
+		id: "mbr-alex",
+		name: "Alex R.",
+		uniqueEnrolleeId: "U***44K1N2",
+		subscriberId: "S***44K1N2",
+		relationship: "Subscriber",
+		dateOfBirth: "11/08/1989",
+		sex: "M",
+		zipCode: "02118",
+		hiosIssuerId: "88888",
+		planId: "P***002",
+		coveragePeriod: "04/01/2027 - 05/15/2027",
+		premium: 612.75,
+		cmsStatus: "Coverage Mismatch",
+		coverageType: "Medical",
+		errorType: "Invalid Coverage Dates",
+	},
+	{
+		id: "mbr-sam",
+		name: "Sam L.",
+		uniqueEnrolleeId: "U***55P0M7",
+		subscriberId: "S***55P0M7",
+		relationship: "Subscriber",
+		dateOfBirth: "06/19/1975",
+		sex: "M",
+		zipCode: "02210",
+		hiosIssuerId: "88888",
+		planId: "P***003",
+		coveragePeriod: "04/01/2027 - 06/30/2027",
+		premium: 498.2,
+		cmsStatus: "Unmapped Plan ID",
+		coverageType: "Medical",
+		errorType: "Invalid Plan ID",
+	},
+];
+
+export const CMS_EDGE_MEMBER_DETAIL = {
+	id: "mbr-jordan",
+	name: "Jordan M.",
+	uniqueEnrolleeId: "UE-82A91X44",
+	cmsStatus: "CMS Ready" as MemberCmsStatus,
+	summary: [
+		{ label: "Relationship", value: "Subscriber", tone: "default" as const },
+		{ label: "Date of Birth", value: "Apr 12, 1962", tone: "default" as const },
+		{ label: "Sex", value: "M", tone: "default" as const },
+		{ label: "HIOS Issuer ID", value: "16696", tone: "default" as const },
+		{
+			label: "Current Plan ID",
+			value: "16696DC0010001",
+			tone: "default" as const,
+		},
+		{ label: "Coverage Status", value: "Active", tone: "success" as const },
+	],
+	identification: [
+		{ label: "Unique Enrollee ID", value: "UE-82A91X44" },
+		{ label: "Subscriber ID", value: "— (Not required for subscriber)" },
+		{ label: "Subscriber Indicator", value: "S" },
+		{ label: "Relationship", value: "Subscriber" },
+		{ label: "Date of Birth", value: "04/12/1962" },
+		{ label: "Sex", value: "M" },
+		{ label: "ZIP Code", value: "02115" },
+		{ label: "Race Code", value: "00 - Unknown" },
+		{ label: "Ethnicity Code", value: "00 - Unknown" },
+		{ label: "Source Vendor", value: "BHP Enrollment" },
+		{ label: "Source Member ID", value: "MBR-****-8456" },
+	],
+	enrollmentPeriods: [
+		{
+			id: "ep-1",
+			planId: "16696DC0010001",
+			coverageStart: "01/01/2024",
+			coverageEnd: "12/31/9999",
+			monthlyPremium: "$612.00",
+			ehb: "$0.00",
+			federalAptc: "$312.00",
+			stateSubsidy: "$0.00",
+			ichra: "$0.00",
+			cmsStatus: "CMS Ready" as MemberCmsStatus,
+		},
+		{
+			id: "ep-2",
+			planId: "16696DC0010001",
+			coverageStart: "01/01/2023",
+			coverageEnd: "12/31/2023",
+			monthlyPremium: "$598.00",
+			ehb: "$0.00",
+			federalAptc: "$298.00",
+			stateSubsidy: "$0.00",
+			ichra: "$0.00",
+			cmsStatus: "Accepted" as MemberCmsStatus,
+		},
+		{
+			id: "ep-3",
+			planId: "16696DC0010001",
+			coverageStart: "01/01/2022",
+			coverageEnd: "12/31/2022",
+			monthlyPremium: "$582.00",
+			ehb: "$0.00",
+			federalAptc: "$294.00",
+			stateSubsidy: "$0.00",
+			ichra: "$0.00",
+			cmsStatus: "Accepted (Terminated)" as MemberCmsStatus,
+		},
+	],
+	validationHistory: [
+		{
+			id: "vh-1",
+			date: "05/15/2024 10:14 AM",
+			rule: "ELIGIBLE_MEMBER_ID_FORMAT",
+			result: "Passed" as MemberValidationResult,
+			message: "Unique Enrollee ID format is valid.",
+			sourceFile: "BHP_EDGE_20240515_001.csv",
+			reviewedBy: "System",
+		},
+		{
+			id: "vh-2",
+			date: "05/15/2024 10:14 AM",
+			rule: "RACE_ETHNICITY_REPORTED",
+			result: "Warning" as MemberValidationResult,
+			message: "Race and ethnicity submitted as 00 - Unknown.",
+			sourceFile: "BHP_EDGE_20240515_001.csv",
+			reviewedBy: "System",
+		},
+		{
+			id: "vh-3",
+			date: "05/15/2024 10:14 AM",
+			rule: "DATE_OF_BIRTH_VALID",
+			result: "Passed" as MemberValidationResult,
+			message: "Date of birth is valid and consistent.",
+			sourceFile: "BHP_EDGE_20240515_001.csv",
+			reviewedBy: "System",
+		},
+		{
+			id: "vh-4",
+			date: "05/15/2024 2:32 PM",
+			rule: "ZIP_CODE_REQUIRED",
+			result: "Corrected" as MemberValidationResult,
+			message: "ZIP code was missing; value 02115 added.",
+			sourceFile: "BHP_EDGE_20240515_001.csv",
+			reviewedBy: "jdoe@bhphealthcare.com",
+		},
+	],
+	family: [
+		{
+			id: "mbr-jordan",
+			name: "Jordan M.",
+			role: "Subscriber",
+			uniqueEnrolleeId: "UE-82A91X44",
+			primary: true,
+		},
+		{
+			id: "mbr-taylor",
+			name: "Taylor M.",
+			role: "Spouse",
+			uniqueEnrolleeId: "UE-91B72K03",
+			primary: false,
+		},
+		{
+			id: "mbr-casey",
+			name: "Casey M.",
+			role: "Dependent",
+			uniqueEnrolleeId: "UE-17C44P82",
+			primary: false,
+		},
+	],
+	currentValidation: {
+		passed: 24,
+		warnings: 1,
+		errors: 0,
+		alert: "Race and ethnicity submitted as 00 - Unknown.",
+	},
+	submissionHistory: [
+		{
+			id: "sh-1",
+			submissionType: "Final Enrollment",
+			reportingPeriod: "Q2 2027",
+			submittedDate: "Jul 21, 2027 09:45 AM",
+			status: "Accepted",
+			fileName: "BHP_EDGE_ENROLL_20270721.xml",
+		},
+		{
+			id: "sh-2",
+			submissionType: "Preliminary Enrollment",
+			reportingPeriod: "Q2 2027",
+			submittedDate: "Jul 14, 2027 02:30 PM",
+			status: "Accepted",
+			fileName: "BHP_EDGE_ENROLL_20270714.xml",
+		},
+	],
+} as const;
+
+export const MEMBER_CMS_STATUS_STYLES: Record<MemberCmsStatus, string> = {
+	"CMS Ready": "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Accepted: "border-sky-200/80 bg-sky-50 text-sky-800",
+	"Accepted (Terminated)": "border-border bg-muted text-muted-foreground",
+	"Needs Review": "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+	"Validation Error": "border-red-200/80 bg-red-50 text-red-800",
+	"Coverage Mismatch": "border-amber-200/80 bg-amber-50 text-amber-900",
+	"Unmapped Plan ID": "border-violet-200/80 bg-violet-50 text-violet-800",
+};
+
+export const MEMBER_VALIDATION_RESULT_STYLES: Record<
+	MemberValidationResult,
+	string
+> = {
+	Passed: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Corrected: "border-violet-200/80 bg-violet-50 text-violet-800",
+	Failed: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+// ─── Providers tab ──────────────────────────────────────────────────────────
+
+export type ProviderEdgeStatus = "Valid" | "Invalid NPI" | "Missing ID";
+export type ProviderClaimCmsStatus = "CMS Ready" | "Warning" | "Error";
+export type ProviderErrorStatus = "Corrected" | "Resolved" | "Open";
+export type ProviderIdQualifier = "NPI" | "TIN" | "NCPDP";
+export type ProviderRole = "Billing" | "Rendering" | "Dispensing";
+
+export type CmsEdgeProviderListRow = {
+	id: string;
+	name: string;
+	npi: string | null;
+	idQualifier: ProviderIdQualifier;
+	role: ProviderRole;
+	taxonomy: string;
+	networkStatus: "In-Network" | "Out-of-Network";
+	medicalClaims: number;
+	pharmacyClaims: number;
+	status: ProviderEdgeStatus;
+	errors: number;
+};
+
+export const CMS_EDGE_PROVIDERS_KPIS = [
+	{
+		id: "total",
+		label: "Total Providers",
+		value: "215,667",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-800",
+		icon: "users" as const,
+	},
+	{
+		id: "validated",
+		label: "Validated",
+		value: "213,201",
+		tone: "text-emerald-700 bg-emerald-500/10",
+		valueClassName: "text-emerald-700",
+		icon: "check" as const,
+	},
+	{
+		id: "invalid",
+		label: "Invalid NPI",
+		value: "93",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "alert" as const,
+	},
+	{
+		id: "missing",
+		label: "Missing Identifier",
+		value: "178",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "circleAlert" as const,
+	},
+	{
+		id: "impacted",
+		label: "Claims Impacted",
+		value: "1,284",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "file" as const,
+	},
+] as const;
+
+export const CMS_EDGE_PROVIDER_VALIDATION_RULES = [
+	{
+		id: "check-digit",
+		title: "NPI Check Digit",
+		description:
+			"Validates the 10-digit NPI using the CMS check digit algorithm.",
+		icon: "badge" as const,
+	},
+	{
+		id: "qualifier",
+		title: "Identifier Qualifier",
+		description:
+			"Confirms the identifier qualifier is valid and appropriate for the provider role.",
+		icon: "search" as const,
+	},
+	{
+		id: "active-dates",
+		title: "Active Dates",
+		description:
+			"Verifies the provider is active during the claim service dates.",
+		icon: "calendar" as const,
+	},
+	{
+		id: "claim-association",
+		title: "Claim Association",
+		description:
+			"Ensures the provider is appropriately associated with the claim record.",
+		icon: "link" as const,
+	},
+] as const;
+
+export const CMS_EDGE_PROVIDERS_LIST: CmsEdgeProviderListRow[] = [
+	{
+		id: "prv-northshore",
+		name: "Northshore Medical Group",
+		npi: "1234567893",
+		idQualifier: "NPI",
+		role: "Billing",
+		taxonomy: "208D00000X Family Medicine",
+		networkStatus: "In-Network",
+		medicalClaims: 4521,
+		pharmacyClaims: 0,
+		status: "Valid",
+		errors: 0,
+	},
+	{
+		id: "prv-sarah",
+		name: "Sarah Johnson, MD",
+		npi: "1987654321",
+		idQualifier: "NPI",
+		role: "Rendering",
+		taxonomy: "207R00000X Internal Medicine",
+		networkStatus: "In-Network",
+		medicalClaims: 1842,
+		pharmacyClaims: 12,
+		status: "Valid",
+		errors: 0,
+	},
+	{
+		id: "prv-metro",
+		name: "Metro Pharmacy Partners",
+		npi: "1678901234",
+		idQualifier: "NCPDP",
+		role: "Dispensing",
+		taxonomy: "333600000X Pharmacy",
+		networkStatus: "In-Network",
+		medicalClaims: 0,
+		pharmacyClaims: 3987,
+		status: "Valid",
+		errors: 0,
+	},
+	{
+		id: "prv-summit",
+		name: "Summit Billing LLC",
+		npi: "1111111111",
+		idQualifier: "NPI",
+		role: "Billing",
+		taxonomy: "261QM1300X Multi-Specialty",
+		networkStatus: "Out-of-Network",
+		medicalClaims: 214,
+		pharmacyClaims: 0,
+		status: "Invalid NPI",
+		errors: 1,
+	},
+	{
+		id: "prv-harbor",
+		name: "Harborview Specialty Clinic",
+		npi: null,
+		idQualifier: "TIN",
+		role: "Billing",
+		taxonomy: "261Q00000X Clinic/Center",
+		networkStatus: "Out-of-Network",
+		medicalClaims: 96,
+		pharmacyClaims: 0,
+		status: "Missing ID",
+		errors: 1,
+	},
+	{
+		id: "prv-lena",
+		name: "Lena Ortiz, DO",
+		npi: "1456789012",
+		idQualifier: "NPI",
+		role: "Rendering",
+		taxonomy: "207Q00000X Family Practice",
+		networkStatus: "In-Network",
+		medicalClaims: 906,
+		pharmacyClaims: 4,
+		status: "Valid",
+		errors: 0,
+	},
+];
+
+export const CMS_EDGE_PROVIDER_DETAIL = {
+	id: "prv-northshore",
+	name: "Northshore Medical Group",
+	npi: "1234567893",
+	validated: true,
+	roles: ["Billing", "Rendering"] as const,
+	kpis: [
+		{
+			id: "type",
+			label: "Provider Type",
+			value: "Organization",
+			tone: "default" as const,
+			icon: "building" as const,
+		},
+		{
+			id: "taxonomy",
+			label: "Primary Taxonomy",
+			value: "208D00000X",
+			tone: "default" as const,
+			icon: "stethoscope" as const,
+		},
+		{
+			id: "network",
+			label: "Network Status",
+			value: "In-Network",
+			tone: "success" as const,
+			icon: "shield" as const,
+		},
+		{
+			id: "medical",
+			label: "Medical Claims",
+			value: "4,521",
+			tone: "default" as const,
+			icon: "file" as const,
+		},
+		{
+			id: "pharmacy",
+			label: "Pharmacy Claims",
+			value: "0",
+			tone: "default" as const,
+			icon: "pill" as const,
+		},
+		{
+			id: "impacted",
+			label: "Claims Impacted",
+			value: "0",
+			tone: "default" as const,
+			icon: "alert" as const,
+		},
+	],
+	identificationLeft: [
+		{ label: "Provider Name", value: "Northshore Medical Group" },
+		{ label: "NPI / Identifier", value: "1234567893" },
+		{ label: "ID Qualifier", value: "NPI" },
+		{ label: "Provider Type", value: "Organization" },
+		{ label: "Taxonomy", value: "208D00000X - General Practice" },
+		{ label: "TIN", value: "***-***6789" },
+	],
+	identificationRight: [
+		{ label: "Effective Date", value: "01/01/2021" },
+		{ label: "Termination Date", value: "—" },
+		{ label: "Network Status", value: "In-Network", tone: "success" as const },
+		{ label: "Source Vendor", value: "BHP Provider Network" },
+		{ label: "Last Updated", value: "Jul 24, 2027 04:18 PM" },
+	],
+	npiValidation: {
+		passed: 12,
+		warnings: 0,
+		errors: 0,
+		lastValidated: "Jul 25, 2027 12:58 PM",
+		checks: [
+			{ id: "c1", label: "10-Digit Format", result: "Passed" as const },
+			{ id: "c2", label: "Check Digit", result: "Passed" as const },
+			{ id: "c3", label: "NPPES Match", result: "Passed" as const },
+			{
+				id: "c4",
+				label: "Active During Service Dates",
+				result: "Passed" as const,
+			},
+			{ id: "c5", label: "Identifier Qualifier", result: "Passed" as const },
+		],
+	},
+	medicalClaims: [
+		{
+			id: "clm-1",
+			claimId: "CLM-2027-88421",
+			uniqueEnrolleeId: "UE-82A91X44",
+			providerRole: "Billing",
+			serviceDate: "06/12/2027",
+			procedureCode: "99213",
+			allowedAmount: "$185.00",
+			planPaid: "$148.00",
+			cmsStatus: "CMS Ready" as ProviderClaimCmsStatus,
+			errors: 0,
+		},
+		{
+			id: "clm-2",
+			claimId: "CLM-2027-88455",
+			uniqueEnrolleeId: "UE-91B72K03",
+			providerRole: "Rendering",
+			serviceDate: "06/14/2027",
+			procedureCode: "80053",
+			allowedAmount: "$62.00",
+			planPaid: "$49.60",
+			cmsStatus: "Warning" as ProviderClaimCmsStatus,
+			errors: 1,
+		},
+		{
+			id: "clm-3",
+			claimId: "CLM-2027-88502",
+			uniqueEnrolleeId: "UE-17C44P82",
+			providerRole: "Billing",
+			serviceDate: "06/18/2027",
+			procedureCode: "90471",
+			allowedAmount: "$40.00",
+			planPaid: "$32.00",
+			cmsStatus: "CMS Ready" as ProviderClaimCmsStatus,
+			errors: 0,
+		},
+		{
+			id: "clm-4",
+			claimId: "CLM-2027-88541",
+			uniqueEnrolleeId: "UE-44K18N02",
+			providerRole: "Rendering",
+			serviceDate: "06/21/2027",
+			procedureCode: "93000",
+			allowedAmount: "$95.00",
+			planPaid: "$0.00",
+			cmsStatus: "Error" as ProviderClaimCmsStatus,
+			errors: 2,
+		},
+	],
+	pharmacyClaims: [] as {
+		id: string;
+		claimId: string;
+		uniqueEnrolleeId: string;
+		providerRole: string;
+		serviceDate: string;
+		procedureCode: string;
+		allowedAmount: string;
+		planPaid: string;
+		cmsStatus: ProviderClaimCmsStatus;
+		errors: number;
+	}[],
+	errorHistory: [
+		{
+			id: "err-1",
+			date: "03/02/2026 09:18 AM",
+			errorCode: "NPI_CHECK_DIGIT",
+			description: "NPI check digit failed initial validation.",
+			claimsImpacted: 18,
+			status: "Corrected" as ProviderErrorStatus,
+			resolution: "Correct NPI applied from NPPES match.",
+			resolvedBy: "jdow@bhp.com",
+		},
+		{
+			id: "err-2",
+			date: "11/14/2025 02:44 PM",
+			errorCode: "NPI_INACTIVE",
+			description: "NPI inactive for claim service date range.",
+			claimsImpacted: 4,
+			status: "Resolved" as ProviderErrorStatus,
+			resolution: "Service dates adjusted; NPI active for DOS.",
+			resolvedBy: "mchen@bhp.com",
+		},
+	],
+	submissionHistory: [
+		{
+			id: "psh-1",
+			submissionType: "Medical Claims File",
+			reportingPeriod: "Q2 2027",
+			submittedDate: "Jul 25, 2027 02:35 PM",
+			status: "Accepted",
+			fileName: "BHP_EDGE_MED_20270725.xml",
+		},
+		{
+			id: "psh-2",
+			submissionType: "Medical Claims File",
+			reportingPeriod: "Q1 2027",
+			submittedDate: "Apr 22, 2027 11:08 AM",
+			status: "Accepted",
+			fileName: "BHP_EDGE_MED_20270422.xml",
+		},
+	],
+	infoNote:
+		"Provider identifiers are submitted within associated medical and pharmacy claims; no standalone CMS provider file is generated.",
+} as const;
+
+export const PROVIDER_EDGE_STATUS_STYLES: Record<ProviderEdgeStatus, string> = {
+	Valid: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	"Invalid NPI": "border-red-200/80 bg-red-50 text-red-800",
+	"Missing ID": "border-amber-200/80 bg-amber-50 text-amber-900",
+};
+
+export const PROVIDER_CLAIM_STATUS_STYLES: Record<
+	ProviderClaimCmsStatus,
+	string
+> = {
+	"CMS Ready": "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const PROVIDER_ERROR_STATUS_STYLES: Record<ProviderErrorStatus, string> =
+	{
+		Corrected: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+		Resolved: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+		Open: "border-amber-200/80 bg-amber-50 text-amber-900",
+	};
+
+export const PROVIDER_ROLE_STYLES: Record<string, string> = {
+	Billing: "border-sky-200/80 bg-sky-50 text-sky-800",
+	Rendering: "border-violet-200/80 bg-violet-50 text-violet-800",
+	Dispensing: "border-amber-200/80 bg-amber-50 text-amber-900",
+};
+
+// ─── Claims tab (Medical Claims) ────────────────────────────────────────────
+
+export type MedicalClaimCmsStatus = "Ready" | "Warning" | "Error";
+export type MedicalClaimTransaction = "Original" | "Replacement" | "Void";
+export type MedicalClaimFilterTab =
+	| "all"
+	| "ready"
+	| "errors"
+	| "warnings"
+	| "voids";
+export type MedicalClaimLineValidation = "Passed" | "Warning" | "Error";
+export type MedicalClaimDetailCmsStatus =
+	| "CMS Ready"
+	| "Draft"
+	| "Warning"
+	| "Error";
+
+export type CmsEdgeMedicalClaimRow = {
+	id: string;
+	claimId: string;
+	enrolleeId: string;
+	formType: string;
+	statementFrom: string;
+	statementThrough: string;
+	billingNpi: string;
+	primaryDiagnosis: string;
+	allowedAmount: number;
+	planPaid: number;
+	transaction: MedicalClaimTransaction;
+	cmsStatus: MedicalClaimCmsStatus;
+};
+
+export const CMS_EDGE_MEDICAL_CLAIMS_KPIS = [
+	{
+		id: "total",
+		label: "Total Medical Claims",
+		value: "9,842,113",
+		hint: null as string | null,
+		hintClassName: "",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-foreground",
+		icon: "file" as const,
+	},
+	{
+		id: "ready",
+		label: "CMS Ready",
+		value: "9,790,412",
+		hint: "99.47% of total",
+		hintClassName: "text-emerald-700",
+		tone: "text-emerald-700 bg-emerald-500/10",
+		valueClassName: "text-emerald-700",
+		icon: "check" as const,
+	},
+	{
+		id: "errors",
+		label: "Validation Errors",
+		value: "421",
+		hint: "0.00% of total",
+		hintClassName: "text-red-600",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "alert" as const,
+	},
+	{
+		id: "warnings",
+		label: "CMS Warnings",
+		value: "1,842",
+		hint: "0.02% of total",
+		hintClassName: "text-amber-700",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "ban" as const,
+	},
+	{
+		id: "unmatched",
+		label: "Unmatched Members",
+		value: "96",
+		hint: "0.00% of total",
+		hintClassName: "text-violet-700",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "user" as const,
+	},
+] as const;
+
+export const MEDICAL_FILTER_BADGE_STYLES = {
+	error: "bg-red-100 text-red-700",
+	warning: "bg-amber-100 text-amber-800",
+	void: "bg-violet-100 text-violet-800",
+} as const;
+
+export const CMS_EDGE_MEDICAL_CLAIM_FILTER_TABS: {
+	id: MedicalClaimFilterTab;
+	label: string;
+	badge: number | null;
+	badgeTone?: keyof typeof MEDICAL_FILTER_BADGE_STYLES;
+}[] = [
+	{ id: "all", label: "All Claims", badge: null },
+	{ id: "ready", label: "Ready", badge: null },
+	{ id: "errors", label: "Errors", badge: 421, badgeTone: "error" },
+	{ id: "warnings", label: "Warnings", badge: 1842, badgeTone: "warning" },
+	{
+		id: "voids",
+		label: "Voids & Replacements",
+		badge: 218,
+		badgeTone: "void",
+	},
+];
+
+export const CMS_EDGE_MEDICAL_CLAIMS_LIST: CmsEdgeMedicalClaimRow[] = [
+	{
+		id: "mcl-1",
+		claimId: "MCL-2027-00842119",
+		enrolleeId: "UE-82A91X44",
+		formType: "Professional",
+		statementFrom: "07/01/2027",
+		statementThrough: "07/01/2027",
+		billingNpi: "1234567890",
+		primaryDiagnosis: "E11.65",
+		allowedAmount: 485.0,
+		planPaid: 392.5,
+		transaction: "Original",
+		cmsStatus: "Ready",
+	},
+	{
+		id: "mcl-2",
+		claimId: "MCL-2027-00842120",
+		enrolleeId: "UE-****4421",
+		formType: "Institutional",
+		statementFrom: "07/02/2027",
+		statementThrough: "07/04/2027",
+		billingNpi: "1987654321",
+		primaryDiagnosis: "I10",
+		allowedAmount: 1240.0,
+		planPaid: 980.0,
+		transaction: "Original",
+		cmsStatus: "Ready",
+	},
+	{
+		id: "mcl-3",
+		claimId: "MCL-2027-00842121",
+		enrolleeId: "UE-****1190",
+		formType: "Professional",
+		statementFrom: "07/05/2027",
+		statementThrough: "07/05/2027",
+		billingNpi: "1456789012",
+		primaryDiagnosis: "J45.909",
+		allowedAmount: 210.25,
+		planPaid: 168.0,
+		transaction: "Replacement",
+		cmsStatus: "Warning",
+	},
+	{
+		id: "mcl-4",
+		claimId: "MCL-2027-00842122",
+		enrolleeId: "UE-****3302",
+		formType: "Professional",
+		statementFrom: "07/06/2027",
+		statementThrough: "07/06/2027",
+		billingNpi: "1678901234",
+		primaryDiagnosis: "Z99.999",
+		allowedAmount: 95.0,
+		planPaid: 0,
+		transaction: "Original",
+		cmsStatus: "Error",
+	},
+	{
+		id: "mcl-5",
+		claimId: "MCL-2027-00842123",
+		enrolleeId: "UE-****7788",
+		formType: "Institutional",
+		statementFrom: "07/08/2027",
+		statementThrough: "07/10/2027",
+		billingNpi: "1234567890",
+		primaryDiagnosis: "E11.9",
+		allowedAmount: 2100.0,
+		planPaid: 0,
+		transaction: "Void",
+		cmsStatus: "Ready",
+	},
+];
+
+export const CMS_EDGE_MEDICAL_VALIDATION_SUMMARY = [
+	{
+		id: "proc-rev",
+		label: "Procedure/Revenue Mismatch",
+		value: "312",
+		hint: "0.003% of total",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "alert" as const,
+	},
+	{
+		id: "invalid-dx",
+		label: "Invalid Diagnosis Code",
+		value: "148",
+		hint: "0.002% of total",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "ban" as const,
+	},
+	{
+		id: "missing-npi",
+		label: "Missing Rendering NPI",
+		value: "87",
+		hint: "0.001% of total",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "user" as const,
+	},
+	{
+		id: "financial",
+		label: "Financial Mismatch",
+		value: "54",
+		hint: "0.001% of total",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-700",
+		icon: "dollar" as const,
+	},
+	{
+		id: "void-link",
+		label: "Void/Replacement Link Error",
+		value: "22",
+		hint: "0.000% of total",
+		tone: "text-teal-700 bg-teal-500/10",
+		valueClassName: "text-teal-700",
+		icon: "link" as const,
+	},
+] as const;
+
+export const MEDICAL_CLAIM_CMS_STATUS_STYLES: Record<
+	MedicalClaimCmsStatus,
+	string
+> = {
+	Ready: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const MEDICAL_CLAIM_TXN_STYLES: Record<MedicalClaimTransaction, string> =
+	{
+		Original: "border-sky-200/80 bg-sky-50 text-sky-800",
+		Replacement: "border-violet-200/80 bg-violet-50 text-violet-800",
+		Void: "border-slate-200/80 bg-slate-100 text-slate-700",
+	};
+
+export const CMS_EDGE_MEDICAL_CLAIM_DETAIL = {
+	id: "mcl-1",
+	claimId: "MCL-2027-00842119",
+	cmsStatus: "CMS Ready" as MedicalClaimDetailCmsStatus,
+	transaction: "Original" as MedicalClaimTransaction,
+	summary: [
+		{
+			label: "Unique Enrollee ID",
+			value: "UE-82A91X44",
+			icon: "user" as const,
+			link: "View Member",
+		},
+		{ label: "Plan ID", value: "16696DC0010001", icon: "shield" as const },
+		{ label: "Form Type", value: "Professional", icon: "file" as const },
+		{ label: "Paid Date", value: "Jul 20, 2027", icon: "calendar" as const },
+		{ label: "Total Allowed", value: "$485.00", icon: "dollar" as const },
+		{ label: "Plan Paid", value: "$392.50", icon: "wallet" as const },
+	],
+	headerLeft: [
+		{ label: "Claim ID", value: "MCL-2027-00842119" },
+		{ label: "Original Claim ID", value: "MCL-2027-00842119" },
+		{ label: "Form Type Code", value: "1 (Professional)" },
+		{ label: "Claim Processed Date/Time", value: "Jul 18, 2027 10:32:15 AM" },
+		{ label: "Void/Replace Code", value: "0 (Original Claim)" },
+		{ label: "Diagnosis Type", value: "ICD-10-CM" },
+		{
+			label: "Primary Diagnosis",
+			value: "E11.65 (Type 2 diabetes mellitus with hyperglycemia)",
+		},
+	],
+	headerRight: [
+		{ label: "Statement From Date", value: "Jul 01, 2027" },
+		{ label: "Statement Through Date", value: "Jul 01, 2027" },
+		{
+			label: "Billing Provider NPI",
+			value: "1234567890",
+			link: "View Provider",
+		},
+		{ label: "Total Allowed Amount", value: "$485.00" },
+		{ label: "Policy Paid Total Amount", value: "$392.50" },
+	],
+	lines: [
+		{
+			id: "line-1",
+			line: 1,
+			serviceFrom: "07/01/2027",
+			serviceTo: "07/01/2027",
+			revenueCode: "—",
+			serviceQualifier: "HC",
+			procedureCode: "99213",
+			modifiers: "—",
+			placeOfService: "11",
+			renderingNpi: "1456789012",
+			allowed: 185.0,
+			planPaid: 148.0,
+			validation: "Passed" as MedicalClaimLineValidation,
+			warning: null as null | {
+				code: string;
+				message: string;
+				recommendedAction: string;
+			},
+		},
+		{
+			id: "line-2",
+			line: 2,
+			serviceFrom: "07/01/2027",
+			serviceTo: "07/01/2027",
+			revenueCode: "—",
+			serviceQualifier: "HC",
+			procedureCode: "83036",
+			modifiers: "—",
+			placeOfService: "11",
+			renderingNpi: "1456789012",
+			allowed: 95.0,
+			planPaid: 76.0,
+			validation: "Passed" as MedicalClaimLineValidation,
+			warning: null,
+		},
+		{
+			id: "line-3",
+			line: 3,
+			serviceFrom: "07/01/2027",
+			serviceTo: "07/01/2027",
+			revenueCode: "0300",
+			serviceQualifier: "HC",
+			procedureCode: "82962",
+			modifiers: "—",
+			placeOfService: "11",
+			renderingNpi: "1456789012",
+			allowed: 120.0,
+			planPaid: 96.0,
+			validation: "Warning" as MedicalClaimLineValidation,
+			warning: {
+				code: "W237",
+				message: "Procedure code 82962 is inconsistent with revenue code 0300.",
+				recommendedAction:
+					"Verify the revenue code and procedure-code combination against the source claim.",
+			},
+		},
+		{
+			id: "line-4",
+			line: 4,
+			serviceFrom: "07/01/2027",
+			serviceTo: "07/01/2027",
+			revenueCode: "—",
+			serviceQualifier: "HC",
+			procedureCode: "36415",
+			modifiers: "—",
+			placeOfService: "11",
+			renderingNpi: "1456789012",
+			allowed: 85.0,
+			planPaid: 72.5,
+			validation: "Passed" as MedicalClaimLineValidation,
+			warning: null,
+		},
+	],
+	lineTotals: { allowed: 485.0, planPaid: 392.5 },
+	cmsValidation: {
+		passed: 28,
+		warnings: 1,
+		errors: 0,
+		warningDetail: {
+			title: "Procedure Code/Revenue Code Mismatch",
+			affectedField: "Procedure Code / Revenue Code",
+			affectedLine: "3",
+			cmsCode: "W237",
+			severity: "Warning",
+			message: "Procedure code 82962 is inconsistent with revenue code 0300.",
+		},
+	},
+	transactionHistory: [
+		{
+			id: "txn-1",
+			transaction: "Original",
+			claimId: "MCL-2027-00842119",
+			originalClaimId: "—",
+			date: "07/18/2027",
+			cmsStatus: "CMS Ready" as MedicalClaimDetailCmsStatus,
+		},
+		{
+			id: "txn-2",
+			transaction: "Replacement Draft",
+			claimId: "MCL-2027-00842119-R1",
+			originalClaimId: "MCL-2027-00842119",
+			date: "07/22/2027",
+			cmsStatus: "Draft" as MedicalClaimDetailCmsStatus,
+		},
+	],
+	submissionHistory: [
+		{
+			id: "sh-1",
+			environment: "Production",
+			fileName: "BHP_EDGE_MED_20270718.xml",
+			submittedDate: "Jul 18, 2027 11:05 AM",
+			cmsResponse: "Accepted",
+			status: "Accepted",
+		},
+	],
+} as const;
+
+export const MEDICAL_CLAIM_DETAIL_STATUS_STYLES: Record<
+	MedicalClaimDetailCmsStatus,
+	string
+> = {
+	"CMS Ready": "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Draft: "border-sky-200/80 bg-sky-50 text-sky-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const MEDICAL_CLAIM_LINE_VALIDATION_STYLES: Record<
+	MedicalClaimLineValidation,
+	string
+> = {
+	Passed: "text-emerald-700",
+	Warning: "text-amber-700",
+	Error: "text-red-600",
+};
+
+// ─── Pharmacy Claims tab ────────────────────────────────────────────────────
+
+export type PharmacyClaimCmsStatus = "Ready" | "Warning" | "Error";
+export type PharmacyClaimTransaction = "Original" | "Replacement" | "Void";
+export type PharmacyClaimNetwork = "Retail" | "Mail Order";
+export type PharmacyClaimFilterTab =
+	| "all"
+	| "ready"
+	| "errors"
+	| "warnings"
+	| "voids";
+
+export type CmsEdgePharmacyClaimRow = {
+	id: string;
+	claimId: string;
+	enrolleeId: string;
+	ndc: string;
+	fillDate: string;
+	rxReference: string;
+	fillNo: number;
+	daysSupply: number;
+	dispensingNpi: string;
+	network: PharmacyClaimNetwork;
+	allowedCost: number;
+	planPaid: number;
+	transaction: PharmacyClaimTransaction;
+	cmsStatus: PharmacyClaimCmsStatus;
+};
+
+export const CMS_EDGE_PHARMACY_CLAIMS_KPIS = [
+	{
+		id: "total",
+		label: "Total Pharmacy Claims",
+		value: "6,318,774",
+		hint: null as string | null,
+		hintClassName: "",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-foreground",
+		icon: "file" as const,
+	},
+	{
+		id: "ready",
+		label: "CMS Ready",
+		value: "6,262,893",
+		hint: "98.12% of total",
+		hintClassName: "text-emerald-700",
+		tone: "text-emerald-700 bg-emerald-500/10",
+		valueClassName: "text-emerald-700",
+		icon: "check" as const,
+	},
+	{
+		id: "errors",
+		label: "Validation Errors",
+		value: "280",
+		hint: "0.00% of total",
+		hintClassName: "text-red-600",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "alert" as const,
+	},
+	{
+		id: "invalid-ndc",
+		label: "Invalid NDC",
+		value: "72",
+		hint: "0.00% of total",
+		hintClassName: "text-amber-700",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "ban" as const,
+	},
+	{
+		id: "missing-npi",
+		label: "Missing Pharmacy NPI",
+		value: "41",
+		hint: "0.00% of total",
+		hintClassName: "text-violet-700",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "user" as const,
+	},
+] as const;
+
+export const PHARMACY_FILTER_BADGE_STYLES = {
+	error: "bg-red-100 text-red-700",
+	warning: "bg-amber-100 text-amber-800",
+	void: "bg-violet-100 text-violet-800",
+} as const;
+
+export const CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS: {
+	id: PharmacyClaimFilterTab;
+	label: string;
+	badge: number | null;
+	badgeTone?: keyof typeof PHARMACY_FILTER_BADGE_STYLES;
+}[] = [
+	{ id: "all", label: "All Claims", badge: null },
+	{ id: "ready", label: "Ready", badge: null },
+	{ id: "errors", label: "Errors", badge: 280, badgeTone: "error" },
+	{ id: "warnings", label: "Warnings", badge: 512, badgeTone: "warning" },
+	{
+		id: "voids",
+		label: "Voids & Replacements",
+		badge: 148,
+		badgeTone: "void",
+	},
+];
+
+export const CMS_EDGE_PHARMACY_CLAIMS_LIST: CmsEdgePharmacyClaimRow[] = [
+	{
+		id: "rx-1",
+		claimId: "CLM-27Q2-00000001",
+		enrolleeId: "ENR-****8765",
+		ndc: "00093-1234-01",
+		fillDate: "04/02/2027",
+		rxReference: "RX-27Q2-00001234567",
+		fillNo: 1,
+		daysSupply: 30,
+		dispensingNpi: "1678901234",
+		network: "Retail",
+		allowedCost: 245.8,
+		planPaid: 198.4,
+		transaction: "Original",
+		cmsStatus: "Ready",
+	},
+	{
+		id: "rx-2",
+		claimId: "CLM-27Q2-00000002",
+		enrolleeId: "ENR-****4421",
+		ndc: "68180-0513-03",
+		fillDate: "04/03/2027",
+		rxReference: "RX-27Q2-00001234601",
+		fillNo: 2,
+		daysSupply: 90,
+		dispensingNpi: "1678901234",
+		network: "Mail Order",
+		allowedCost: 612.1,
+		planPaid: 540.0,
+		transaction: "Original",
+		cmsStatus: "Ready",
+	},
+	{
+		id: "rx-3",
+		claimId: "CLM-27Q2-00000003",
+		enrolleeId: "ENR-****1190",
+		ndc: "00074-3042-13",
+		fillDate: "04/05/2027",
+		rxReference: "RX-27Q2-00001234888",
+		fillNo: 1,
+		daysSupply: 30,
+		dispensingNpi: "1456789012",
+		network: "Retail",
+		allowedCost: 89.25,
+		planPaid: 65.0,
+		transaction: "Replacement",
+		cmsStatus: "Warning",
+	},
+	{
+		id: "rx-4",
+		claimId: "CLM-27Q2-00000004",
+		enrolleeId: "ENR-****3302",
+		ndc: "00002-1433-80",
+		fillDate: "04/06/2027",
+		rxReference: "RX-27Q2-00001235002",
+		fillNo: 1,
+		daysSupply: 0,
+		dispensingNpi: "1678901234",
+		network: "Retail",
+		allowedCost: 412.0,
+		planPaid: 360.0,
+		transaction: "Original",
+		cmsStatus: "Error",
+	},
+	{
+		id: "rx-5",
+		claimId: "CLM-27Q2-00000005",
+		enrolleeId: "ENR-****7788",
+		ndc: "68180-0513-03",
+		fillDate: "04/08/2027",
+		rxReference: "RX-27Q2-00001235110",
+		fillNo: 1,
+		daysSupply: 30,
+		dispensingNpi: "1678901234",
+		network: "Mail Order",
+		allowedCost: 612.1,
+		planPaid: 0.0,
+		transaction: "Void",
+		cmsStatus: "Ready",
+	},
+];
+
+export const CMS_EDGE_PHARMACY_VALIDATION_SUMMARY = [
+	{
+		id: "invalid-ndc",
+		label: "Invalid NDC",
+		value: "72",
+		hint: "0.001% of total",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "ban" as const,
+	},
+	{
+		id: "missing-days",
+		label: "Missing Days Supply",
+		value: "134",
+		hint: "0.002% of total",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "calendar" as const,
+	},
+	{
+		id: "invalid-npi",
+		label: "Invalid Dispensing Provider NPI",
+		value: "41",
+		hint: "0.001% of total",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "user" as const,
+	},
+	{
+		id: "financial",
+		label: "Financial Mismatch",
+		value: "33",
+		hint: "0.001% of total",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-700",
+		icon: "dollar" as const,
+	},
+	{
+		id: "void-link",
+		label: "Void/Replacement Link Error",
+		value: "12",
+		hint: "0.000% of total",
+		tone: "text-teal-700 bg-teal-500/10",
+		valueClassName: "text-teal-700",
+		icon: "link" as const,
+	},
+] as const;
+
+export const PHARMACY_CLAIM_CMS_STATUS_STYLES: Record<
+	PharmacyClaimCmsStatus,
+	string
+> = {
+	Ready: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const PHARMACY_CLAIM_TXN_STYLES: Record<
+	PharmacyClaimTransaction,
+	string
+> = {
+	Original: "border-sky-200/80 bg-sky-50 text-sky-800",
+	Replacement: "border-violet-200/80 bg-violet-50 text-violet-800",
+	Void: "border-slate-200/80 bg-slate-100 text-slate-700",
+};
+
+export type PharmacyClaimDetailCmsStatus =
+	| "CMS Ready"
+	| "Draft"
+	| "Warning"
+	| "Error";
+export type PharmacyClaimValidationResult = "Passed" | "Warning" | "Failed";
+
+export const CMS_EDGE_PHARMACY_CLAIM_DETAIL = {
+	id: "rx-1",
+	claimId: "PCL-2027-0001234567",
+	cmsStatus: "CMS Ready" as PharmacyClaimDetailCmsStatus,
+	transaction: "Original" as PharmacyClaimTransaction,
+	summary: [
+		{
+			label: "Unique Enrollee ID",
+			value: "UE-82A91X44",
+			icon: "user" as const,
+		},
+		{ label: "Plan ID", value: "16696DC0010001", icon: "id" as const },
+		{ label: "NDC", value: "00093-1234-01", icon: "pill" as const },
+		{ label: "Fill Date", value: "Apr 2, 2027", icon: "calendar" as const },
+		{ label: "Allowed Cost", value: "$85.42", icon: "dollar" as const },
+		{ label: "Plan Paid", value: "$25.62", icon: "dollar" as const },
+	],
+	claimInfoLeft: [
+		{ label: "Claim ID", value: "PCL-2027-0001234567" },
+		{ label: "Original Claim ID", value: "—" },
+		{ label: "Record ID", value: "RX-27Q2-00001234567" },
+		{ label: "Unique Enrollee ID", value: "UE-82A91X44" },
+		{ label: "Claim Processed Date/Time", value: "04/05/2027 09:14 AM" },
+		{ label: "Issuer Claim Paid Date", value: "04/06/2027" },
+	],
+	claimInfoRight: [
+		{ label: "Fill Date", value: "04/02/2027" },
+		{ label: "Prescription Reference Number", value: "RX-27Q2-00001234567" },
+		{ label: "Fill Number", value: "1" },
+		{ label: "Dispensing Status Code", value: "P - Paid" },
+		{ label: "Void/Replace Code", value: "0 - Original" },
+		{ label: "Plan ID", value: "16696DC0010001" },
+		{ label: "HIOS Issuer ID", value: "16696" },
+	],
+	drugInfoLeft: [
+		{ label: "Product Service ID / NDC", value: "00093-1234-01" },
+		{ label: "Drug Name", value: "Metformin HCl 500 mg Tablet" },
+		{ label: "Days Supply", value: "30" },
+		{ label: "Quantity Dispensed", value: "60" },
+		{ label: "Dispensing Provider NPI", value: "1678901234" },
+	],
+	drugInfoRight: [
+		{ label: "Provider Name", value: "HealthPlus Pharmacy" },
+		{ label: "Provider ID Qualifier", value: "NPI" },
+		{ label: "Pharmacy Network Indicator", value: "In-Network" },
+		{ label: "Pharmacy Type", value: "Retail" },
+		{ label: "Prescriber NPI", value: "1456789012" },
+	],
+	financial: {
+		allowedCost: "$85.42",
+		planPaid: "$25.62",
+		memberResponsibility: "$59.80",
+		difference: "$0.00",
+		equation: "$85.42 = $25.62 + $59.80",
+		status: "Balanced",
+	},
+	transactionHistory: [
+		{
+			id: "txn-1",
+			transaction: "Original",
+			claimId: "PCL-2027-0001234567",
+			originalClaimId: "—",
+			processedDate: "04/05/2027",
+			allowedCost: "$85.42",
+			planPaid: "$25.62",
+			cmsStatus: "CMS Ready" as PharmacyClaimDetailCmsStatus,
+		},
+		{
+			id: "txn-2",
+			transaction: "Replacement Draft",
+			claimId: "PCL-2027-0001234567-R1",
+			originalClaimId: "PCL-2027-0001234567",
+			processedDate: "04/12/2027",
+			allowedCost: "$85.42",
+			planPaid: "$25.62",
+			cmsStatus: "Draft" as PharmacyClaimDetailCmsStatus,
+		},
+	],
+	validationHistory: [
+		{
+			id: "vh-1",
+			date: "04/05/2027 09:14 AM",
+			rule: "NDC Format",
+			result: "Passed" as PharmacyClaimValidationResult,
+			message: "NDC is valid and active.",
+			sourceFile: "BHP_PHARM_20270405_001.dat",
+			reviewedBy: "System",
+		},
+		{
+			id: "vh-2",
+			date: "04/05/2027 09:14 AM",
+			rule: "Days Supply",
+			result: "Passed" as PharmacyClaimValidationResult,
+			message: "Days supply is within expected range.",
+			sourceFile: "BHP_PHARM_20270405_001.dat",
+			reviewedBy: "System",
+		},
+		{
+			id: "vh-3",
+			date: "04/05/2027 09:14 AM",
+			rule: "Pharmacy Network Map",
+			result: "Warning" as PharmacyClaimValidationResult,
+			message: "Network indicator mapped from source value RETAIL-IN.",
+			sourceFile: "BHP_PHARM_20270405_001.dat",
+			reviewedBy: "System",
+		},
+		{
+			id: "vh-4",
+			date: "04/05/2027 09:14 AM",
+			rule: "Financial Balance",
+			result: "Passed" as PharmacyClaimValidationResult,
+			message: "Allowed cost equals plan paid plus member responsibility.",
+			sourceFile: "BHP_PHARM_20270405_001.dat",
+			reviewedBy: "System",
+		},
+	],
+	cmsValidation: {
+		passed: 26,
+		warnings: 1,
+		errors: 0,
+		checks: [
+			{ id: "c1", label: "Member Enrollment Match", result: "Passed" },
+			{ id: "c2", label: "NDC Format", result: "Passed" },
+			{ id: "c3", label: "Days Supply", result: "Passed" },
+			{ id: "c4", label: "Dispensing Provider NPI", result: "Passed" },
+			{ id: "c5", label: "Financial Balance", result: "Passed" },
+			{ id: "c6", label: "Fill Date in Period", result: "Passed" },
+		],
+		alert:
+			"Pharmacy network indicator was mapped from the source vendor value RETAIL-IN.",
+	},
+	submissionHistory: [
+		{
+			id: "sh-1",
+			submissionType: "Pharmacy Claims File",
+			reportingPeriod: "Q2 2027",
+			submittedDate: "Jul 18, 2027 09:12 AM",
+			status: "Accepted",
+			fileName: "BHP_EDGE_PHARM_20270718.xml",
+		},
+	],
+} as const;
+
+export const PHARMACY_CLAIM_DETAIL_STATUS_STYLES: Record<
+	PharmacyClaimDetailCmsStatus,
+	string
+> = {
+	"CMS Ready": "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Draft: "border-sky-200/80 bg-sky-50 text-sky-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const PHARMACY_CLAIM_VALIDATION_RESULT_STYLES: Record<
+	PharmacyClaimValidationResult,
+	string
+> = {
+	Passed: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Failed: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+// ─── Supplemental Diagnoses tab ─────────────────────────────────────────────
+
+export type SupplementalDxCmsStatus = "Ready" | "Warning" | "Error";
+export type SupplementalDxTransaction = "Original" | "Replacement" | "Void";
+export type SupplementalDxClaimLink = "Matched" | "Unmatched";
+export type SupplementalDxFilterTab =
+	| "all"
+	| "ready"
+	| "errors"
+	| "warnings"
+	| "voids";
+
+export type CmsEdgeSupplementalDxRow = {
+	id: string;
+	recordId: string;
+	enrolleeId: string;
+	originalClaimId: string | null;
+	detailRecordId: string;
+	diagnosisType: string;
+	diagnosisCode: string;
+	serviceFrom: string;
+	serviceTo: string;
+	transaction: SupplementalDxTransaction;
+	claimLink: SupplementalDxClaimLink;
+	cmsStatus: SupplementalDxCmsStatus;
+};
+
+export const CMS_EDGE_SUPPLEMENTAL_DX_KPIS = [
+	{
+		id: "total",
+		label: "Total Diagnosis Records",
+		value: "6,315,889",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-800",
+		icon: "file" as const,
+	},
+	{
+		id: "ready",
+		label: "CMS Ready",
+		value: "6,307,821",
+		tone: "text-emerald-700 bg-emerald-500/10",
+		valueClassName: "text-emerald-700",
+		icon: "check" as const,
+	},
+	{
+		id: "errors",
+		label: "Validation Errors",
+		value: "8,068",
+		tone: "text-red-700 bg-red-500/10",
+		valueClassName: "text-red-600",
+		icon: "alert" as const,
+	},
+	{
+		id: "unmatched",
+		label: "Unmatched Claims",
+		value: "1,245",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "unlink" as const,
+	},
+	{
+		id: "invalid-code",
+		label: "Invalid Diagnosis Codes",
+		value: "687",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "code" as const,
+	},
+] as const;
+
+export const CMS_EDGE_SUPPLEMENTAL_DX_FILTER_TABS: {
+	id: SupplementalDxFilterTab;
+	label: string;
+}[] = [
+	{ id: "all", label: "All Records" },
+	{ id: "ready", label: "Ready" },
+	{ id: "errors", label: "Errors" },
+	{ id: "warnings", label: "Warnings" },
+	{ id: "voids", label: "Voids & Replacements" },
+];
+
+export const CMS_EDGE_SUPPLEMENTAL_DX_LIST: CmsEdgeSupplementalDxRow[] = [
+	{
+		id: "sdr-1",
+		recordId: "SDR-27-0000012345",
+		enrolleeId: "UEI-27-****5678",
+		originalClaimId: "CLM-27-****9012",
+		detailRecordId: "DR-27-0000001",
+		diagnosisType: "ICD-10-CM",
+		diagnosisCode: "E11.65",
+		serviceFrom: "04/02/2027",
+		serviceTo: "04/02/2027",
+		transaction: "Original",
+		claimLink: "Matched",
+		cmsStatus: "Ready",
+	},
+	{
+		id: "sdr-2",
+		recordId: "SDR-27-0000012346",
+		enrolleeId: "UEI-27-****4412",
+		originalClaimId: "CLM-27-****3344",
+		detailRecordId: "DR-27-0000002",
+		diagnosisType: "ICD-10-CM",
+		diagnosisCode: "I10",
+		serviceFrom: "04/03/2027",
+		serviceTo: "04/05/2027",
+		transaction: "Original",
+		claimLink: "Matched",
+		cmsStatus: "Ready",
+	},
+	{
+		id: "sdr-3",
+		recordId: "SDR-27-0000012347",
+		enrolleeId: "UEI-27-****8821",
+		originalClaimId: "CLM-27-****7788",
+		detailRecordId: "DR-27-0000003",
+		diagnosisType: "ICD-10-CM",
+		diagnosisCode: "J45.909",
+		serviceFrom: "04/04/2027",
+		serviceTo: "04/04/2027",
+		transaction: "Replacement",
+		claimLink: "Unmatched",
+		cmsStatus: "Warning",
+	},
+	{
+		id: "sdr-4",
+		recordId: "SDR-27-0000012348",
+		enrolleeId: "UEI-27-****1190",
+		originalClaimId: null,
+		detailRecordId: "DR-27-0000004",
+		diagnosisType: "ICD-10-CM",
+		diagnosisCode: "Z99.999",
+		serviceFrom: "04/06/2027",
+		serviceTo: "04/06/2027",
+		transaction: "Original",
+		claimLink: "Unmatched",
+		cmsStatus: "Error",
+	},
+	{
+		id: "sdr-5",
+		recordId: "SDR-27-0000012349",
+		enrolleeId: "UEI-27-****5566",
+		originalClaimId: "CLM-27-****2211",
+		detailRecordId: "DR-27-0000005",
+		diagnosisType: "ICD-10-CM",
+		diagnosisCode: "E11.65",
+		serviceFrom: "04/08/2027",
+		serviceTo: "04/08/2027",
+		transaction: "Void",
+		claimLink: "Matched",
+		cmsStatus: "Ready",
+	},
+];
+
+export const CMS_EDGE_SUPPLEMENTAL_DX_VALIDATION_SUMMARY = [
+	{
+		id: "unmatched",
+		label: "Unmatched Medical Claim",
+		value: "1,245",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-red-600",
+		icon: "unlink" as const,
+	},
+	{
+		id: "invalid-code",
+		label: "Invalid Diagnosis Code",
+		value: "687",
+		tone: "text-violet-700 bg-violet-500/10",
+		valueClassName: "text-violet-700",
+		icon: "code" as const,
+	},
+	{
+		id: "missing-date",
+		label: "Missing Service Date",
+		value: "312",
+		tone: "text-amber-700 bg-amber-500/10",
+		valueClassName: "text-amber-700",
+		icon: "calendar" as const,
+	},
+	{
+		id: "member-mismatch",
+		label: "Member Enrollment Mismatch",
+		value: "96",
+		tone: "text-sky-700 bg-sky-500/10",
+		valueClassName: "text-sky-700",
+		icon: "user" as const,
+	},
+	{
+		id: "void-link",
+		label: "Void/Replacement Link Error",
+		value: "42",
+		tone: "text-teal-700 bg-teal-500/10",
+		valueClassName: "text-teal-700",
+		icon: "link" as const,
+	},
+] as const;
+
+export const SUPPLEMENTAL_DX_CMS_STATUS_STYLES: Record<
+	SupplementalDxCmsStatus,
+	string
+> = {
+	Ready: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const SUPPLEMENTAL_DX_TXN_STYLES: Record<
+	SupplementalDxTransaction,
+	string
+> = {
+	Original: "border-sky-200/80 bg-sky-50 text-sky-800",
+	Replacement: "border-violet-200/80 bg-violet-50 text-violet-800",
+	Void: "border-slate-200/80 bg-slate-100 text-slate-700",
+};
+
+export const SUPPLEMENTAL_DX_CLAIM_LINK_STYLES: Record<
+	SupplementalDxClaimLink,
+	string
+> = {
+	Matched: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Unmatched: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export type SupplementalDxDetailCmsStatus =
+	| "CMS Ready"
+	| "Draft"
+	| "Warning"
+	| "Error";
+export type SupplementalDxHistoryResult =
+	| "Passed"
+	| "Accepted"
+	| "Warning"
+	| "Failed";
+
+export const CMS_EDGE_SUPPLEMENTAL_DX_DETAIL = {
+	id: "sdr-1",
+	recordId: "SDR-27-0000012345",
+	cmsStatus: "CMS Ready" as SupplementalDxDetailCmsStatus,
+	transaction: "Original" as SupplementalDxTransaction,
+	summary: [
+		{
+			label: "Unique Enrollee ID",
+			value: "UE-82A91X44",
+			icon: "user" as const,
+		},
+		{
+			label: "Original Medical Claim ID",
+			value: "MCL-2027-00842119",
+			icon: "clipboard" as const,
+		},
+		{
+			label: "Diagnosis Code",
+			value: "E11.65",
+			icon: "stethoscope" as const,
+		},
+		{ label: "Service Date", value: "Apr 1, 2027", icon: "calendar" as const },
+		{ label: "Plan ID", value: "16696DC0010001", icon: "shield" as const },
+		{ label: "Claim Link", value: "Matched", icon: "link" as const },
+	],
+	recordInfoLeft: [
+		{ label: "Supplemental Record ID", value: "SDR-27-0000012345" },
+		{ label: "Diagnosis Detail Record ID", value: "DR-27-00000001" },
+		{ label: "Original Diagnosis Detail Record ID", value: "—" },
+		{ label: "Transaction Type", value: "Original" },
+		{ label: "Void/Replace Code", value: "0 - Original Record" },
+	],
+	recordInfoRight: [
+		{ label: "Diagnosis Type", value: "ICD-10-CM" },
+		{ label: "Diagnosis Code", value: "E11.65" },
+		{
+			label: "Diagnosis Description",
+			value: "Type 2 diabetes mellitus with hyperglycemia",
+		},
+		{ label: "Service From Date", value: "04/01/2027" },
+		{ label: "Service Through Date", value: "04/01/2027" },
+		{ label: "Source Vendor", value: "BHP Medical Claims" },
+		{
+			label: "Source File",
+			value: "BHP_SUPPLEMENTAL_DX_20270405_001.dat",
+		},
+	],
+	memberLink: {
+		name: "Jordan M.",
+		enrolleeId: "UE-82A91X44",
+		enrollmentStatus: "Active on Service Date",
+		coveragePeriod: "01/01/2027 – 12/31/2027",
+	},
+	claimLink: {
+		claimId: "MCL-2027-00842119",
+		claimStatus: "Paid",
+		primaryDiagnosis: "E11.9",
+		allowedAmount: "$485.00",
+		planPaid: "$392.50",
+		matched: true,
+	},
+	transactionHistory: [
+		{
+			id: "txn-1",
+			transaction: "Original",
+			recordId: "SDR-27-0000012345",
+			originalDetailRecordId: "—",
+			diagnosisCode: "E11.65",
+			processedDate: "04/05/2027",
+			cmsStatus: "CMS Ready" as SupplementalDxDetailCmsStatus,
+		},
+		{
+			id: "txn-2",
+			transaction: "Replacement Draft",
+			recordId: "SDR-27-0000012345-R1",
+			originalDetailRecordId: "DR-27-00000001",
+			diagnosisCode: "E11.65",
+			processedDate: "04/12/2027",
+			cmsStatus: "Draft" as SupplementalDxDetailCmsStatus,
+		},
+	],
+	submissionHistory: [
+		{
+			id: "sh-1",
+			date: "04/05/2027 10:22 AM",
+			activity: "Source Validation",
+			environment: "Prod",
+			fileName: "BHP_SUPPLEMENTAL_DX_20270405_001.dat",
+			result: "Passed" as SupplementalDxHistoryResult,
+			reviewedBy: "System",
+		},
+		{
+			id: "sh-2",
+			date: "07/18/2027 09:40 AM",
+			activity: "File Generation",
+			environment: "Prod",
+			fileName: "BHP_EDGE_SUPP_DX_20270718.xml",
+			result: "Passed" as SupplementalDxHistoryResult,
+			reviewedBy: "jdoe@bhphealthcare.com",
+		},
+		{
+			id: "sh-3",
+			date: "07/18/2027 11:05 AM",
+			activity: "CMS Submission",
+			environment: "Prod",
+			fileName: "BHP_EDGE_SUPP_DX_20270718.xml",
+			result: "Accepted" as SupplementalDxHistoryResult,
+			reviewedBy: "System",
+		},
+	],
+	cmsValidation: {
+		passed: 18,
+		warnings: 1,
+		errors: 0,
+		checks: [
+			{ id: "c1", label: "Diagnosis Code Valid", result: "Passed" },
+			{ id: "c2", label: "Plan ID Match", result: "Passed" },
+			{ id: "c3", label: "Member Enrollment Match", result: "Passed" },
+			{ id: "c4", label: "Service Date in Coverage", result: "Passed" },
+			{ id: "c5", label: "Medical Claim Link", result: "Passed" },
+			{ id: "c6", label: "Transaction Integrity", result: "Passed" },
+		],
+		alert:
+			"Supplemental diagnosis differs from the medical claim primary diagnosis; accepted as an additional diagnosis.",
+	},
+} as const;
+
+export const SUPPLEMENTAL_DX_DETAIL_STATUS_STYLES: Record<
+	SupplementalDxDetailCmsStatus,
+	string
+> = {
+	"CMS Ready": "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+	Draft: "border-sky-200/80 bg-sky-50 text-sky-800",
+	Warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+	Error: "border-red-200/80 bg-red-50 text-red-800",
+};
+
+export const SUPPLEMENTAL_DX_HISTORY_RESULT_STYLES: Record<
+	SupplementalDxHistoryResult,
+	string
+> = {
+	Passed: "text-emerald-700",
+	Accepted: "text-emerald-700",
+	Warning: "text-amber-700",
+	Failed: "text-red-600",
 };
 
 // ─── Responses tab ──────────────────────────────────────────────────────────

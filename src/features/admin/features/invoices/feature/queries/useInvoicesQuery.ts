@@ -8,6 +8,7 @@ import {
 	createInvoices,
 	getInvoices,
 	listInvoices,
+	seedInvoices,
 	updateInvoices,
 } from "../api/invoicesApi";
 import type { InvoicesCreateDto, InvoicesUpdateDto } from "../dto/invoicesDto";
@@ -37,6 +38,15 @@ export function useCreateInvoicesMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: (input: InvoicesCreateDto) => createInvoices(input),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: featureQueryKey(domain) }),
+	});
+}
+
+export function useSeedInvoicesMutation() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: () => seedInvoices(),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: featureQueryKey(domain) }),
 	});

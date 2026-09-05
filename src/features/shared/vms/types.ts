@@ -127,7 +127,7 @@ export type CertificateModel = {
 	name: string;
 	issuer: string;
 	expiresAt: string;
-	status: "valid" | "expiring" | "expired";
+	status: "valid" | "expiring" | "expired" | "pending";
 	riskFlag: boolean;
 };
 

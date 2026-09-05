@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -36,6 +36,7 @@ import { formatDate } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
+import { downloadDocumentFile } from "../feature/api/documentsApi";
 import {
 	useDocument,
 	useDocumentsList,
@@ -68,6 +69,105 @@ function expiryProgress(days: number | null, horizon = 365) {
 	if (days == null) return 100;
 	if (days < 0) return 0;
 	return Math.min(100, Math.round((days / horizon) * 100));
+}
+
+function DocumentFilePreview({
+	documentId,
+	fileName,
+	mimeHint,
+}: {
+	documentId: string;
+	fileName: string;
+	mimeHint?: string;
+}) {
+	const [objectUrl, setObjectUrl] = useState<string | null>(null);
+	const [contentType, setContentType] = useState(mimeHint ?? "");
+	const [error, setError] = useState<string | null>(null);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		let cancelled = false;
+		let createdUrl: string | null = null;
+		setLoading(true);
+		setError(null);
+		downloadDocumentFile(documentId)
+			.then(({ blob, contentType: type }) => {
+				const url = URL.createObjectURL(blob);
+				if (cancelled) {
+					URL.revokeObjectURL(url);
+					return;
+				}
+				createdUrl = url;
+				setObjectUrl(url);
+				setContentType(type || blob.type || mimeHint || "");
+			})
+			.catch((err: unknown) => {
+				if (cancelled) return;
+				const status =
+					err && typeof err === "object" && "status" in err
+						? Number((err as { status?: number }).status)
+						: undefined;
+				if (status === 404) {
+					setError(
+						"Download API not available on this backend yet (404). Deploy vendor-management-core document download + seed, or point NEXT_PUBLIC_VENDOR_CORE_API_URL at a local core that has those routes."
+					);
+					return;
+				}
+				setError(err instanceof Error ? err.message : "Preview unavailable");
+			})
+			.finally(() => {
+				if (!cancelled) setLoading(false);
+			});
+		return () => {
+			cancelled = true;
+			if (createdUrl) URL.revokeObjectURL(createdUrl);
+		};
+	}, [documentId, mimeHint]);
+
+	const isPdf =
+		contentType.includes("pdf") || fileName.toLowerCase().endsWith(".pdf");
+	const isImage = contentType.startsWith("image/");
+
+	if (loading) {
+		return <Skeleton className="h-[280px] w-full rounded-lg" />;
+	}
+	if (error || !objectUrl) {
+		return (
+			<div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/20 px-6 py-10 text-center">
+				<FileText className="size-10 text-muted-foreground/60" />
+				<p className="mt-3 text-sm font-medium">{fileName}</p>
+				<p className="mt-1 max-w-sm text-xs text-muted-foreground">
+					{error ??
+						"File is not in object storage yet. Seed onboarding to write demo PDFs."}
+				</p>
+			</div>
+		);
+	}
+	return (
+		<div className="overflow-hidden rounded-lg border border-border/70 bg-muted/10">
+			{isPdf ? (
+				<iframe
+					title={fileName}
+					src={objectUrl}
+					className="h-[480px] w-full bg-white"
+				/>
+			) : isImage ? (
+				<img
+					src={objectUrl}
+					alt={fileName}
+					className="max-h-[480px] w-full object-contain"
+				/>
+			) : (
+				<div className="flex min-h-[280px] flex-col items-center justify-center px-6 py-10 text-center">
+					<FileText className="size-10 text-muted-foreground/60" />
+					<p className="mt-3 text-sm font-medium">{fileName}</p>
+					<p className="mt-1 text-xs text-muted-foreground">
+						This format cannot render inline. Download the file to open it.
+					</p>
+				</div>
+			)}
+		</div>
+	);
 }
 
 export function DocumentDetailPage() {
@@ -163,6 +263,32 @@ export function DocumentDetailPage() {
 	}
 
 	const canReview = document.status === "pending";
+	const documentId = document.id;
+	const fileLabel = document.fileExtension
+		? `${document.name}.${document.fileExtension}`
+		: document.name;
+
+	async function downloadFile(asAttachment: boolean) {
+		try {
+			const { blob, filename } = await downloadDocumentFile(
+				documentId,
+				asAttachment
+			);
+			const url = URL.createObjectURL(blob);
+			if (!asAttachment) {
+				window.open(url, "_blank", "noopener,noreferrer");
+				window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+				return;
+			}
+			const link = window.document.createElement("a");
+			link.href = url;
+			link.download = filename || fileLabel;
+			link.click();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Download failed");
+		}
+	}
 
 	return (
 		<div className="space-y-4">
@@ -215,11 +341,21 @@ export function DocumentDetailPage() {
 				</div>
 
 				<div className="flex flex-wrap gap-2">
-					<Button variant="outline" size="sm" className="h-9">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9"
+						onClick={() => void downloadFile(false)}
+					>
 						<Eye className="mr-1.5 size-3.5" />
 						Preview
 					</Button>
-					<Button variant="outline" size="sm" className="h-9">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9"
+						onClick={() => void downloadFile(true)}
+					>
 						<Download className="mr-1.5 size-3.5" />
 						Download
 					</Button>
@@ -418,24 +554,28 @@ export function DocumentDetailPage() {
 						<CardHeader className="pb-3">
 							<CardTitle className="text-base">Preview</CardTitle>
 							<CardDescription>
-								Mock preview panel — connect to storage for live rendering
+								Rendered from object storage for this document
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
-							<div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/20 px-6 py-10 text-center">
-								<FileText className="size-10 text-muted-foreground/60" />
-								<p className="mt-3 text-sm font-medium">
-									{document.name}.{document.fileExtension ?? "pdf"}
-								</p>
-								<p className="mt-1 max-w-sm text-xs text-muted-foreground">
-									Document preview would render here for PDF, images, and
-									supported office formats.
-								</p>
-								<Button variant="outline" size="sm" className="mt-4">
-									<Eye className="mr-1.5 size-3.5" />
-									Open full preview
-								</Button>
-							</div>
+							<DocumentFilePreview
+								documentId={documentId}
+								fileName={fileLabel}
+								mimeHint={
+									document.fileExtension === "pdf"
+										? "application/pdf"
+										: undefined
+								}
+							/>
+							<Button
+								variant="outline"
+								size="sm"
+								className="mt-3"
+								onClick={() => void downloadFile(false)}
+							>
+								<Eye className="mr-1.5 size-3.5" />
+								Open full preview
+							</Button>
 						</CardContent>
 					</Card>
 				</div>

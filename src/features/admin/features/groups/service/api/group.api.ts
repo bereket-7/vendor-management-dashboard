@@ -142,4 +142,55 @@ export const groupApi = {
 		if (isMockEnabled()) return;
 		await removeRemote(id);
 	},
+
+	async addMembers(
+		id: string,
+		members: IdentityGroupCreateInput["members"]
+	): Promise<GroupModel> {
+		if (isMockEnabled()) {
+			const model = await this.getById(id);
+			if (!model) throw new Error("Group not found");
+			return model;
+		}
+		const dto = coreDtoToApiDto(
+			await vendorCoreApi.addIdentityGroupMembers(id, members ?? [])
+		);
+		const model = toGroupModel(dto);
+		if (!model) throw new Error("Invalid add members response");
+		return model;
+	},
+
+	async removeMembers(
+		id: string,
+		body: { member_ids?: string[]; external_ids?: string[] }
+	): Promise<GroupModel> {
+		if (isMockEnabled()) {
+			const model = await this.getById(id);
+			if (!model) throw new Error("Group not found");
+			return model;
+		}
+		const dto = coreDtoToApiDto(
+			await vendorCoreApi.removeIdentityGroupMembers(id, body)
+		);
+		const model = toGroupModel(dto);
+		if (!model) throw new Error("Invalid remove members response");
+		return model;
+	},
+
+	async linkMemberUser(
+		id: string,
+		body: { member_id: string; user_id: string }
+	): Promise<GroupModel> {
+		if (isMockEnabled()) {
+			const model = await this.getById(id);
+			if (!model) throw new Error("Group not found");
+			return model;
+		}
+		const dto = coreDtoToApiDto(
+			await vendorCoreApi.linkIdentityGroupMemberUser(id, body)
+		);
+		const model = toGroupModel(dto);
+		if (!model) throw new Error("Invalid link member response");
+		return model;
+	},
 };

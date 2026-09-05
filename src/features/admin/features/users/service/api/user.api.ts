@@ -49,4 +49,52 @@ export const userApi = {
 			[]
 		);
 	},
+
+	async create(input: {
+		username: string;
+		email: string;
+		phoneNumber?: number;
+		firstName?: string;
+		lastName?: string;
+		password?: string;
+	}): Promise<UserModel> {
+		if (isMockEnabled()) {
+			const model = toUserModelList([
+				{
+					id: `user-${Date.now()}`,
+					username: input.username,
+					email: input.email,
+					first_name: input.firstName,
+					last_name: input.lastName,
+					is_active: true,
+					phone_number: input.phoneNumber,
+				},
+			])[0];
+			if (!model) throw new Error("Invalid create response");
+			return model;
+		}
+		const dto = await vendorCoreApi.createUser({
+			username: input.username,
+			email: input.email,
+			phone_number: input.phoneNumber ?? 0,
+			first_name: input.firstName ?? "",
+			last_name: input.lastName ?? "",
+			password: input.password,
+		});
+		const model = toUserModelList([dto as ApiUserDto])[0];
+		if (!model) throw new Error("Invalid create response");
+		return model;
+	},
+
+	async update(id: string, input: Record<string, unknown>): Promise<UserModel> {
+		const dto = await vendorCoreApi.updateUser(id, input);
+		const model = toUserModelList([dto as ApiUserDto])[0];
+		if (!model) throw new Error("Invalid update response");
+		return model;
+	},
+
+	async remove(id: string): Promise<void> {
+		if (isMockEnabled()) return;
+		await vendorCoreApi.deleteUser(id);
+	},
 };

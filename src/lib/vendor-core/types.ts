@@ -1841,6 +1841,12 @@ export type WorkQueueSeedResultDto = {
 	case_codes?: string[];
 };
 
+export type OnboardingSeedResultDto = {
+	created: number;
+	files_written: number;
+	vendor_count: number;
+};
+
 export type MigrationCaseBulkStatusInput = {
 	ids: string[];
 	migration_status: MigrationStatusDto | string;

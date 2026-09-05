@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 
-import { CalendarDays, SlidersHorizontal } from "lucide-react";
+import {
+	CalendarDays,
+	ClipboardList,
+	FileOutput,
+	FileText,
+	LayoutDashboard,
+	type LucideIcon,
+	Pill,
+	Settings2,
+	SlidersHorizontal,
+	Stethoscope,
+	Users,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,8 +31,15 @@ import { CmsEdgeConfigurationTab } from "@/features/admin/features/claim-encount
 import { CmsEdgeFileGenerationTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeFileGenerationTab";
 import { CmsEdgeMembersEnrollmentTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeMembersEnrollmentTab";
 import { CmsEdgeOverviewTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeOverviewTab";
+import { CmsEdgePharmacyClaimsTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgePharmacyClaimsTab";
 import { CmsEdgeProvidersTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeProvidersTab";
-import { CMS_EDGE_TAB_TRIGGER_CLASS } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import {
+	CMS_EDGE_TAB_HAIRLINE_CLASS,
+	CMS_EDGE_TAB_ICON_WELL_CLASS,
+	CMS_EDGE_TAB_NAV_CLASS,
+	CMS_EDGE_TAB_TRIGGER_CLASS,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import { CmsEdgeSupplementalDiagnosesTab } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeSupplementalDiagnosesTab";
 import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_TABS,
@@ -39,17 +58,28 @@ const toolbarField = cn(
 	"focus:ring-2 focus:ring-primary/15"
 );
 
+const TAB_ICONS: Record<CmsEdgeTabId, LucideIcon> = {
+	overview: LayoutDashboard,
+	"members-enrollment": Users,
+	providers: Stethoscope,
+	claims: FileText,
+	"pharmacy-claims": Pill,
+	"supplemental-diagnoses": ClipboardList,
+	"file-generation": FileOutput,
+	configuration: Settings2,
+};
+
 export function CmsEdgePage() {
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
 	const [activeTab, setActiveTab] = useState<CmsEdgeTabId>("overview");
-	const tabMeta = CMS_EDGE_TAB_META[activeTab];
+	const pageMeta = CMS_EDGE_TAB_META.overview;
 
 	return (
 		<div className="space-y-0">
 			<div className="pb-3">
 				<ClaimPageHeader
-					title={tabMeta.title}
-					description={tabMeta.description}
+					title={pageMeta.title}
+					description={pageMeta.description}
 					actions={
 						<div className="flex items-center gap-1.5">
 							<Select
@@ -85,29 +115,41 @@ export function CmsEdgePage() {
 				value={activeTab}
 				onValueChange={(value) => setActiveTab(value as CmsEdgeTabId)}
 			>
-				<div className="border-b border-border/70 bg-card">
+				<nav aria-label="CMS EDGE sections" className={CMS_EDGE_TAB_NAV_CLASS}>
 					<ScrollArea
 						type="always"
 						className="w-full"
 						scrollbarClassName="h-2.5"
 					>
-						<TabsList className="inline-flex h-auto w-max min-w-full justify-start gap-0 rounded-none bg-transparent p-0">
-							{CMS_EDGE_TABS.map((tab) => (
-								<TabsTrigger
-									key={tab.id}
-									value={tab.id}
-									className={CMS_EDGE_TAB_TRIGGER_CLASS}
-								>
-									{tab.label}
-								</TabsTrigger>
-							))}
+						<TabsList className="inline-flex h-auto w-max min-w-full items-end justify-start gap-1 rounded-none bg-transparent p-0">
+							{CMS_EDGE_TABS.map((tab) => {
+								const Icon = TAB_ICONS[tab.id];
+								return (
+									<TabsTrigger
+										key={tab.id}
+										value={tab.id}
+										className={CMS_EDGE_TAB_TRIGGER_CLASS}
+									>
+										<span className={CMS_EDGE_TAB_ICON_WELL_CLASS}>
+											<Icon className="size-3.5" />
+										</span>
+										<span>{tab.label}</span>
+										<span aria-hidden className={CMS_EDGE_TAB_HAIRLINE_CLASS} />
+									</TabsTrigger>
+								);
+							})}
 						</TabsList>
 					</ScrollArea>
-				</div>
+				</nav>
 
 				<div className="bg-muted/30 py-4">
 					<TabsContent value="overview" className="mt-0 space-y-0">
-						<CmsEdgeOverviewTab />
+						<CmsEdgeOverviewTab
+							onNavigateTab={(tabId) => {
+								if (tabId === "exceptions") return;
+								setActiveTab(tabId);
+							}}
+						/>
 					</TabsContent>
 					<TabsContent value="members-enrollment" className="mt-0 space-y-0">
 						<CmsEdgeMembersEnrollmentTab />
@@ -117,6 +159,15 @@ export function CmsEdgePage() {
 					</TabsContent>
 					<TabsContent value="claims" className="mt-0 space-y-0">
 						<CmsEdgeClaimsTab />
+					</TabsContent>
+					<TabsContent value="pharmacy-claims" className="mt-0 space-y-0">
+						<CmsEdgePharmacyClaimsTab />
+					</TabsContent>
+					<TabsContent
+						value="supplemental-diagnoses"
+						className="mt-0 space-y-0"
+					>
+						<CmsEdgeSupplementalDiagnosesTab />
 					</TabsContent>
 					<TabsContent value="file-generation" className="mt-0 space-y-0">
 						<CmsEdgeFileGenerationTab />

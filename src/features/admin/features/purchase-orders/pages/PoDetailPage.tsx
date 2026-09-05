@@ -93,6 +93,23 @@ export function PoDetailPage() {
 							Mark received
 						</Button>
 					)}
+					{order.status === "sent" && (
+						<Button
+							variant="outline"
+							onClick={() =>
+								void updatePo
+									.mutateAsync({
+										id: order.id,
+										patch: { status: "acknowledged" },
+									})
+									.then(() => toast.success("Purchase order acknowledged."))
+									.catch(() => toast.error("Could not acknowledge."))
+							}
+							disabled={updatePo.isPending}
+						>
+							Acknowledge
+						</Button>
+					)}
 				</div>
 			</div>
 			<div className="grid gap-4 rounded-xl border border-border bg-card shadow-sm p-5 sm:grid-cols-4">
@@ -144,6 +161,17 @@ export function PoDetailPage() {
 								</TableCell>
 							</TableRow>
 						))}
+						{order.lines.length === 0 && (
+							<TableRow>
+								<TableCell
+									colSpan={5}
+									className="h-24 text-center text-muted-foreground"
+								>
+									No line items on this order. Create a new PO with a
+									description, quantity, and unit price to store a line.
+								</TableCell>
+							</TableRow>
+						)}
 					</TableBody>
 				</Table>
 			</div>

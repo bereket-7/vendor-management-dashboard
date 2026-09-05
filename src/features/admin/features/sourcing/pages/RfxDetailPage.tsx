@@ -3,16 +3,16 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
+import { Gavel, MoreHorizontal, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -24,10 +24,13 @@ import {
 } from "@/components/ui/table";
 import { useCreateContractMutation } from "@/features/admin/features/contracts/feature/queries/useContractsQuery";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
+import type { BidModel } from "@/features/shared/vms/types";
 import { formatDate, formatMoney } from "@/features/shared/vms/utils";
 import { Link } from "@/i18n/navigation";
 
+import { RecordBidDialog } from "../feature/components/RecordBidDialog";
 import {
+	useAwardRfxMutation,
 	useBidsList,
 	useRfx,
 	useUpdateRfxMutation,
@@ -38,9 +41,9 @@ export function RfxDetailPage() {
 	const { rfx, isLoading } = useRfx(params.rfxId);
 	const { bids } = useBidsList(params.rfxId);
 	const updateRfx = useUpdateRfxMutation();
+	const awardRfx = useAwardRfxMutation();
 	const createContract = useCreateContractMutation();
-	const [selectedBidId, setSelectedBidId] = useState("");
-	const [createDraft, setCreateDraft] = useState(true);
+	const [recordBidOpen, setRecordBidOpen] = useState(false);
 
 	async function publish() {
 		if (!rfx) return;
@@ -54,12 +57,11 @@ export function RfxDetailPage() {
 			toast.error("Could not publish RFX.");
 		}
 	}
-	async function award() {
+
+	async function award(bid: BidModel, createDraft = true) {
 		if (!rfx) return;
-		const bid = bids.find((item) => item.id === selectedBidId);
-		if (!bid) return toast.error("Select a bid to award.");
 		try {
-			await updateRfx.mutateAsync({ id: rfx.id, patch: { status: "awarded" } });
+			await awardRfx.mutateAsync({ id: rfx.id, bidId: bid.id });
 			if (createDraft) {
 				const today = new Date();
 				const end = new Date(today);
@@ -109,11 +111,19 @@ export function RfxDetailPage() {
 					</div>
 					<p className="text-muted-foreground">{rfx.title}</p>
 				</div>
-				{rfx.status === "draft" && (
-					<Button onClick={publish} disabled={updateRfx.isPending}>
-						Publish
-					</Button>
-				)}
+				<div className="flex flex-wrap gap-2">
+					{rfx.status === "draft" && (
+						<Button onClick={publish} disabled={updateRfx.isPending}>
+							Publish
+						</Button>
+					)}
+					{rfx.status !== "awarded" && rfx.status !== "cancelled" ? (
+						<Button variant="outline" onClick={() => setRecordBidOpen(true)}>
+							<Gavel className="mr-2 size-4" />
+							Record bid
+						</Button>
+					) : null}
+				</div>
 			</div>
 			<section className="grid gap-5 rounded-xl border border-border bg-card shadow-sm p-6 sm:grid-cols-2 lg:grid-cols-4">
 				<div>
@@ -148,38 +158,6 @@ export function RfxDetailPage() {
 							{bids.length} responses received
 						</p>
 					</div>
-					{rfx.status !== "awarded" && bids.length > 0 && (
-						<div className="flex flex-wrap items-center gap-3">
-							<Select value={selectedBidId} onValueChange={setSelectedBidId}>
-								<SelectTrigger className="w-60">
-									<SelectValue placeholder="Select winning bid" />
-								</SelectTrigger>
-								<SelectContent>
-									{bids
-										.filter((bid) => bid.status === "submitted")
-										.map((bid) => (
-											<SelectItem key={bid.id} value={bid.id}>
-												{bid.vendorName}
-											</SelectItem>
-										))}
-								</SelectContent>
-							</Select>
-							<label className="flex items-center gap-2 text-sm">
-								<input
-									type="checkbox"
-									checked={createDraft}
-									onChange={(e) => setCreateDraft(e.target.checked)}
-								/>{" "}
-								Create contract draft
-							</label>
-							<Button
-								onClick={award}
-								disabled={updateRfx.isPending || createContract.isPending}
-							>
-								Award
-							</Button>
-						</div>
-					)}
 				</div>
 				<div className="rounded-xl border border-border bg-card shadow-sm">
 					<Table>
@@ -190,6 +168,7 @@ export function RfxDetailPage() {
 								<TableHead>Status</TableHead>
 								<TableHead>Submitted</TableHead>
 								<TableHead>Notes</TableHead>
+								<TableHead className="w-12 text-right">Actions</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -206,12 +185,47 @@ export function RfxDetailPage() {
 									<TableCell className="max-w-xs truncate">
 										{bid.notes || "—"}
 									</TableCell>
+									<TableCell className="text-right">
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button variant="ghost" size="icon" className="size-8">
+													<MoreHorizontal className="size-4" />
+													<span className="sr-only">Bid actions</span>
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end">
+												<DropdownMenuItem
+													disabled={
+														rfx.status === "awarded" ||
+														rfx.status === "cancelled" ||
+														awardRfx.isPending ||
+														createContract.isPending
+													}
+													onClick={() => void award(bid, true)}
+												>
+													<Trophy className="mr-2 size-3.5" />
+													Award + contract draft
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													disabled={
+														rfx.status === "awarded" ||
+														rfx.status === "cancelled" ||
+														awardRfx.isPending
+													}
+													onClick={() => void award(bid, false)}
+												>
+													<Trophy className="mr-2 size-3.5" />
+													Award only
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									</TableCell>
 								</TableRow>
 							))}
 							{bids.length === 0 && (
 								<TableRow>
 									<TableCell
-										colSpan={5}
+										colSpan={6}
 										className="h-24 text-center text-muted-foreground"
 									>
 										No bids received.
@@ -222,6 +236,11 @@ export function RfxDetailPage() {
 					</Table>
 				</div>
 			</section>
+			<RecordBidDialog
+				open={recordBidOpen}
+				onOpenChange={setRecordBidOpen}
+				rfx={rfx}
+			/>
 		</div>
 	);
 }

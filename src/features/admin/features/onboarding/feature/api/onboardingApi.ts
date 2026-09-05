@@ -8,6 +8,10 @@ function requireRecord<T>(record: T | null): T {
 	return record;
 }
 
+export async function seedOnboarding(force = false) {
+	return vmsApi.seedOnboarding(force);
+}
+
 export async function listOnboarding(): Promise<OnboardingCaseModel[]> {
 	return vmsApi.listOnboarding();
 }

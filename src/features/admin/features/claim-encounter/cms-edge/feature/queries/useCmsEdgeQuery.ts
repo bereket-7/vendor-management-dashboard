@@ -1,15 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 
 import {
+	type ListPharmacyClaimsParams,
+	getPharmacyClaim,
 	listAuditReports,
 	listAuditRequests,
 	listCmsResponses,
 	listDocumentLibrary,
+	listMedicalClaims,
+	listPharmacyClaims,
 	listSubmissionHistory,
+	seedPharmacyClaims,
 } from "../api/cms-edgeApi";
 
 const domain = "cms-edge";
@@ -93,4 +98,66 @@ export function useCmsEdgeDocumentLibraryQuery() {
 export function useCmsEdgeDocumentLibraryList() {
 	const query = useCmsEdgeDocumentLibraryQuery();
 	return { ...query, documentLibrary: query.data?.items ?? [] };
+}
+
+export function useCmsEdgePharmacyClaimsQuery(
+	params: ListPharmacyClaimsParams = {}
+) {
+	return useQuery({
+		queryKey: featureQueryKey(domain, "pharmacyClaims", params),
+		queryFn: () => listPharmacyClaims(params),
+	});
+}
+
+export function useCmsEdgePharmacyClaimsList(
+	params: ListPharmacyClaimsParams = {}
+) {
+	const query = useCmsEdgePharmacyClaimsQuery(params);
+	return {
+		...query,
+		pharmacyClaims: query.data?.items ?? [],
+		total: query.data?.total ?? 0,
+		kpis: query.data?.kpis ?? [],
+	};
+}
+
+export function useCmsEdgePharmacyClaimDetailQuery(id: string | null) {
+	return useQuery({
+		queryKey: featureQueryKey(domain, "pharmacyClaimDetail", { id }),
+		queryFn: () => getPharmacyClaim(id!),
+		enabled: Boolean(id),
+	});
+}
+
+export function useCmsEdgeMedicalClaimsQuery() {
+	return useQuery({
+		queryKey: featureQueryKey(domain, "medicalClaims"),
+		queryFn: () => listMedicalClaims(),
+	});
+}
+
+export function useCmsEdgeMedicalClaimsList() {
+	const query = useCmsEdgeMedicalClaimsQuery();
+	return {
+		...query,
+		medicalClaims: query.data?.items ?? [],
+		total: query.data?.total ?? 0,
+		kpis: query.data?.kpis ?? [],
+	};
+}
+
+export function useSeedPharmacyClaims() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (body?: {
+			vendor_id?: string;
+			count?: number;
+			force?: boolean;
+		}) => seedPharmacyClaims(body),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey(domain, "pharmacyClaims"),
+			});
+		},
+	});
 }

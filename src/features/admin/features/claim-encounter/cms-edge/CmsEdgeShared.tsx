@@ -79,6 +79,40 @@ export function CmsEdgeScrollRegion({
 	);
 }
 
+/** Soft dual-shadow panel — matches CMS EDGE Reporting */
+export const CMS_EDGE_PANEL_CLASS =
+	"rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
+
+export const CMS_EDGE_STAT_SHADOW =
+	"shadow-[0_1px_2px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)]";
+
+export const CMS_EDGE_STAT_HOVER =
+	"hover:shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(15,23,42,0.10)] hover:-translate-y-px";
+
+export const CMS_EDGE_KPI_CARD_CLASS = cn(
+	"relative overflow-hidden rounded-sm border border-border/70 bg-card p-4 transition-all duration-200 ease-out",
+	CMS_EDGE_STAT_SHADOW,
+	CMS_EDGE_STAT_HOVER
+);
+
+/** Left accent gradient for KPI cards from tone class strings */
+export function cmsEdgeKpiAccent(tone: string) {
+	if (tone.includes("emerald") || tone.includes("green")) {
+		return "from-emerald-500/80 to-emerald-400/40";
+	}
+	if (tone.includes("red")) return "from-red-500/80 to-red-400/40";
+	if (tone.includes("amber") || tone.includes("orange")) {
+		return "from-amber-500/80 to-amber-400/40";
+	}
+	if (tone.includes("violet") || tone.includes("purple")) {
+		return "from-violet-500/80 to-violet-400/40";
+	}
+	if (tone.includes("slate") || tone.includes("zinc")) {
+		return "from-slate-500/80 to-slate-400/40";
+	}
+	return "from-sky-500/80 to-sky-400/40";
+}
+
 export function CmsEdgeSectionPanel({
 	title,
 	subtitle,
@@ -99,15 +133,12 @@ export function CmsEdgeSectionPanel({
 	bodyClassName?: string;
 }) {
 	return (
-		<section
-			className={cn(
-				"overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm",
-				className
-			)}
-		>
-			<div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-4 py-3">
+		<section className={cn("overflow-hidden", CMS_EDGE_PANEL_CLASS, className)}>
+			<div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-4 py-2.5">
 				<div className="min-w-0">
-					<h3 className="text-sm font-semibold text-foreground">{title}</h3>
+					<h3 className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+						{title}
+					</h3>
 					{subtitle ? (
 						<p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
 					) : null}
@@ -212,11 +243,21 @@ export function CmsEdgeTripleRow({
 	);
 }
 
+/** Pill tabs — matches CMS EDGE Reporting shell */
 export const CMS_EDGE_TAB_TRIGGER_CLASS = cn(
-	"rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold shadow-none transition-colors",
-	"text-muted-foreground hover:text-foreground",
-	"data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+	"group relative mb-1.5 flex shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-[11px] font-bold tracking-wide whitespace-nowrap shadow-none transition-all duration-200",
+	"border-0 text-foreground/75 hover:bg-muted/55 hover:text-foreground",
+	"data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-sm"
 );
+
+export const CMS_EDGE_TAB_ICON_WELL_CLASS =
+	"flex size-5 shrink-0 items-center justify-center rounded-full text-primary group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground";
+
+export const CMS_EDGE_TAB_HAIRLINE_CLASS =
+	"absolute inset-x-3 -bottom-[7px] h-[2px] rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-40 group-data-[state=active]:opacity-100";
+
+export const CMS_EDGE_TAB_NAV_CLASS =
+	"relative flex items-end gap-0.5 border-b border-border/50 bg-card px-1 pb-0 pt-0.5 sm:px-2";
 
 /** Blank-tab scaffold — one wrapper per not-yet-built CMS EDGE tab */
 export function CmsEdgeBlankTab({

@@ -1,6 +1,11 @@
 import { apiClient } from "@/lib/api/client";
-import { withMockOrRemote } from "@/lib/mock-mode";
+import {
+	isMockEnabled,
+	isNestApiEnabled,
+	withMockOrRemote,
+} from "@/lib/mock-mode";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
+import { isVendorCoreLive } from "@/lib/vendor-core/client";
 import type { CoreUserDto, LoginEventDto } from "@/lib/vendor-core/types";
 
 import { usersEndpoints } from "../../users-endpoints";
@@ -10,7 +15,32 @@ import type {
 	UsersUpdateDto,
 } from "../dto/usersDto";
 
+function slugUsername(name: string): string {
+	return (
+		name
+			.trim()
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, ".") || "user"
+	);
+}
+
+function createBodyFromDto(body: UsersCreateDto): Record<string, unknown> {
+	const username = slugUsername(body.name);
+	return {
+		username,
+		email: `${username}@placeholder.local`,
+		phone_number: 0,
+		first_name: body.name,
+		is_active: true,
+	};
+}
+
 export async function listUsers() {
+	if (isMockEnabled()) return { results: [] as ApiUsersDto[], count: 0 };
+	if (isVendorCoreLive() || !isNestApiEnabled()) {
+		const page = await vendorCoreApi.listUsers();
+		return { results: page.results ?? [], count: page.count ?? 0 };
+	}
 	return withMockOrRemote(
 		() => ({ results: [], count: 0 }),
 		() =>
@@ -21,6 +51,10 @@ export async function listUsers() {
 }
 
 export async function getUsers(id: string) {
+	if (isMockEnabled()) return { id: "mock" } as never;
+	if (isVendorCoreLive() || !isNestApiEnabled()) {
+		return vendorCoreApi.getUser(id);
+	}
 	return withMockOrRemote(
 		() => ({ id: "mock" }) as never,
 		() => apiClient<ApiUsersDto>(usersEndpoints.detail(id))
@@ -28,6 +62,10 @@ export async function getUsers(id: string) {
 }
 
 export async function createUsers(body: UsersCreateDto) {
+	if (isMockEnabled()) return { id: "mock" } as never;
+	if (isVendorCoreLive() || !isNestApiEnabled()) {
+		return vendorCoreApi.createUser(createBodyFromDto(body));
+	}
 	return withMockOrRemote(
 		() => ({ id: "mock" }) as never,
 		() =>
@@ -39,6 +77,15 @@ export async function createUsers(body: UsersCreateDto) {
 }
 
 export async function updateUsers(id: string, body: UsersUpdateDto) {
+	if (isMockEnabled()) return { id: "mock" } as never;
+	if (isVendorCoreLive() || !isNestApiEnabled()) {
+		const patch: Record<string, unknown> = {};
+		if (body.name) {
+			patch.first_name = body.name;
+			patch.username = slugUsername(body.name);
+		}
+		return vendorCoreApi.updateUser(id, patch);
+	}
 	return withMockOrRemote(
 		() => ({ id: "mock" }) as never,
 		() =>
@@ -50,6 +97,11 @@ export async function updateUsers(id: string, body: UsersUpdateDto) {
 }
 
 export async function deleteUsers(id: string) {
+	if (isMockEnabled()) return undefined;
+	if (isVendorCoreLive() || !isNestApiEnabled()) {
+		await vendorCoreApi.deleteUser(id);
+		return;
+	}
 	return withMockOrRemote(
 		() => undefined,
 		() =>
@@ -57,6 +109,18 @@ export async function deleteUsers(id: string) {
 				method: "DELETE",
 			})
 	);
+}
+
+export async function restoreUsers(id: string) {
+	return vendorCoreApi.restoreUser(id);
+}
+
+export async function hardDeleteUsers(id: string) {
+	return vendorCoreApi.hardDeleteUser(id);
+}
+
+export async function setUsersRoles(id: string, role_ids: string[]) {
+	return vendorCoreApi.setUserRoles(id, { role_ids });
 }
 
 export async function listVendorCoreUsers(): Promise<CoreUserDto[]> {

@@ -31,6 +31,30 @@ export function InvoiceDetailPage() {
 			toast.error("Could not approve invoice.");
 		}
 	}
+	async function match() {
+		if (!invoice) return;
+		try {
+			await updateInvoice.mutateAsync({
+				id: invoice.id,
+				patch: { status: "matched" },
+			});
+			toast.success("Invoice matched.");
+		} catch {
+			toast.error("Could not match invoice.");
+		}
+	}
+	async function dispute() {
+		if (!invoice) return;
+		try {
+			await updateInvoice.mutateAsync({
+				id: invoice.id,
+				patch: { status: "disputed" },
+			});
+			toast.success("Invoice disputed.");
+		} catch {
+			toast.error("Could not dispute invoice.");
+		}
+	}
 	if (isLoading)
 		return (
 			<div className="container py-8">
@@ -67,11 +91,33 @@ export function InvoiceDetailPage() {
 						{formatMoney(invoice.amount, invoice.currency)}
 					</p>
 				</div>
-				{["matched", "exception", "submitted"].includes(invoice.status) && (
-					<Button onClick={approve} disabled={updateInvoice.isPending}>
-						Approve invoice
-					</Button>
-				)}
+				<div className="flex flex-wrap gap-2">
+					{["draft", "submitted", "exception"].includes(invoice.status) ? (
+						<Button
+							variant="outline"
+							onClick={match}
+							disabled={updateInvoice.isPending}
+						>
+							Match
+						</Button>
+					) : null}
+					{invoice.status === "matched" ? (
+						<Button onClick={approve} disabled={updateInvoice.isPending}>
+							Approve invoice
+						</Button>
+					) : null}
+					{["draft", "submitted", "matched", "exception"].includes(
+						invoice.status
+					) ? (
+						<Button
+							variant="outline"
+							onClick={dispute}
+							disabled={updateInvoice.isPending}
+						>
+							Dispute
+						</Button>
+					) : null}
+				</div>
 			</div>
 			<section className="rounded-xl border border-border bg-card shadow-sm p-6">
 				<h2 className="mb-5 font-semibold">Invoice details</h2>

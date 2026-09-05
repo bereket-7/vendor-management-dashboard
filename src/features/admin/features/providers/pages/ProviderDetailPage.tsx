@@ -47,6 +47,12 @@ import {
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/confirm-dialog";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -200,13 +206,13 @@ function ClaimStatusPill({ status }: { status: ClaimActivityStatus }) {
 
 const PROVIDER_UI = {
 	radius: "rounded-xl",
-	radiusSm: "rounded-md",
-	surface: "overflow-hidden border border-border/50 bg-card",
+	radiusSm: "rounded-lg",
+	surface: "overflow-hidden border border-border/60 bg-card shadow-sm",
 	label:
 		"text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground",
 	labelAccent:
 		"text-[10px] font-medium uppercase tracking-[0.08em] text-primary/80",
-	title: "text-xs font-semibold tracking-tight text-foreground",
+	title: "text-sm font-semibold tracking-tight text-foreground",
 } as const;
 
 function SurfaceTopAccent() {
@@ -239,19 +245,23 @@ function Panel({
 	return (
 		<section
 			className={cn(
-				"flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/40 bg-card",
+				"flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
 				className
 			)}
 		>
 			<div
 				className={cn(
-					"flex items-center gap-2 border-b border-border/35 bg-muted/[0.12]",
-					dense ? "px-3 py-1.5" : "px-3.5 py-2"
+					"relative flex items-center gap-2.5 border-b border-border/50 bg-muted/20",
+					dense ? "px-4 py-2.5" : "px-4 py-3"
 				)}
 			>
+				<span
+					className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary"
+					aria-hidden
+				/>
 				{Icon ? (
-					<span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary">
-						<Icon className="size-3" strokeWidth={2.25} />
+					<span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+						<Icon className="size-3.5" strokeWidth={2.25} />
 					</span>
 				) : null}
 				<h3 className={cn("min-w-0 flex-1", PROVIDER_UI.title)}>{title}</h3>
@@ -259,13 +269,88 @@ function Panel({
 			</div>
 			<div
 				className={cn(
-					"min-h-0 flex-1",
-					flush ? "p-0" : dense ? "p-2.5" : "p-3.5"
+					"min-h-0 flex-1 bg-card",
+					flush ? "p-0" : dense ? "p-3.5" : "p-4"
 				)}
 			>
 				{children}
 			</div>
 		</section>
+	);
+}
+
+/** Collapsible panel for Overview / Demographics — keeps Panel chrome, toggle body. */
+function CollapsiblePanel({
+	title,
+	icon: Icon,
+	action,
+	children,
+	className,
+	dense,
+	defaultOpen = true,
+}: {
+	title: string;
+	icon?: typeof BadgeCheck;
+	action?: ReactNode;
+	children: ReactNode;
+	className?: string;
+	dense?: boolean;
+	defaultOpen?: boolean;
+}) {
+	return (
+		<Accordion
+			type="multiple"
+			defaultValue={defaultOpen ? ["section"] : []}
+			className={cn("min-w-0", className)}
+		>
+			<AccordionItem
+				value="section"
+				className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm"
+			>
+				<AccordionTrigger
+					className={cn(
+						"relative items-center gap-2.5 rounded-none border-b border-transparent bg-muted/20 py-0 pr-4 hover:no-underline data-[state=open]:border-border/50",
+						dense ? "pl-4" : "pl-4"
+					)}
+				>
+					<span
+						className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary"
+						aria-hidden
+					/>
+					<span
+						className={cn(
+							"flex min-w-0 flex-1 items-center gap-2.5",
+							dense ? "py-2.5" : "py-3"
+						)}
+					>
+						{Icon ? (
+							<span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+								<Icon className="size-3.5" strokeWidth={2.25} />
+							</span>
+						) : null}
+						<span
+							className={cn("min-w-0 truncate text-left", PROVIDER_UI.title)}
+						>
+							{title}
+						</span>
+						{action ? (
+							<span
+								className="ml-auto shrink-0"
+								onClick={(event) => event.stopPropagation()}
+								onKeyDown={(event) => event.stopPropagation()}
+							>
+								{action}
+							</span>
+						) : null}
+					</span>
+				</AccordionTrigger>
+				<AccordionContent className="border-t-0 pb-0">
+					<div className={cn("bg-card", dense ? "p-3.5" : "p-4")}>
+						{children}
+					</div>
+				</AccordionContent>
+			</AccordionItem>
+		</Accordion>
 	);
 }
 
@@ -280,25 +365,26 @@ function ViewAllLink({
 		<button
 			type="button"
 			onClick={onClick}
-			className="mt-2 text-xs font-medium text-primary hover:underline"
+			className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:text-primary/80"
 		>
-			{label} →
+			{label}
+			<span aria-hidden>→</span>
 		</button>
 	);
 }
 
-/** Table chrome — compact rows, dark field headers. Fixed layout + clamp long text. */
+/** Table chrome — compact rows, clear field headers. Fixed layout + clamp long text. */
 const DETAIL_TH =
-	"h-6 bg-muted/50 px-2 text-left text-[9px] font-bold uppercase tracking-wide text-foreground";
+	"h-8 bg-muted/45 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground";
 const DETAIL_TD =
-	"min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-1.5 align-middle text-xs text-foreground";
+	"min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-2.5 align-middle text-xs text-foreground";
 const DETAIL_TD_MUTED = cn(DETAIL_TD, "text-muted-foreground");
 const DETAIL_TD_WRAP =
 	"min-w-0 overflow-hidden break-words whitespace-normal px-2.5 py-1.5 align-middle text-xs text-foreground";
 const DETAIL_TD_ACTIONS =
 	"min-w-0 overflow-visible whitespace-normal px-2.5 py-1.5 align-middle text-xs";
 const DETAIL_ROW =
-	"border-b border-border/30 hover:bg-muted/15 last:border-b-0";
+	"border-b border-border/40 hover:bg-muted/20 last:border-b-0";
 
 function DetailTableHead({
 	children,
@@ -331,13 +417,13 @@ function AttrTable({
 	return (
 		<div
 			className={cn(
-				"overflow-x-auto overflow-y-hidden rounded-md border border-border/40",
+				"overflow-x-auto overflow-y-hidden rounded-lg border border-border/50 bg-background/40",
 				className
 			)}
 		>
 			<Table className="w-full table-fixed">
 				<TableHeader>
-					<TableRow className="hover:bg-transparent border-0">
+					<TableRow className="border-b border-border/50 hover:bg-transparent">
 						{columns.map((col) => (
 							<DetailTableHead
 								key={col.key}
@@ -389,7 +475,7 @@ function AttrTable({
 /** Shared wrapper for multi-row list tables (locations, claims, etc.). */
 function DataTableShell({ children }: { children: ReactNode }) {
 	return (
-		<div className="overflow-x-auto overflow-y-hidden rounded-md border border-border/40">
+		<div className="overflow-x-auto overflow-y-hidden rounded-lg border border-border/50 bg-background/40">
 			{children}
 		</div>
 	);
@@ -612,7 +698,7 @@ function ProviderTabsNav({
 	return (
 		<nav
 			className={cn(
-				"relative flex items-end gap-0.5 border border-border/50 bg-card p-1 pb-1.5",
+				"relative flex items-center gap-1 border border-border/60 bg-card p-1.5 shadow-sm",
 				PROVIDER_UI.radius
 			)}
 		>
@@ -622,9 +708,9 @@ function ProviderTabsNav({
 				disabled={!canLeft}
 				onClick={() => scrollByDir(-1)}
 				className={cn(
-					"mb-0.5 flex size-7 shrink-0 items-center justify-center rounded-md transition-opacity",
+					"flex size-8 shrink-0 items-center justify-center rounded-lg transition-opacity",
 					canLeft
-						? "text-foreground/80 hover:bg-muted/70 hover:text-foreground"
+						? "text-muted-foreground hover:bg-muted hover:text-foreground"
 						: "pointer-events-none opacity-0"
 				)}
 			>
@@ -633,8 +719,7 @@ function ProviderTabsNav({
 			<div
 				ref={scrollerRef}
 				className={cn(
-					"flex min-w-0 flex-1 gap-0.5 overflow-x-auto overflow-y-hidden pb-1",
-					/* Modern thin horizontal scrollbar */
+					"flex min-w-0 flex-1 gap-1 overflow-x-auto overflow-y-hidden",
 					"[scrollbar-width:thin] [scrollbar-color:oklch(0.55_0_0_/_0.35)_transparent]",
 					"[&::-webkit-scrollbar]:h-1.5",
 					"[&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-muted/40",
@@ -644,23 +729,25 @@ function ProviderTabsNav({
 					"[&::-webkit-scrollbar-thumb]:bg-clip-padding"
 				)}
 			>
-				{TABS.map((item) => (
-					<button
-						key={item}
-						type="button"
-						data-active-tab={tab === item ? "true" : undefined}
-						onClick={() => onTabChange(item)}
-						className={cn(
-							"shrink-0 px-3 py-2 text-[11px] font-bold tracking-wide whitespace-nowrap transition-all",
-							PROVIDER_UI.radiusSm,
-							tab === item
-								? "bg-foreground text-background"
-								: "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
-						)}
-					>
-						{item}
-					</button>
-				))}
+				{TABS.map((item) => {
+					const active = tab === item;
+					return (
+						<button
+							key={item}
+							type="button"
+							data-active-tab={active ? "true" : undefined}
+							onClick={() => onTabChange(item)}
+							className={cn(
+								"shrink-0 rounded-lg px-3.5 py-2 text-[11px] font-semibold tracking-wide whitespace-nowrap transition-colors",
+								active
+									? "bg-primary text-primary-foreground shadow-sm"
+									: "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+							)}
+						>
+							{item}
+						</button>
+					);
+				})}
 			</div>
 			<button
 				type="button"
@@ -668,9 +755,9 @@ function ProviderTabsNav({
 				disabled={!canRight}
 				onClick={() => scrollByDir(1)}
 				className={cn(
-					"mb-0.5 flex size-7 shrink-0 items-center justify-center rounded-md transition-opacity",
+					"flex size-8 shrink-0 items-center justify-center rounded-lg transition-opacity",
 					canRight
-						? "text-foreground/80 hover:bg-muted/70 hover:text-foreground"
+						? "text-muted-foreground hover:bg-muted hover:text-foreground"
 						: "pointer-events-none opacity-0"
 				)}
 			>
@@ -1163,247 +1250,275 @@ function ProviderDetailPageInner({
 				<ProviderTabsNav tab={tab} onTabChange={handleTabChange} />
 
 				{tab === "Overview" ? (
-					<div className="space-y-3">
-						<div className="space-y-3">
-							<Panel dense icon={BadgeCheck} title="Provider summary">
-								<AttrTable
-									columns={[
-										{ key: "enrollment", label: "Enrollment" },
-										{ key: "effective", label: "Effective" },
-										{ key: "program", label: "Program" },
-										{ key: "status", label: "Provider status" },
-										{ key: "org", label: "Organization" },
-										{ key: "address", label: "Address" },
-										{ key: "phone", label: "Phone" },
-										{ key: "email", label: "Email" },
-									]}
-									rows={[
-										{
-											enrollment:
-												provider.enrollmentStatus === "enrolled" ? (
-													<span className="text-chart-2">Enrolled</span>
-												) : (
-													<span className="capitalize">
-														{provider.enrollmentStatus}
-													</span>
-												),
-											effective: (
-												<span className="tabular-nums">
-													{formatDate(provider.enrollmentEffective)}
-												</span>
-											),
-											program: provider.program,
-											status: <ProfileStatusBadge status={provider.status} />,
-											org: provider.practiceName,
-											address: `${provider.practiceCity}, ${provider.practiceState}`,
-											phone: (
-												<span className="tabular-nums">
-													{provider.practicePhone}
-												</span>
-											),
-											email: (
-												<span className="block truncate" title={provider.email}>
-													{provider.email}
-												</span>
-											),
-										},
-									]}
-								/>
-							</Panel>
-
-							<Panel dense icon={Network} title="Network & credentialing">
-								<AttrTable
-									columns={[
-										{ key: "plans", label: "Plans" },
-										{ key: "primary", label: "Primary network" },
-										{ key: "netStatus", label: "Network status" },
-										{ key: "locations", label: "Locations" },
-										{ key: "credPct", label: "Cred. complete" },
-										{ key: "credTotal", label: "Complete / total" },
-										{ key: "expiring", label: "Expiring" },
-										{ key: "exceptions", label: "Open exceptions" },
-									]}
-									rows={[
-										{
-											plans: String(provider.networks.length),
-											primary: primaryNetwork?.networkPlan ?? "—",
-											netStatus: primaryNetwork ? (
-												<NetworkPill status={primaryNetwork.status} />
+					<div className="space-y-5">
+						<CollapsiblePanel
+							dense
+							defaultOpen
+							icon={BadgeCheck}
+							title="Provider summary"
+						>
+							<AttrTable
+								columns={[
+									{ key: "enrollment", label: "Enrollment" },
+									{ key: "effective", label: "Effective" },
+									{ key: "program", label: "Program" },
+									{ key: "status", label: "Provider status" },
+									{ key: "org", label: "Organization" },
+									{ key: "address", label: "Address" },
+									{ key: "phone", label: "Phone" },
+									{ key: "email", label: "Email" },
+								]}
+								rows={[
+									{
+										enrollment:
+											provider.enrollmentStatus === "enrolled" ? (
+												<span className="text-chart-2">Enrolled</span>
 											) : (
-												"—"
-											),
-											locations: String(provider.locations.length),
-											credPct: <span className="tabular-nums">{credPct}%</span>,
-											credTotal: (
-												<span className="tabular-nums">
-													{credCounts.complete} / {credTotal}
+												<span className="capitalize">
+													{provider.enrollmentStatus}
 												</span>
 											),
-											expiring: (
-												<span className="tabular-nums">
-													{credCounts.expiring}
-												</span>
-											),
-											exceptions: (
-												<span className="tabular-nums">
-													{provider.exceptions.length}
-												</span>
-											),
-										},
-									]}
-								/>
-							</Panel>
+										effective: (
+											<span className="tabular-nums">
+												{formatDate(provider.enrollmentEffective)}
+											</span>
+										),
+										program: provider.program,
+										status: <ProfileStatusBadge status={provider.status} />,
+										org: provider.practiceName,
+										address: `${provider.practiceCity}, ${provider.practiceState}`,
+										phone: (
+											<span className="tabular-nums">
+												{provider.practicePhone}
+											</span>
+										),
+										email: (
+											<span className="block truncate" title={provider.email}>
+												{provider.email}
+											</span>
+										),
+									},
+								]}
+							/>
+						</CollapsiblePanel>
 
-							<Panel dense icon={Stethoscope} title="12-month performance">
-								<AttrTable
-									columns={[
-										{ key: "claims", label: "Claims" },
-										{ key: "encounters", label: "Encounters" },
-										{ key: "billed", label: "Total billed" },
-										{ key: "paid", label: "Total paid" },
-										{ key: "rejection", label: "Rejection rate" },
-										{ key: "net", label: "Net payment" },
-									]}
-									rows={[
-										{
-											claims: (
-												<span className="inline-flex items-center gap-1.5">
-													<span className="tabular-nums">
-														{formatCompact(provider.claims12m)}
-													</span>
-													<Trend value={provider.claimsTrendPct} />
-												</span>
-											),
-											encounters: (
-												<span className="inline-flex items-center gap-1.5">
-													<span className="tabular-nums">
-														{formatCompact(provider.encounters12m)}
-													</span>
-													<Trend value={provider.encountersTrendPct} />
-												</span>
-											),
-											billed: (
-												<span className="inline-flex items-center gap-1.5">
-													<span className="tabular-nums">
-														{formatCurrency(provider.billed12m)}
-													</span>
-													<Trend value={provider.billedTrendPct} />
-												</span>
-											),
-											paid: (
-												<span className="inline-flex items-center gap-1.5">
-													<span className="tabular-nums">
-														{formatCurrency(provider.paid12m)}
-													</span>
-													<Trend value={provider.paidTrendPct} />
-												</span>
-											),
-											rejection: (
-												<span className="inline-flex items-center gap-1.5">
-													<span className="tabular-nums">
-														{provider.rejectionRate}%
-													</span>
-													<Trend value={provider.rejectionTrendPct} />
-												</span>
-											),
-											net: (
-												<span className="inline-flex items-center gap-1.5">
-													<span className="tabular-nums">
-														{formatCurrency(provider.netPayment12m)}
-													</span>
-													<Trend value={provider.netPaymentTrendPct} />
-												</span>
-											),
-										},
-									]}
-								/>
-							</Panel>
-						</div>
+						<CollapsiblePanel
+							dense
+							icon={Network}
+							title="Network & credentialing"
+						>
+							<AttrTable
+								columns={[
+									{ key: "plans", label: "Plans" },
+									{ key: "primary", label: "Primary network" },
+									{ key: "netStatus", label: "Network status" },
+									{ key: "locations", label: "Locations" },
+									{ key: "credPct", label: "Cred. complete" },
+									{ key: "credTotal", label: "Complete / total" },
+									{ key: "expiring", label: "Expiring" },
+									{ key: "exceptions", label: "Open exceptions" },
+								]}
+								rows={[
+									{
+										plans: String(provider.networks.length),
+										primary: primaryNetwork?.networkPlan ?? "—",
+										netStatus: primaryNetwork ? (
+											<NetworkPill status={primaryNetwork.status} />
+										) : (
+											"—"
+										),
+										locations: String(provider.locations.length),
+										credPct: <span className="tabular-nums">{credPct}%</span>,
+										credTotal: (
+											<span className="tabular-nums">
+												{credCounts.complete} / {credTotal}
+											</span>
+										),
+										expiring: (
+											<span className="tabular-nums">
+												{credCounts.expiring}
+											</span>
+										),
+										exceptions: (
+											<span className="tabular-nums">
+												{provider.exceptions.length}
+											</span>
+										),
+									},
+								]}
+							/>
+						</CollapsiblePanel>
 
-						<div className="grid gap-3 lg:grid-cols-2">
-							<Panel dense icon={MapPin} title="Locations">
-								<DataTableShell>
-									<Table className="w-full table-fixed">
-										<TableHeader>
-											<TableRow className="hover:bg-transparent">
-												<DetailTableHead>Location</DetailTableHead>
-												<DetailTableHead>Status</DetailTableHead>
-												<DetailTableHead>Primary</DetailTableHead>
+						<CollapsiblePanel
+							dense
+							icon={Stethoscope}
+							title="12-month performance"
+						>
+							<AttrTable
+								columns={[
+									{ key: "claims", label: "Claims" },
+									{ key: "encounters", label: "Encounters" },
+									{ key: "billed", label: "Total billed" },
+									{ key: "paid", label: "Total paid" },
+									{ key: "rejection", label: "Rejection rate" },
+									{ key: "net", label: "Net payment" },
+								]}
+								rows={[
+									{
+										claims: (
+											<span className="inline-flex items-center gap-1.5">
+												<span className="tabular-nums">
+													{formatCompact(provider.claims12m)}
+												</span>
+												<Trend value={provider.claimsTrendPct} />
+											</span>
+										),
+										encounters: (
+											<span className="inline-flex items-center gap-1.5">
+												<span className="tabular-nums">
+													{formatCompact(provider.encounters12m)}
+												</span>
+												<Trend value={provider.encountersTrendPct} />
+											</span>
+										),
+										billed: (
+											<span className="inline-flex items-center gap-1.5">
+												<span className="tabular-nums">
+													{formatCurrency(provider.billed12m)}
+												</span>
+												<Trend value={provider.billedTrendPct} />
+											</span>
+										),
+										paid: (
+											<span className="inline-flex items-center gap-1.5">
+												<span className="tabular-nums">
+													{formatCurrency(provider.paid12m)}
+												</span>
+												<Trend value={provider.paidTrendPct} />
+											</span>
+										),
+										rejection: (
+											<span className="inline-flex items-center gap-1.5">
+												<span className="tabular-nums">
+													{provider.rejectionRate}%
+												</span>
+												<Trend value={provider.rejectionTrendPct} />
+											</span>
+										),
+										net: (
+											<span className="inline-flex items-center gap-1.5">
+												<span className="tabular-nums">
+													{formatCurrency(provider.netPayment12m)}
+												</span>
+												<Trend value={provider.netPaymentTrendPct} />
+											</span>
+										),
+									},
+								]}
+							/>
+						</CollapsiblePanel>
+
+						<CollapsiblePanel dense icon={MapPin} title="Locations">
+							<DataTableShell>
+								<Table className="w-full">
+									<colgroup>
+										<col className="w-auto" />
+										<col className="w-[7.5rem]" />
+										<col className="w-[5.5rem]" />
+									</colgroup>
+									<TableHeader>
+										<TableRow className="border-b border-border/50 hover:bg-transparent">
+											<DetailTableHead>Location</DetailTableHead>
+											<DetailTableHead>Status</DetailTableHead>
+											<DetailTableHead>Primary</DetailTableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{provider.locations.map((loc) => (
+											<TableRow key={loc.id} className={DETAIL_ROW}>
+												<TableCell
+													className={DETAIL_TD_WRAP}
+													title={`${loc.name} — ${loc.address}`}
+												>
+													<p className="font-medium">{loc.name}</p>
+													<p className="break-words text-xs leading-relaxed text-muted-foreground">
+														{loc.address}
+													</p>
+												</TableCell>
+												<TableCell
+													className={cn(DETAIL_TD, "whitespace-nowrap")}
+												>
+													<StatusPill status={loc.status} />
+												</TableCell>
+												<TableCell
+													className={cn(DETAIL_TD, "text-xs whitespace-nowrap")}
+												>
+													{loc.isPrimary ? "Yes" : "No"}
+												</TableCell>
 											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{provider.locations.map((loc) => (
-												<TableRow key={loc.id} className={DETAIL_ROW}>
-													<TableCell
-														className={DETAIL_TD_WRAP}
-														title={`${loc.name} — ${loc.address}`}
-													>
-														<p className="truncate font-medium">{loc.name}</p>
-														<p className="truncate text-xs text-muted-foreground">
-															{loc.address}
-														</p>
-													</TableCell>
-													<TableCell className={DETAIL_TD}>
-														<StatusPill status={loc.status} />
-													</TableCell>
-													<TableCell className={cn(DETAIL_TD, "text-xs")}>
-														{loc.isPrimary ? "Yes" : "No"}
-													</TableCell>
-												</TableRow>
-											))}
-										</TableBody>
-									</Table>
-								</DataTableShell>
-								<ViewAllLink
-									label={`View all (${provider.locations.length})`}
-									onClick={() => handleTabChange("Locations")}
-								/>
-							</Panel>
-							<Panel dense icon={Network} title="Network participation">
-								<DataTableShell>
-									<Table className="w-full table-fixed">
-										<TableHeader>
-											<TableRow className="hover:bg-transparent">
-												<DetailTableHead>Network</DetailTableHead>
-												<DetailTableHead>Status</DetailTableHead>
-												<DetailTableHead>Effective</DetailTableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{provider.networks.slice(0, 5).map((n) => (
-												<TableRow key={n.id} className={DETAIL_ROW}>
-													<TableCell
-														className={DETAIL_TD_WRAP}
-														title={`${n.networkPlan} — ${n.payer}`}
-													>
-														<p className="truncate font-medium">
-															{n.networkPlan}
-														</p>
-														<p className="truncate text-xs text-muted-foreground">
-															{n.payer}
-														</p>
-													</TableCell>
-													<TableCell className={DETAIL_TD}>
-														<NetworkPill status={n.status} />
-													</TableCell>
-													<TableCell
-														className={cn(DETAIL_TD, "text-xs tabular-nums")}
-													>
-														{formatDate(n.effectiveDate)}
-													</TableCell>
-												</TableRow>
-											))}
-										</TableBody>
-									</Table>
-								</DataTableShell>
-								<ViewAllLink
-									label={`View all (${provider.networks.length})`}
-									onClick={() => handleTabChange("Network Participation")}
-								/>
-							</Panel>
-						</div>
+										))}
+									</TableBody>
+								</Table>
+							</DataTableShell>
+							<ViewAllLink
+								label={`View all (${provider.locations.length})`}
+								onClick={() => handleTabChange("Locations")}
+							/>
+						</CollapsiblePanel>
 
-						<Panel
+						<CollapsiblePanel
+							dense
+							icon={Network}
+							title="Network participation"
+						>
+							<DataTableShell>
+								<Table className="w-full">
+									<colgroup>
+										<col className="w-auto" />
+										<col className="w-[8rem]" />
+										<col className="w-[7rem]" />
+									</colgroup>
+									<TableHeader>
+										<TableRow className="border-b border-border/50 hover:bg-transparent">
+											<DetailTableHead>Network</DetailTableHead>
+											<DetailTableHead>Status</DetailTableHead>
+											<DetailTableHead>Effective</DetailTableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{provider.networks.slice(0, 5).map((n) => (
+											<TableRow key={n.id} className={DETAIL_ROW}>
+												<TableCell className={cn(DETAIL_TD, "min-w-0")}>
+													<p className="font-medium">{n.networkPlan}</p>
+													<p className="text-xs text-muted-foreground">
+														{n.payer}
+													</p>
+												</TableCell>
+												<TableCell
+													className={cn(DETAIL_TD, "whitespace-nowrap")}
+												>
+													<NetworkPill status={n.status} />
+												</TableCell>
+												<TableCell
+													className={cn(
+														DETAIL_TD,
+														"text-xs whitespace-nowrap tabular-nums"
+													)}
+												>
+													{formatDate(n.effectiveDate)}
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</DataTableShell>
+							<ViewAllLink
+								label={`View all (${provider.networks.length})`}
+								onClick={() => handleTabChange("Network Participation")}
+							/>
+						</CollapsiblePanel>
+
+						<CollapsiblePanel
 							dense
 							icon={BadgeCheck}
 							title="Identifiers"
@@ -1429,9 +1544,10 @@ function ProviderDetailPageInner({
 									),
 								]}
 							/>
-						</Panel>
+						</CollapsiblePanel>
 
-						<div className="grid gap-3 lg:grid-cols-2">
+						{/* Charts stay expanded — not dropdowns */}
+						<div className="grid gap-5 lg:grid-cols-2">
 							<Panel dense icon={Stethoscope} title="Claims & encounters">
 								<div className="h-[260px]">
 									<ResponsiveContainer width="100%" height="100%">
@@ -1509,11 +1625,15 @@ function ProviderDetailPageInner({
 							</Panel>
 						</div>
 
-						<Panel dense icon={ClipboardList} title="Top rejection reasons">
+						<CollapsiblePanel
+							dense
+							icon={ClipboardList}
+							title="Top rejection reasons"
+						>
 							<DataTableShell>
 								<Table className="w-full table-fixed">
 									<TableHeader>
-										<TableRow className="hover:bg-transparent">
+										<TableRow className="border-b border-border/50 hover:bg-transparent">
 											<DetailTableHead>Reason</DetailTableHead>
 											<DetailTableHead className="text-right">
 												Count
@@ -1542,121 +1662,125 @@ function ProviderDetailPageInner({
 									</TableBody>
 								</Table>
 							</DataTableShell>
+						</CollapsiblePanel>
+
+						<CollapsiblePanel dense icon={Building2} title="Vendors / sources">
+							<DataTableShell>
+								<Table className="w-full">
+									<colgroup>
+										<col className="w-auto" />
+										<col className="w-[8rem]" />
+										<col className="w-[7rem]" />
+									</colgroup>
+									<TableHeader>
+										<TableRow className="border-b border-border/50 hover:bg-transparent">
+											<DetailTableHead>Vendor</DetailTableHead>
+											<DetailTableHead>Feed</DetailTableHead>
+											<DetailTableHead>Status</DetailTableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{provider.vendors.map((v) => (
+											<TableRow key={v.id} className={DETAIL_ROW}>
+												<TableCell className={cn(DETAIL_TD, "min-w-0")}>
+													<p className="font-medium">{v.vendor}</p>
+													<p className="text-xs text-muted-foreground">
+														{v.frequency} · {v.lastReceived}
+													</p>
+												</TableCell>
+												<TableCell className={DETAIL_TD}>
+													{v.fileType}
+												</TableCell>
+												<TableCell
+													className={cn(DETAIL_TD, "whitespace-nowrap")}
+												>
+													<FeedPill status={v.status} />
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</DataTableShell>
+							<ViewAllLink
+								label="View all vendors / sources"
+								onClick={() => handleTabChange("Vendors / Sources")}
+							/>
+						</CollapsiblePanel>
+
+						{/* Credentialing donut chart stays expanded */}
+						<Panel dense icon={BadgeCheck} title="Credentialing">
+							<div className="flex flex-col items-center gap-3 sm:flex-row">
+								<div className="relative h-[160px] w-[160px] shrink-0">
+									<ResponsiveContainer width="100%" height="100%">
+										<PieChart>
+											<Pie
+												data={donutData}
+												dataKey="value"
+												nameKey="name"
+												innerRadius={48}
+												outerRadius={68}
+												paddingAngle={2}
+											>
+												{donutData.map((d) => (
+													<Cell key={d.name} fill={d.fill} />
+												))}
+											</Pie>
+										</PieChart>
+									</ResponsiveContainer>
+									<div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+										<p className="text-lg font-semibold tabular-nums">
+											{credPct}%
+										</p>
+										<p className="text-xs text-muted-foreground">Complete</p>
+									</div>
+								</div>
+								<ul className="w-full space-y-2 text-sm">
+									{[
+										{
+											label: "Complete",
+											value: credCounts.complete,
+											color: "bg-chart-2",
+										},
+										{
+											label: "Expiring",
+											value: credCounts.expiring,
+											color: "bg-chart-3",
+										},
+										{
+											label: "Expired",
+											value: credCounts.expired,
+											color: "bg-destructive",
+										},
+										{
+											label: "Pending",
+											value: credCounts.pending,
+											color: "bg-muted-foreground/50",
+										},
+									].map((row) => (
+										<li
+											key={row.label}
+											className="flex items-center justify-between gap-2"
+										>
+											<span className="flex items-center gap-2">
+												<span
+													className={cn("size-2.5 rounded-full", row.color)}
+												/>
+												{row.label}
+											</span>
+											<span className="font-medium tabular-nums">
+												{row.value}
+											</span>
+										</li>
+									))}
+								</ul>
+							</div>
+							<ViewAllLink
+								label="View credentialing details"
+								onClick={() => handleTabChange("Credentialing & Exceptions")}
+							/>
 						</Panel>
 
-						<div className="grid gap-3 lg:grid-cols-2">
-							<Panel dense icon={Building2} title="Vendors / sources">
-								<DataTableShell>
-									<Table className="w-full table-fixed">
-										<TableHeader>
-											<TableRow className="hover:bg-transparent">
-												<DetailTableHead>Vendor</DetailTableHead>
-												<DetailTableHead>Feed</DetailTableHead>
-												<DetailTableHead>Status</DetailTableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{provider.vendors.map((v) => (
-												<TableRow key={v.id} className={DETAIL_ROW}>
-													<TableCell
-														className={DETAIL_TD_WRAP}
-														title={v.vendor}
-													>
-														<p className="truncate font-medium">{v.vendor}</p>
-														<p className="truncate text-xs text-muted-foreground">
-															{v.frequency} · {v.lastReceived}
-														</p>
-													</TableCell>
-													<TableCell className={DETAIL_TD} title={v.fileType}>
-														{v.fileType}
-													</TableCell>
-													<TableCell className={DETAIL_TD}>
-														<FeedPill status={v.status} />
-													</TableCell>
-												</TableRow>
-											))}
-										</TableBody>
-									</Table>
-								</DataTableShell>
-								<ViewAllLink
-									label="View all vendors / sources"
-									onClick={() => handleTabChange("Vendors / Sources")}
-								/>
-							</Panel>
-							<Panel dense icon={BadgeCheck} title="Credentialing">
-								<div className="flex flex-col items-center gap-3 sm:flex-row">
-									<div className="relative h-[160px] w-[160px] shrink-0">
-										<ResponsiveContainer width="100%" height="100%">
-											<PieChart>
-												<Pie
-													data={donutData}
-													dataKey="value"
-													nameKey="name"
-													innerRadius={48}
-													outerRadius={68}
-													paddingAngle={2}
-												>
-													{donutData.map((d) => (
-														<Cell key={d.name} fill={d.fill} />
-													))}
-												</Pie>
-											</PieChart>
-										</ResponsiveContainer>
-										<div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-											<p className="text-lg font-semibold tabular-nums">
-												{credPct}%
-											</p>
-											<p className="text-xs text-muted-foreground">Complete</p>
-										</div>
-									</div>
-									<ul className="w-full space-y-2 text-sm">
-										{[
-											{
-												label: "Complete",
-												value: credCounts.complete,
-												color: "bg-chart-2",
-											},
-											{
-												label: "Expiring",
-												value: credCounts.expiring,
-												color: "bg-chart-3",
-											},
-											{
-												label: "Expired",
-												value: credCounts.expired,
-												color: "bg-destructive",
-											},
-											{
-												label: "Pending",
-												value: credCounts.pending,
-												color: "bg-muted-foreground/50",
-											},
-										].map((row) => (
-											<li
-												key={row.label}
-												className="flex items-center justify-between gap-2"
-											>
-												<span className="flex items-center gap-2">
-													<span
-														className={cn("size-2.5 rounded-full", row.color)}
-													/>
-													{row.label}
-												</span>
-												<span className="font-medium tabular-nums">
-													{row.value}
-												</span>
-											</li>
-										))}
-									</ul>
-								</div>
-								<ViewAllLink
-									label="View credentialing details"
-									onClick={() => handleTabChange("Credentialing & Exceptions")}
-								/>
-							</Panel>
-						</div>
-
-						<Panel
+						<CollapsiblePanel
 							dense
 							icon={ClipboardList}
 							title="Credentialing & enrollment exceptions"
@@ -1669,7 +1793,7 @@ function ProviderDetailPageInner({
 								<DataTableShell>
 									<Table className="w-full table-fixed">
 										<TableHeader>
-											<TableRow className="hover:bg-transparent">
+											<TableRow className="border-b border-border/50 hover:bg-transparent">
 												<DetailTableHead>Type</DetailTableHead>
 												<DetailTableHead>Status</DetailTableHead>
 												<DetailTableHead>Date</DetailTableHead>
@@ -1705,7 +1829,7 @@ function ProviderDetailPageInner({
 								label="View all exceptions"
 								onClick={() => handleTabChange("Credentialing & Exceptions")}
 							/>
-						</Panel>
+						</CollapsiblePanel>
 
 						<footer className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-muted-foreground">
 							<p>All dates and times are displayed in Eastern Time (ET).</p>
@@ -1760,7 +1884,7 @@ function ClaimsEncountersTab({
 		) / 100;
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-5">
 			<Panel dense icon={Stethoscope} title="12-month performance">
 				<AttrTable
 					columns={[
@@ -1990,7 +2114,7 @@ function ClaimsEncountersTab({
 				<DataTableShell>
 					<Table className="w-full table-fixed">
 						<TableHeader>
-							<TableRow className="hover:bg-transparent">
+							<TableRow className="border-b border-border/50 hover:bg-transparent">
 								<DetailTableHead>DOS</DetailTableHead>
 								<DetailTableHead>Claim #</DetailTableHead>
 								<DetailTableHead>Member</DetailTableHead>
@@ -2100,7 +2224,7 @@ function CredentialingTab({
 	);
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-5">
 			<Panel dense icon={ClipboardList} title="Credentialing health">
 				<AttrTable
 					columns={[
@@ -2157,7 +2281,7 @@ function CredentialingTab({
 					<DataTableShell>
 						<Table className="w-full table-fixed">
 							<TableHeader>
-								<TableRow className="hover:bg-transparent">
+								<TableRow className="border-b border-border/50 hover:bg-transparent">
 									<DetailTableHead>Requirement</DetailTableHead>
 									<DetailTableHead>Issuer</DetailTableHead>
 									<DetailTableHead>Verified</DetailTableHead>
@@ -2209,7 +2333,7 @@ function CredentialingTab({
 							<DataTableShell>
 								<Table className="w-full table-fixed">
 									<TableHeader>
-										<TableRow className="hover:bg-transparent">
+										<TableRow className="border-b border-border/50 hover:bg-transparent">
 											<DetailTableHead>Credential</DetailTableHead>
 											<DetailTableHead>Issuer</DetailTableHead>
 											<DetailTableHead>Expires</DetailTableHead>
@@ -2312,7 +2436,7 @@ function CredentialingTab({
 					<DataTableShell>
 						<Table className="w-full table-fixed">
 							<TableHeader>
-								<TableRow className="hover:bg-transparent">
+								<TableRow className="border-b border-border/50 hover:bg-transparent">
 									<DetailTableHead>Type</DetailTableHead>
 									<DetailTableHead>Description</DetailTableHead>
 									<DetailTableHead>Status</DetailTableHead>
@@ -2383,8 +2507,8 @@ function TabBody({
 			.join(" ");
 
 		return (
-			<div className="space-y-3">
-				<Panel dense icon={UserRound} title="Snapshot">
+			<div className="space-y-5">
+				<CollapsiblePanel dense defaultOpen icon={UserRound} title="Snapshot">
 					<AttrTable
 						columns={[
 							{ key: "status", label: "Status" },
@@ -2418,9 +2542,9 @@ function TabBody({
 							},
 						]}
 					/>
-				</Panel>
+				</CollapsiblePanel>
 
-				<Panel dense icon={BadgeCheck} title="Identifiers">
+				<CollapsiblePanel dense icon={BadgeCheck} title="Identifiers">
 					<AttrTable
 						columns={provider.identifiers.map((id) => ({
 							key: id.id,
@@ -2433,9 +2557,9 @@ function TabBody({
 							),
 						]}
 					/>
-				</Panel>
+				</CollapsiblePanel>
 
-				<Panel dense icon={UserRound} title="Personal identity">
+				<CollapsiblePanel dense icon={UserRound} title="Personal identity">
 					<AttrTable
 						columns={[
 							{ key: "legal", label: "Legal name" },
@@ -2476,9 +2600,9 @@ function TabBody({
 							},
 						]}
 					/>
-				</Panel>
+				</CollapsiblePanel>
 
-				<Panel dense icon={Stethoscope} title="Professional profile">
+				<CollapsiblePanel dense icon={Stethoscope} title="Professional profile">
 					<AttrTable
 						columns={[
 							{ key: "type", label: "Provider type" },
@@ -2531,9 +2655,9 @@ function TabBody({
 							},
 						]}
 					/>
-				</Panel>
+				</CollapsiblePanel>
 
-				<Panel dense icon={BadgeCheck} title="Program & status">
+				<CollapsiblePanel dense icon={BadgeCheck} title="Program & status">
 					<AttrTable
 						columns={[
 							{ key: "program", label: "Program" },
@@ -2570,9 +2694,13 @@ function TabBody({
 							},
 						]}
 					/>
-				</Panel>
+				</CollapsiblePanel>
 
-				<Panel dense icon={Building2} title="Primary practice & contact">
+				<CollapsiblePanel
+					dense
+					icon={Building2}
+					title="Primary practice & contact"
+				>
 					<AttrTable
 						columns={[
 							{ key: "org", label: "Practice / organization" },
@@ -2624,7 +2752,7 @@ function TabBody({
 							},
 						]}
 					/>
-				</Panel>
+				</CollapsiblePanel>
 			</div>
 		);
 	}
@@ -2717,7 +2845,7 @@ function TabBody({
 				<DataTableShell>
 					<Table className="w-full table-fixed">
 						<TableHeader>
-							<TableRow className="hover:bg-transparent">
+							<TableRow className="border-b border-border/50 hover:bg-transparent">
 								<DetailTableHead>Network / Plan</DetailTableHead>
 								<DetailTableHead>Payer</DetailTableHead>
 								<DetailTableHead>Status</DetailTableHead>
@@ -2828,7 +2956,7 @@ function TabBody({
 
 	if (tab === "Rejection Trends") {
 		return (
-			<div className="grid gap-3 lg:grid-cols-2">
+			<div className="grid gap-5 lg:grid-cols-2">
 				<Panel dense icon={ArrowDownRight} title="Rejection Trends">
 					<div className="h-[280px]">
 						<ResponsiveContainer width="100%" height="100%">
@@ -2851,7 +2979,7 @@ function TabBody({
 					<DataTableShell>
 						<Table className="w-full table-fixed">
 							<TableHeader>
-								<TableRow className="hover:bg-transparent">
+								<TableRow className="border-b border-border/50 hover:bg-transparent">
 									<DetailTableHead>Reason</DetailTableHead>
 									<DetailTableHead className="text-right">
 										Count
@@ -2891,7 +3019,7 @@ function TabBody({
 				<DataTableShell>
 					<Table className="w-full table-fixed">
 						<TableHeader>
-							<TableRow className="hover:bg-transparent">
+							<TableRow className="border-b border-border/50 hover:bg-transparent">
 								<DetailTableHead>Vendor / Source</DetailTableHead>
 								<DetailTableHead>File type</DetailTableHead>
 								<DetailTableHead>Data sent</DetailTableHead>

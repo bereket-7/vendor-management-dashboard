@@ -324,6 +324,19 @@ export async function vendorCoreChangePassword(input: {
 	);
 }
 
+/** Verify a JWT access token without storing it. */
+export async function vendorCoreVerifyToken(token: string): Promise<boolean> {
+	const response = await fetch(
+		buildUrl("/api/v1/authentication/token/verify/"),
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ token }),
+		}
+	);
+	return response.ok;
+}
+
 /** Public — request email OTP (always returns sent=true). */
 export async function vendorCorePasswordResetRequest(input: {
 	email: string;

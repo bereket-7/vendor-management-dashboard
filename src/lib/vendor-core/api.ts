@@ -56,6 +56,7 @@ import type {
 	MigrationCaseUpdateInput,
 	MigrationStatusDto,
 	MonitoringDashboardDto,
+	OnboardingSeedResultDto,
 	PaginatedResult,
 	PharmacyClaimFileDto,
 	PharmacyClaimFileListQuery,
@@ -190,26 +191,91 @@ export const vendorCoreEndpoints = {
 	documentsCreate: "/api/v1/documents/create/",
 	document: (id: string) => `/api/v1/documents/${id}/`,
 	documentUpdate: (id: string) => `/api/v1/documents/${id}/update/`,
+	documentDownload: (id: string) => `/api/v1/documents/${id}/download/`,
+	onboardingList: "/api/v1/onboarding/list/",
+	onboardingCreate: "/api/v1/onboarding/create/",
+	onboardingSeed: "/api/v1/onboarding/seed/",
+	onboarding: (id: string) => `/api/v1/onboarding/${id}/`,
+	onboardingUpdate: (id: string) => `/api/v1/onboarding/${id}/update/`,
+	onboardingSubmit: (id: string) => `/api/v1/onboarding/${id}/submit/`,
+	onboardingApprove: (id: string) => `/api/v1/onboarding/${id}/approve/`,
+	onboardingReject: (id: string) => `/api/v1/onboarding/${id}/reject/`,
+	certificatesList: "/api/v1/certificates/list/",
+	certificatesCreate: "/api/v1/certificates/create/",
+	certificateUpdate: (id: string) => `/api/v1/certificates/${id}/update/`,
+	rfxList: "/api/v1/rfx/list/",
+	rfxCreate: "/api/v1/rfx/create/",
+	rfx: (id: string) => `/api/v1/rfx/${id}/`,
+	rfxUpdate: (id: string) => `/api/v1/rfx/${id}/update/`,
+	rfxPublish: (id: string) => `/api/v1/rfx/${id}/publish/`,
+	rfxAward: (id: string) => `/api/v1/rfx/${id}/award/`,
+	rfxBidsList: (id: string) => `/api/v1/rfx/${id}/bids/list/`,
+	rfxBidsCreate: (id: string) => `/api/v1/rfx/${id}/bids/create/`,
+	purchaseOrdersList: "/api/v1/purchase-orders/list/",
+	purchaseOrdersCreate: "/api/v1/purchase-orders/create/",
+	purchaseOrder: (id: string) => `/api/v1/purchase-orders/${id}/`,
+	purchaseOrderUpdate: (id: string) => `/api/v1/purchase-orders/${id}/update/`,
+	purchaseOrderAcknowledge: (id: string) =>
+		`/api/v1/purchase-orders/${id}/acknowledge/`,
+	purchaseOrderReceive: (id: string) =>
+		`/api/v1/purchase-orders/${id}/receive/`,
+	invoicesList: "/api/v1/invoices/list/",
+	invoicesCreate: "/api/v1/invoices/create/",
+	invoice: (id: string) => `/api/v1/invoices/${id}/`,
+	invoiceUpdate: (id: string) => `/api/v1/invoices/${id}/update/`,
+	invoiceMatch: (id: string) => `/api/v1/invoices/${id}/match/`,
+	invoiceDispute: (id: string) => `/api/v1/invoices/${id}/dispute/`,
+	invoiceApprove: (id: string) => `/api/v1/invoices/${id}/approve/`,
+	approvalsList: "/api/v1/approvals/list/",
+	approval: (id: string) => `/api/v1/approvals/${id}/`,
+	approvalUpdate: (id: string) => `/api/v1/approvals/${id}/update/`,
+	approvalDecide: (id: string) => `/api/v1/approvals/${id}/decide/`,
+	scorecardsList: "/api/v1/scorecards/list/",
+	scorecardsCreate: "/api/v1/scorecards/create/",
+	scorecard: (id: string) => `/api/v1/scorecards/${id}/`,
+	notificationsList: "/api/v1/notifications/list/",
+	notificationMarkRead: (id: string) =>
+		`/api/v1/notifications/${id}/mark-read/`,
 	vendorContactsList: "/api/v1/vendor-contacts/list/",
 	vendorContactsCreate: "/api/v1/vendor-contacts/create/",
 	vendorContact: (id: string) => `/api/v1/vendor-contacts/${id}/`,
 	vendorContactUpdate: (id: string) => `/api/v1/vendor-contacts/${id}/update/`,
 	vendorContactDelete: (id: string) => `/api/v1/vendor-contacts/${id}/delete/`,
+	vendorContactRestore: (id: string) =>
+		`/api/v1/vendor-contacts/${id}/restore/`,
+	vendorContactHardDelete: (id: string) =>
+		`/api/v1/vendor-contacts/${id}/hard-delete/`,
 	vendorNotesList: "/api/v1/vendor-notes/list/",
 	vendorNotesCreate: "/api/v1/vendor-notes/create/",
 	vendorNote: (id: string) => `/api/v1/vendor-notes/${id}/`,
 	vendorNoteUpdate: (id: string) => `/api/v1/vendor-notes/${id}/update/`,
 	vendorNoteDelete: (id: string) => `/api/v1/vendor-notes/${id}/delete/`,
+	vendorNoteRestore: (id: string) => `/api/v1/vendor-notes/${id}/restore/`,
+	vendorNoteHardDelete: (id: string) =>
+		`/api/v1/vendor-notes/${id}/hard-delete/`,
 	credentialsList: "/api/v1/credentials/list/",
 	credentialsCreate: "/api/v1/credentials/create/",
+	credential: (id: string) => `/api/v1/credentials/${id}/`,
+	credentialUpdate: (id: string) => `/api/v1/credentials/${id}/update/`,
+	credentialDelete: (id: string) => `/api/v1/credentials/${id}/delete/`,
+	credentialRestore: (id: string) => `/api/v1/credentials/${id}/restore/`,
+	credentialHardDelete: (id: string) =>
+		`/api/v1/credentials/${id}/hard-delete/`,
 	connectionsList: "/api/v1/connections/list/",
 	connectionsCreate: "/api/v1/connections/create/",
 	connection: (id: string) => `/api/v1/connections/${id}/`,
 	connectionUpdate: (id: string) => `/api/v1/connections/${id}/update/`,
+	connectionDelete: (id: string) => `/api/v1/connections/${id}/delete/`,
+	connectionRestore: (id: string) => `/api/v1/connections/${id}/restore/`,
+	connectionHardDelete: (id: string) =>
+		`/api/v1/connections/${id}/hard-delete/`,
 	connectionTest: (id: string) => `/api/v1/connections/${id}/test/`,
 	intakeJobs: "/api/v1/intake-jobs/",
 	intakeJob: (id: string) => `/api/v1/intake-jobs/${id}/`,
 	intakeJobRun: (id: string) => `/api/v1/intake-jobs/${id}/run/`,
+	intakeJobDisable: (id: string) => `/api/v1/intake-jobs/${id}/disable/`,
+	intakeCompletionSftp: "/api/v1/intake/completion/sftp/",
+	intakeCompletionEdi: "/api/v1/intake/completion/edi/",
 	intakeJobRunsList: "/api/v1/intake-job-runs/list/",
 	memberCoveragesList: "/api/v1/member-coverages/list/",
 	memberCoveragesCreate: "/api/v1/member-coverages/create/",
@@ -272,6 +338,7 @@ export const vendorCoreEndpoints = {
 	pharmacyClaimFile: (id: string) => `/api/v1/pharmacy-claim-files/${id}/`,
 	pharmacyClaimRowsList: "/api/v1/pharmacy-claim-rows/list/",
 	pharmacyClaimRowsCreate: "/api/v1/pharmacy-claim-rows/create/",
+	pharmacyClaimRowsSeed: "/api/v1/pharmacy-claim-rows/seed/",
 	pharmacyClaimRow: (id: string) => `/api/v1/pharmacy-claim-rows/${id}/`,
 	pharmacyClaimRowUpdate: (id: string) =>
 		`/api/v1/pharmacy-claim-rows/${id}/update/`,
@@ -413,8 +480,14 @@ export const vendorCoreEndpoints = {
 		`/api/v1/migration-cases/${id}/documents/upload/`,
 	migrationCaseDocumentsList: (id: string) =>
 		`/api/v1/migration-cases/${id}/documents/list/`,
+	migrationCaseDocument: (caseId: string, docId: string) =>
+		`/api/v1/migration-cases/${caseId}/documents/${docId}/`,
 	migrationCaseDocumentDelete: (caseId: string, docId: string) =>
 		`/api/v1/migration-cases/${caseId}/documents/${docId}/delete/`,
+	migrationCaseDocumentRestore: (caseId: string, docId: string) =>
+		`/api/v1/migration-cases/${caseId}/documents/${docId}/restore/`,
+	migrationCaseDocumentHardDelete: (caseId: string, docId: string) =>
+		`/api/v1/migration-cases/${caseId}/documents/${docId}/hard-delete/`,
 	workQueueKpis: "/api/v1/work-queue/kpis/",
 	workQueueProgressSummary: "/api/v1/work-queue/progress-summary/",
 	workQueueAnalystStats: "/api/v1/work-queue/analyst-stats/",
@@ -429,6 +502,16 @@ export const vendorCoreEndpoints = {
 	claimLineDelete: (id: string) => `/api/v1/claim-lines/${id}/delete/`,
 	claimLineHardDelete: (id: string) => `/api/v1/claim-lines/${id}/hard-delete/`,
 	claimLineRestore: (id: string) => `/api/v1/claim-lines/${id}/restore/`,
+	claimVendorFilesList: "/api/v1/claim-vendor-files/list/",
+	claimVendorFile: (id: string) => `/api/v1/claim-vendor-files/${id}/`,
+	claimResponsesList: "/api/v1/claim-responses/list/",
+	claimResponse: (id: string) => `/api/v1/claim-responses/${id}/`,
+	claimExceptionsList: "/api/v1/claim-exceptions/list/",
+	claimException: (id: string) => `/api/v1/claim-exceptions/${id}/`,
+	submissionBatchesList: "/api/v1/submission-batches/list/",
+	submissionBatch: (id: string) => `/api/v1/submission-batches/${id}/`,
+	claimDiagnosesList: "/api/v1/claim-diagnoses/list/",
+	claimDiagnosis: (id: string) => `/api/v1/claim-diagnoses/${id}/`,
 	eligibilityFilesList: "/api/v1/eligibility-files/list/",
 	eligibilityFilesCreate: "/api/v1/eligibility-files/create/",
 	inboundFiles: "/api/v1/inbound-files/",
@@ -446,10 +529,25 @@ export const vendorCoreEndpoints = {
 	errorResolve: (id: string) => `/api/v1/errors/${id}/resolve/`,
 	routingRulesList: "/api/v1/routing-rules/list/",
 	routingRulesCreate: "/api/v1/routing-rules/create/",
+	routingRule: (id: string) => `/api/v1/routing-rules/${id}/`,
+	routingRuleUpdate: (id: string) => `/api/v1/routing-rules/${id}/update/`,
+	routingRuleDelete: (id: string) => `/api/v1/routing-rules/${id}/delete/`,
+	routingRuleRestore: (id: string) => `/api/v1/routing-rules/${id}/restore/`,
+	routingRuleHardDelete: (id: string) =>
+		`/api/v1/routing-rules/${id}/hard-delete/`,
 	auditList: "/api/v1/audit/list/",
 	users: "/api/v1/users/",
+	usersList: "/api/v1/users/list/",
+	usersCreate: "/api/v1/users/create/",
+	user: (id: string) => `/api/v1/users/${id}/`,
 	userUpdate: (id: string) => `/api/v1/users/${id}/update/`,
+	userDelete: (id: string) => `/api/v1/users/${id}/delete/`,
+	userRestore: (id: string) => `/api/v1/users/${id}/restore/`,
+	userHardDelete: (id: string) => `/api/v1/users/${id}/hard-delete/`,
 	userPassword: (id: string) => `/api/v1/users/${id}/password/`,
+	userRolesSet: (id: string) => `/api/v1/users/${id}/roles/`,
+	userRolesAdd: (id: string) => `/api/v1/users/${id}/roles/add/`,
+	userRolesRemove: (id: string) => `/api/v1/users/${id}/roles/remove/`,
 	userLoginEvents: (id: string) => `/api/v1/users/${id}/login-events/`,
 	loginEvents: "/api/v1/users/login-events/",
 	myLoginEvents: "/api/v1/users/me/login-events/",
@@ -457,6 +555,7 @@ export const vendorCoreEndpoints = {
 	vendorDelete: (id: string) => `/api/v1/vendors/${id}/delete/`,
 	vendorHardDelete: (id: string) => `/api/v1/vendors/${id}/hard-delete/`,
 	vendorRestore: (id: string) => `/api/v1/vendors/${id}/restore/`,
+	tokenVerify: "/api/v1/authentication/token/verify/",
 	health: "/health/",
 	identityGroupsList: "/api/v1/identity-groups/list/",
 	identityGroupsCreate: "/api/v1/identity-groups/create/",
@@ -584,6 +683,30 @@ export const vendorCoreApi = {
 			body: JSON.stringify(body),
 		}),
 
+	getCredential: (id: string) =>
+		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credential(id)),
+
+	updateCredential: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credentialUpdate(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	deleteCredential: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.credentialDelete(id), {
+			method: "DELETE",
+		}),
+
+	restoreCredential: (id: string) =>
+		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credentialRestore(id), {
+			method: "POST",
+		}),
+
+	hardDeleteCredential: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.credentialHardDelete(id), {
+			method: "DELETE",
+		}),
+
 	createConnection: (body: Record<string, unknown>) =>
 		vendorCoreFetch<ConnectionDto>(vendorCoreEndpoints.connectionsCreate, {
 			method: "POST",
@@ -592,16 +715,84 @@ export const vendorCoreApi = {
 			normalizeConnection(c as unknown as Record<string, unknown>)
 		),
 
+	getConnection: async (id: string) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.connection(id)
+		);
+		return normalizeConnection(raw);
+	},
+
+	deleteConnection: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.connectionDelete(id), {
+			method: "DELETE",
+		}),
+
+	restoreConnection: async (id: string) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.connectionRestore(id),
+			{ method: "POST" }
+		);
+		return normalizeConnection(raw);
+	},
+
+	hardDeleteConnection: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.connectionHardDelete(id), {
+			method: "DELETE",
+		}),
+
 	createIntakeJob: (body: Record<string, unknown>) =>
 		vendorCoreFetch<IntakeJobDto>(vendorCoreEndpoints.intakeJobs, {
 			method: "POST",
 			body: JSON.stringify(body),
 		}).then((j) => normalizeJob(j as unknown as Record<string, unknown>)),
 
+	disableIntakeJob: async (id: string) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.intakeJobDisable(id),
+			{ method: "POST" }
+		);
+		return normalizeJob(raw);
+	},
+
+	getIntakeCompletionSftp: () =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.intakeCompletionSftp
+		),
+
+	getIntakeCompletionEdi: () =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.intakeCompletionEdi
+		),
+
 	createRoutingRule: (body: Record<string, unknown>) =>
 		vendorCoreFetch<RoutingRuleDto>(vendorCoreEndpoints.routingRulesCreate, {
 			method: "POST",
 			body: JSON.stringify(body),
+		}),
+
+	getRoutingRule: (id: string) =>
+		vendorCoreFetch<RoutingRuleDto>(vendorCoreEndpoints.routingRule(id)),
+
+	updateRoutingRule: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<RoutingRuleDto>(vendorCoreEndpoints.routingRuleUpdate(id), {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	deleteRoutingRule: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.routingRuleDelete(id), {
+			method: "DELETE",
+		}),
+
+	restoreRoutingRule: (id: string) =>
+		vendorCoreFetch<RoutingRuleDto>(
+			vendorCoreEndpoints.routingRuleRestore(id),
+			{ method: "POST" }
+		),
+
+	hardDeleteRoutingRule: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.routingRuleHardDelete(id), {
+			method: "DELETE",
 		}),
 
 	listVendors: async (params?: { status?: string; search?: string }) => {
@@ -1125,6 +1316,23 @@ export const vendorCoreApi = {
 			vendorCoreEndpoints.pharmacyClaimRowsCreate,
 			{ method: "POST", body: JSON.stringify(body) }
 		),
+
+	seedPharmacyClaimRows: (body?: {
+		vendor_id?: string;
+		count?: number;
+		force?: boolean;
+	}) =>
+		vendorCoreFetch<{
+			created: number;
+			skipped?: boolean;
+			existing_files?: number;
+			existing_rows?: number;
+			file_id?: string | null;
+			row_ids?: string[];
+		}>(vendorCoreEndpoints.pharmacyClaimRowsSeed, {
+			method: "POST",
+			body: JSON.stringify(body ?? {}),
+		}),
 
 	updatePharmacyClaimRow: (id: string, body: PharmacyClaimRowUpdateInput) =>
 		vendorCoreFetch<PharmacyClaimRowDetailDto>(
@@ -2004,6 +2212,291 @@ export const vendorCoreApi = {
 			}
 		),
 
+	getDocument: (id: string) =>
+		vendorCoreFetch<ProcurementDocumentDto>(vendorCoreEndpoints.document(id)),
+
+	updateDocument: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<ProcurementDocumentDto>(
+			vendorCoreEndpoints.documentUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	downloadDocument: (id: string, asAttachment = false) =>
+		vendorCoreFetchBlob(vendorCoreEndpoints.documentDownload(id), {
+			params: asAttachment ? { download: "1" } : undefined,
+		}),
+
+	listOnboardingCases: (params?: {
+		status?: string;
+		vendor_id?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.onboardingList,
+			{ params: pageParams(params) }
+		),
+
+	getOnboardingCase: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboarding(id)
+		),
+
+	createOnboardingCase: (body: {
+		vendor_id: string;
+		assigned_to_id?: string | null;
+	}) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingCreate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	seedOnboardingCases: (body?: { force?: boolean }) =>
+		vendorCoreFetch<OnboardingSeedResultDto>(
+			vendorCoreEndpoints.onboardingSeed,
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	updateOnboardingCase: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	submitOnboardingCase: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingSubmit(id),
+			{ method: "POST" }
+		),
+
+	approveOnboardingCase: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingApprove(id),
+			{ method: "POST" }
+		),
+
+	rejectOnboardingCase: (id: string, body?: { rejection_reason?: string }) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.onboardingReject(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	listCertificates: (params?: {
+		vendor_id?: string;
+		status?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.certificatesList,
+			{ params: pageParams(params) }
+		),
+
+	createCertificate: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.certificatesCreate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateCertificate: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.certificateUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	listRfx: (params?: { status?: string; limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.rfxList,
+			{ params: pageParams(params) }
+		),
+
+	getRfx: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.rfx(id)),
+
+	createRfx: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.rfxCreate, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	updateRfx: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.rfxUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	publishRfx: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.rfxPublish(id),
+			{ method: "POST" }
+		),
+
+	awardRfx: (id: string, body: { bid_id: string }) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.rfxAward(id), {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	listRfxBids: (id: string, params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.rfxBidsList(id),
+			{ params: pageParams(params) }
+		),
+
+	createRfxBid: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.rfxBidsCreate(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	listPurchaseOrders: (params?: {
+		vendor_id?: string;
+		status?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.purchaseOrdersList,
+			{ params: pageParams(params) }
+		),
+
+	getPurchaseOrder: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrder(id)
+		),
+
+	createPurchaseOrder: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrdersCreate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updatePurchaseOrder: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrderUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	acknowledgePurchaseOrder: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrderAcknowledge(id),
+			{ method: "POST" }
+		),
+
+	receivePurchaseOrder: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.purchaseOrderReceive(id),
+			{ method: "POST" }
+		),
+
+	listInvoices: (params?: {
+		vendor_id?: string;
+		status?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.invoicesList,
+			{ params: pageParams(params) }
+		),
+
+	getInvoice: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.invoice(id)),
+
+	createInvoice: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.invoicesCreate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	updateInvoice: (id: string, body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.invoiceUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	matchInvoice: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.invoiceMatch(id),
+			{ method: "POST" }
+		),
+
+	disputeInvoice: (id: string, body?: { rejection_reason?: string }) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.invoiceDispute(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	approveInvoice: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.invoiceApprove(id),
+			{ method: "POST" }
+		),
+
+	listApprovals: (params?: {
+		status?: string;
+		entity_type?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.approvalsList,
+			{ params: pageParams(params) }
+		),
+
+	getApproval: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.approval(id)),
+
+	updateApproval: (id: string, body: { status: string }) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.approvalUpdate(id),
+			{ method: "PATCH", body: JSON.stringify(body) }
+		),
+
+	decideApproval: (
+		id: string,
+		body: { decision: "approved" | "rejected" | "changes_requested" }
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.approvalDecide(id),
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	listScorecards: (params?: {
+		vendor_id?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.scorecardsList,
+			{ params: pageParams(params) }
+		),
+
+	getScorecard: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(vendorCoreEndpoints.scorecard(id)),
+
+	createScorecard: (body: Record<string, unknown>) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.scorecardsCreate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	listNotifications: (params?: {
+		status?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.notificationsList,
+			{ params: pageParams(params) }
+		),
+
+	markNotificationRead: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.notificationMarkRead(id),
+			{ method: "POST" }
+		),
+
 	listVendorContacts: async (params?: { vendor_id?: string }) => {
 		const page = await vendorCoreFetch<PaginatedResult<VendorContactDto>>(
 			vendorCoreEndpoints.vendorContactsList,
@@ -2030,8 +2523,22 @@ export const vendorCoreApi = {
 			}
 		),
 
+	getVendorContact: (id: string) =>
+		vendorCoreFetch<VendorContactDto>(vendorCoreEndpoints.vendorContact(id)),
+
 	deleteVendorContact: (id: string) =>
 		vendorCoreFetch<void>(vendorCoreEndpoints.vendorContactDelete(id), {
+			method: "DELETE",
+		}),
+
+	restoreVendorContact: (id: string) =>
+		vendorCoreFetch<VendorContactDto>(
+			vendorCoreEndpoints.vendorContactRestore(id),
+			{ method: "POST" }
+		),
+
+	hardDeleteVendorContact: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.vendorContactHardDelete(id), {
 			method: "DELETE",
 		}),
 
@@ -2055,8 +2562,21 @@ export const vendorCoreApi = {
 			body: JSON.stringify(body),
 		}),
 
+	getVendorNote: (id: string) =>
+		vendorCoreFetch<VendorNoteDto>(vendorCoreEndpoints.vendorNote(id)),
+
 	deleteVendorNote: (id: string) =>
 		vendorCoreFetch<void>(vendorCoreEndpoints.vendorNoteDelete(id), {
+			method: "DELETE",
+		}),
+
+	restoreVendorNote: (id: string) =>
+		vendorCoreFetch<VendorNoteDto>(vendorCoreEndpoints.vendorNoteRestore(id), {
+			method: "POST",
+		}),
+
+	hardDeleteVendorNote: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.vendorNoteHardDelete(id), {
 			method: "DELETE",
 		}),
 
@@ -2153,9 +2673,12 @@ export const vendorCoreApi = {
 
 	listUsers: async (params?: { search?: string }) => {
 		const results = await listAllPages(async ({ limit, offset }) =>
-			vendorCoreFetch<PaginatedResult<CoreUserDto>>(vendorCoreEndpoints.users, {
-				params: pageParams({ ...params, limit, offset }),
-			})
+			vendorCoreFetch<PaginatedResult<CoreUserDto>>(
+				vendorCoreEndpoints.usersList,
+				{
+					params: pageParams({ ...params, limit, offset }),
+				}
+			)
 		);
 		return {
 			limit: results.length,
@@ -2167,9 +2690,51 @@ export const vendorCoreApi = {
 		} satisfies PaginatedResult<CoreUserDto>;
 	},
 
+	getUser: (id: string) =>
+		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.user(id)),
+
+	createUser: (body: Record<string, unknown>) =>
+		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.usersCreate, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
 	updateUser: (id: string, body: Record<string, unknown>) =>
 		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.userUpdate(id), {
 			method: "PATCH",
+			body: JSON.stringify(body),
+		}),
+
+	deleteUser: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.userDelete(id), {
+			method: "DELETE",
+		}),
+
+	restoreUser: (id: string) =>
+		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.userRestore(id), {
+			method: "POST",
+		}),
+
+	hardDeleteUser: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.userHardDelete(id), {
+			method: "DELETE",
+		}),
+
+	setUserRoles: (id: string, body: { role_ids: string[] }) =>
+		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.userRolesSet(id), {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	addUserRoles: (id: string, body: { role_ids: string[] }) =>
+		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.userRolesAdd(id), {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	removeUserRoles: (id: string, body: { role_ids: string[] }) =>
+		vendorCoreFetch<CoreUserDto>(vendorCoreEndpoints.userRolesRemove(id), {
+			method: "POST",
 			body: JSON.stringify(body),
 		}),
 
@@ -2797,10 +3362,102 @@ export const vendorCoreApi = {
 		return mapPage(page, normalizeMigrationCaseDocument);
 	},
 
+	getMigrationCaseDocument: async (caseId: string, documentId: string) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.migrationCaseDocument(caseId, documentId)
+		);
+		return normalizeMigrationCaseDocument(raw);
+	},
+
 	deleteMigrationCaseDocument: async (caseId: string, documentId: string) => {
 		await vendorCoreFetch<void>(
 			vendorCoreEndpoints.migrationCaseDocumentDelete(caseId, documentId),
 			{ method: "POST" }
 		);
 	},
+
+	restoreMigrationCaseDocument: async (caseId: string, documentId: string) => {
+		const raw = await vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.migrationCaseDocumentRestore(caseId, documentId),
+			{ method: "POST" }
+		);
+		return normalizeMigrationCaseDocument(raw);
+	},
+
+	hardDeleteMigrationCaseDocument: async (
+		caseId: string,
+		documentId: string
+	) => {
+		await vendorCoreFetch<void>(
+			vendorCoreEndpoints.migrationCaseDocumentHardDelete(caseId, documentId),
+			{ method: "POST" }
+		);
+	},
+
+	hardDeleteMigrationCase: (id: string) =>
+		vendorCoreFetch<void>(vendorCoreEndpoints.migrationCaseHardDelete(id), {
+			method: "DELETE",
+		}),
+
+	listClaimVendorFiles: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.claimVendorFilesList,
+			{ params: pageParams(params) }
+		),
+
+	getClaimVendorFile: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimVendorFile(id)
+		),
+
+	listClaimResponses: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.claimResponsesList,
+			{ params: pageParams(params) }
+		),
+
+	getClaimResponse: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimResponse(id)
+		),
+
+	listClaimExceptions: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.claimExceptionsList,
+			{ params: pageParams(params) }
+		),
+
+	getClaimException: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimException(id)
+		),
+
+	listSubmissionBatches: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.submissionBatchesList,
+			{ params: pageParams(params) }
+		),
+
+	getSubmissionBatch: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.submissionBatch(id)
+		),
+
+	listClaimDiagnoses: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.claimDiagnosesList,
+			{ params: pageParams(params) }
+		),
+
+	getClaimDiagnosis: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimDiagnosis(id)
+		),
+
+	verifyToken: (token: string) =>
+		vendorCoreFetch<{ detail?: string }>(vendorCoreEndpoints.tokenVerify, {
+			method: "POST",
+			body: JSON.stringify({ token }),
+			auth: false,
+		}),
 };

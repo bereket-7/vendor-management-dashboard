@@ -56,6 +56,13 @@ export async function createVendorCategoryAssignment(
 	return vendorCoreApi.createVendorCategoryAssignment(body);
 }
 
+export async function listVendorCategoryAssignments(vendorId?: string) {
+	const page = await vendorCoreApi.listVendorCategoryAssignments(
+		vendorId ? { vendor_id: vendorId } : undefined
+	);
+	return page.results ?? [];
+}
+
 export async function createVendorConnection(body: Record<string, unknown>) {
 	return vendorCoreApi.createConnection(body);
 }
@@ -97,6 +104,18 @@ export async function updateVendorContact(
 
 export async function deleteVendorContact(id: string): Promise<void> {
 	await vendorCoreApi.deleteVendorContact(id);
+}
+
+export async function getVendorContact(id: string) {
+	return vendorCoreApi.getVendorContact(id);
+}
+
+export async function restoreVendorContact(id: string) {
+	return vendorCoreApi.restoreVendorContact(id);
+}
+
+export async function hardDeleteVendorContact(id: string) {
+	return vendorCoreApi.hardDeleteVendorContact(id);
 }
 
 export async function listVendorConnections(
@@ -141,6 +160,22 @@ export async function updateVendorConnection(
 	body: Record<string, unknown>
 ) {
 	return vendorCoreApi.updateConnection(id, body);
+}
+
+export async function getVendorConnection(id: string) {
+	return vendorCoreApi.getConnection(id);
+}
+
+export async function deleteVendorConnection(id: string) {
+	return vendorCoreApi.deleteConnection(id);
+}
+
+export async function restoreVendorConnection(id: string) {
+	return vendorCoreApi.restoreConnection(id);
+}
+
+export async function hardDeleteVendorConnection(id: string) {
+	return vendorCoreApi.hardDeleteConnection(id);
 }
 
 export async function listVendorAccounts(
@@ -433,4 +468,16 @@ export async function updateVendorNote(
 
 export async function deleteVendorNote(id: string) {
 	return vendorCoreApi.deleteVendorNote(id);
+}
+
+export async function getVendorNote(id: string) {
+	return vendorCoreApi.getVendorNote(id);
+}
+
+export async function restoreVendorNote(id: string) {
+	return vendorCoreApi.restoreVendorNote(id);
+}
+
+export async function hardDeleteVendorNote(id: string) {
+	return vendorCoreApi.hardDeleteVendorNote(id);
 }

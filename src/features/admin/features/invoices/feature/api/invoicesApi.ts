@@ -22,6 +22,10 @@ export async function createInvoices(
 	return vmsApi.createInvoice(input);
 }
 
+export async function seedInvoices() {
+	return vmsApi.seedInvoices();
+}
+
 export async function updateInvoices(
 	id: string,
 	patch: InvoicesUpdateDto

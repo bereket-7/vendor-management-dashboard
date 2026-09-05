@@ -68,3 +68,15 @@ export async function updateIntegrationIntakeJob(
 export async function runIntegrationIntakeJob(id: string) {
 	return vendorCoreApi.runIntakeJob(id);
 }
+
+export async function disableIntegrationIntakeJob(id: string) {
+	return vendorCoreApi.disableIntakeJob(id);
+}
+
+export async function getIntakeCompletionSftp() {
+	return vendorCoreApi.getIntakeCompletionSftp();
+}
+
+export async function getIntakeCompletionEdi() {
+	return vendorCoreApi.getIntakeCompletionEdi();
+}

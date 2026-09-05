@@ -1,5 +1,5 @@
-import { apiClient } from "@/lib/api/client";
-import { withMockOrRemote } from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
+import { isVendorCoreLive } from "@/lib/vendor-core/client";
 
 import { onboardingEndpoints } from "../../onboarding-endpoints";
 import type { ApiOnboardingRecordDto } from "../dto/onboardingRecordDto";
@@ -12,16 +12,20 @@ export type OnboardingListResponse = {
 };
 
 export async function listOnboardingRecords(params?: Record<string, string>) {
-	return withMockOrRemote(
-		() => ({ results: [], count: 0 }),
-		() =>
-			apiClient<OnboardingListResponse>(onboardingEndpoints.list(), { params })
-	);
+	if (isVendorCoreLive()) {
+		const page = await vendorCoreApi.listOnboardingCases({
+			limit: 100,
+			status: params?.status,
+			vendor_id: params?.vendor_id,
+		});
+		return { results: page.results ?? [], count: page.count ?? 0 };
+	}
+	return { results: [], count: 0 };
 }
 
 export async function getOnboardingRecord(id: string) {
-	return withMockOrRemote(
-		() => ({ id: "mock" }) as never,
-		() => apiClient<ApiOnboardingRecordDto>(onboardingEndpoints.detail(id))
-	);
+	if (isVendorCoreLive()) {
+		return vendorCoreApi.getOnboardingCase(id);
+	}
+	throw new Error("Onboarding detail requires the live API.");
 }

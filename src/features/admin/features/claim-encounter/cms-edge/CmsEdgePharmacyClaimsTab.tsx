@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useDeferredValue, useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
+	ArrowUpDown,
 	Ban,
 	CalendarDays,
 	CheckCircle2,
@@ -45,7 +46,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { CmsEdgeClaimLinesExpandPanel } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeClaimLinesExpandPanel";
-import { CmsEdgeMedicalClaimDetail } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeMedicalClaimDetail";
+import { CmsEdgePharmacyClaimDetail } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgePharmacyClaimDetail";
 import {
 	CMS_EDGE_KPI_CARD_CLASS,
 	CMS_EDGE_PAGE_STACK,
@@ -58,18 +59,23 @@ import {
 	CmsEdgeTableScroll,
 	cmsEdgeKpiAccent,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
-import { useCmsEdgeMedicalClaimsList } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
-import { deriveMedicalClaimKpis } from "@/features/admin/features/claim-encounter/cms-edge/live-medical-claims";
 import {
-	CMS_EDGE_MEDICAL_CLAIM_FILTER_TABS,
-	CMS_EDGE_MEDICAL_VALIDATION_SUMMARY,
+	useCmsEdgePharmacyClaimsList,
+	useSeedPharmacyClaims,
+} from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import {
+	derivePharmacyClaimKpis,
+	groupPharmacyClaimsByClaimNo,
+} from "@/features/admin/features/claim-encounter/cms-edge/live-pharmacy-claims";
+import {
+	CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS,
+	CMS_EDGE_PHARMACY_VALIDATION_SUMMARY,
 	CMS_EDGE_REPORTING_PERIODS,
-	MEDICAL_CLAIM_CMS_STATUS_STYLES,
-	MEDICAL_CLAIM_TXN_STYLES,
-	MEDICAL_FILTER_BADGE_STYLES,
-	type MedicalClaimFilterTab,
+	PHARMACY_CLAIM_CMS_STATUS_STYLES,
+	PHARMACY_CLAIM_TXN_STYLES,
+	PHARMACY_FILTER_BADGE_STYLES,
+	type PharmacyClaimFilterTab,
 } from "@/features/admin/features/claim-encounter/cms-edge/mock-data";
-import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 const KPI_ICONS = {
@@ -81,27 +87,27 @@ const KPI_ICONS = {
 } satisfies Record<"file" | "check" | "alert" | "ban" | "user", LucideIcon>;
 
 const VALIDATION_ICONS = {
-	alert: AlertTriangle,
 	ban: Ban,
+	calendar: CalendarDays,
 	user: User,
 	dollar: CircleDollarSign,
 	link: Link2,
 } satisfies Record<
-	(typeof CMS_EDGE_MEDICAL_VALIDATION_SUMMARY)[number]["icon"],
+	(typeof CMS_EDGE_PHARMACY_VALIDATION_SUMMARY)[number]["icon"],
 	LucideIcon
 >;
 
-const MEDICAL_LINE_COLUMNS = [
-	{ key: "line", label: "Line" },
-	{ key: "serviceDate", label: "Service Date" },
-	{ key: "procedure", label: "Procedure" },
-	{ key: "revenue", label: "Revenue" },
-	{ key: "allowed", label: "Allowed", align: "right" as const },
+const PHARMACY_LINE_COLUMNS = [
+	{ key: "claimId", label: "Claim / Line ID" },
+	{ key: "ndc", label: "NDC" },
+	{ key: "fillDate", label: "Fill Date" },
+	{ key: "daysSupply", label: "Days", align: "right" as const },
 	{ key: "planPaid", label: "Plan Paid", align: "right" as const },
-	{ key: "status", label: "Status" },
+	{ key: "transaction", label: "Transaction" },
+	{ key: "cmsStatus", label: "CMS Status" },
 ];
 
-const TABLE_COL_SPAN = 13;
+const TABLE_COL_SPAN = 15;
 
 function formatCurrency(value: number) {
 	return value.toLocaleString("en-US", {
@@ -111,19 +117,23 @@ function formatCurrency(value: number) {
 	});
 }
 
-export function CmsEdgeClaimsTab() {
-	const router = useRouter();
+export function CmsEdgePharmacyClaimsTab() {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [expandedId, setExpandedId] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
 	const [period, setPeriod] = useState("q2-2027");
-	const [filterTab, setFilterTab] = useState<MedicalClaimFilterTab>("all");
+	const [filterTab, setFilterTab] = useState<PharmacyClaimFilterTab>("all");
+	const deferredSearch = useDeferredValue(search.trim());
 
-	const { medicalClaims, isLoading, isError, error } =
-		useCmsEdgeMedicalClaimsList();
+	const { pharmacyClaims, isLoading, isError, error, refetch } =
+		useCmsEdgePharmacyClaimsList({
+			search: deferredSearch || undefined,
+			limit: 100,
+		});
+	const seedPharmacyClaims = useSeedPharmacyClaims();
 
 	const rows = useMemo(() => {
-		let list = medicalClaims;
+		let list = pharmacyClaims;
 
 		if (filterTab === "ready") {
 			list = list.filter((row) => row.cmsStatus === "Ready");
@@ -137,25 +147,25 @@ export function CmsEdgeClaimsTab() {
 			);
 		}
 
-		const q = search.trim().toLowerCase();
-		if (!q) return list;
-		return list.filter(
-			(row) =>
-				row.claimId.toLowerCase().includes(q) ||
-				row.enrolleeId.toLowerCase().includes(q) ||
-				row.primaryDiagnosis.toLowerCase().includes(q) ||
-				row.billingNpi.includes(q) ||
-				row.formType.toLowerCase().includes(q)
-		);
-	}, [filterTab, medicalClaims, search]);
+		const q = deferredSearch.toLowerCase();
+		if (q) {
+			list = list.filter(
+				(row) =>
+					row.claimId.toLowerCase().includes(q) ||
+					row.enrolleeId.toLowerCase().includes(q) ||
+					row.ndc.toLowerCase().includes(q) ||
+					row.rxReference.toLowerCase().includes(q) ||
+					row.dispensingNpi.includes(q)
+			);
+		}
 
-	const kpis = useMemo(() => deriveMedicalClaimKpis(rows), [rows]);
+		return groupPharmacyClaimsByClaimNo(list);
+	}, [filterTab, pharmacyClaims, deferredSearch]);
 
-	function openClaimLineDetail(claimReferenceId: string) {
-		router.push(
-			`/admin/claim-encounter/claims/${encodeURIComponent(claimReferenceId)}`
-		);
-	}
+	const kpis = useMemo(
+		() => derivePharmacyClaimKpis(rows.flatMap((g) => g.lines)),
+		[rows]
+	);
 
 	function toggleExpand(groupKey: string) {
 		setExpandedId((prev) => (prev === groupKey ? null : groupKey));
@@ -164,7 +174,10 @@ export function CmsEdgeClaimsTab() {
 	if (selectedId) {
 		return (
 			<div className={CMS_EDGE_PAGE_STACK}>
-				<CmsEdgeMedicalClaimDetail onBack={() => setSelectedId(null)} />
+				<CmsEdgePharmacyClaimDetail
+					id={selectedId}
+					onBack={() => setSelectedId(null)}
+				/>
 				<CmsEdgePageFooter />
 			</div>
 		);
@@ -175,11 +188,11 @@ export function CmsEdgeClaimsTab() {
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div className="min-w-0">
 					<h2 className="text-xl font-semibold tracking-tight text-foreground">
-						Medical Claims
+						Pharmacy Claims
 					</h2>
 					<p className="mt-1 text-sm text-muted-foreground">
-						Review medical claims, claim lines, providers, financial values, and
-						CMS EDGE validation.
+						Review prescription claims, dispensing providers, financial values,
+						and CMS EDGE validation.
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
@@ -206,7 +219,7 @@ export function CmsEdgeClaimsTab() {
 						<Input
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Search Claim / Member / Dx"
+							placeholder="Search Claim / Member / NDC"
 							className="h-9 pl-8 text-xs"
 						/>
 					</div>
@@ -221,12 +234,54 @@ export function CmsEdgeClaimsTab() {
 					<Button
 						size="sm"
 						className="h-9 shadow-sm"
-						onClick={() => toast.success("Medical claims export started.")}
+						onClick={() => toast.success("Pharmacy claims export started.")}
 					>
 						<Upload className="mr-1.5 size-3.5" />
 						Export
 						<ChevronDown className="ml-1 size-3.5" />
 					</Button>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-9 border-border/70 bg-card shadow-sm"
+								disabled={seedPharmacyClaims.isPending}
+							>
+								More
+								<ChevronDown className="ml-1 size-3.5" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem
+								disabled={seedPharmacyClaims.isPending}
+								onClick={async () => {
+									try {
+										const result = await seedPharmacyClaims.mutateAsync({
+											force: true,
+											count: 8,
+										});
+										if (result.skipped) {
+											toast.message(
+												`Seed skipped — ${result.existing_rows ?? 0} demo rows already exist.`
+											);
+										} else {
+											toast.success(
+												`Seeded ${result.created} pharmacy claim rows.`
+											);
+										}
+										await refetch();
+									} catch (err) {
+										toast.error(
+											err instanceof Error ? err.message : "Seed failed."
+										);
+									}
+								}}
+							>
+								Seed pharmacy claims
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 			</div>
 
@@ -282,7 +337,7 @@ export function CmsEdgeClaimsTab() {
 
 			<section className={cn("overflow-hidden", CMS_EDGE_PANEL_CLASS)}>
 				<div className="flex flex-wrap items-center gap-1 border-b border-border/50 px-3">
-					{CMS_EDGE_MEDICAL_CLAIM_FILTER_TABS.map((tab) => {
+					{CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS.map((tab) => {
 						const active = filterTab === tab.id;
 						return (
 							<button
@@ -301,7 +356,7 @@ export function CmsEdgeClaimsTab() {
 									<span
 										className={cn(
 											"inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
-											MEDICAL_FILTER_BADGE_STYLES[tab.badgeTone]
+											PHARMACY_FILTER_BADGE_STYLES[tab.badgeTone]
 										)}
 									>
 										{tab.badge}
@@ -318,7 +373,7 @@ export function CmsEdgeClaimsTab() {
 				<CmsEdgeTableScroll>
 					<Table
 						containerClassName={CMS_EDGE_TABLE_CONTAINER}
-						className={cn(CMS_EDGE_TABLE_CLASS, "min-w-[1200px]")}
+						className={cn(CMS_EDGE_TABLE_CLASS, "min-w-[1280px]")}
 					>
 						<TableHeader>
 							<TableRow className="border-b border-border/50 hover:bg-transparent">
@@ -329,25 +384,36 @@ export function CmsEdgeClaimsTab() {
 								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
 									Unique Enrollee ID
 								</TableHead>
+								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>NDC</TableHead>
 								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
-									Form Type
+									<span className="inline-flex items-center gap-1">
+										Fill Date
+										<ArrowUpDown className="size-3 text-muted-foreground" />
+									</span>
 								</TableHead>
 								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
-									Statement From
-								</TableHead>
-								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
-									Statement Through
-								</TableHead>
-								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
-									Billing Provider NPI
-								</TableHead>
-								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
-									Primary Diagnosis
+									Rx Reference Number
 								</TableHead>
 								<TableHead
 									className={cn(CMS_EDGE_TABLE_HEAD_CLASS, "text-right")}
 								>
-									Allowed
+									Fill No.
+								</TableHead>
+								<TableHead
+									className={cn(CMS_EDGE_TABLE_HEAD_CLASS, "text-right")}
+								>
+									Days Supply
+								</TableHead>
+								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
+									Dispensing Provider NPI
+								</TableHead>
+								<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
+									Network
+								</TableHead>
+								<TableHead
+									className={cn(CMS_EDGE_TABLE_HEAD_CLASS, "text-right")}
+								>
+									Allowed Cost
 								</TableHead>
 								<TableHead
 									className={cn(CMS_EDGE_TABLE_HEAD_CLASS, "text-right")}
@@ -372,7 +438,7 @@ export function CmsEdgeClaimsTab() {
 										colSpan={TABLE_COL_SPAN}
 										className="px-3 py-8 text-center text-muted-foreground"
 									>
-										Loading medical claims…
+										Loading pharmacy claims…
 									</TableCell>
 								</TableRow>
 							) : isError ? (
@@ -381,7 +447,7 @@ export function CmsEdgeClaimsTab() {
 										colSpan={TABLE_COL_SPAN}
 										className="px-3 py-8 text-center text-red-600"
 									>
-										Failed to load medical claims
+										Failed to load pharmacy claims
 										{error instanceof Error ? `: ${error.message}` : "."}
 									</TableCell>
 								</TableRow>
@@ -391,7 +457,7 @@ export function CmsEdgeClaimsTab() {
 										colSpan={TABLE_COL_SPAN}
 										className="px-3 py-8 text-center text-muted-foreground"
 									>
-										No medical claims match this filter.
+										No pharmacy claims match this filter.
 									</TableCell>
 								</TableRow>
 							) : (
@@ -441,23 +507,29 @@ export function CmsEdgeClaimsTab() {
 												<TableCell className="px-3 py-2.5 font-mono text-[11px]">
 													{row.enrolleeId}
 												</TableCell>
-												<TableCell className="px-3 py-2.5">
-													{row.formType}
+												<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+													{row.ndc}
 												</TableCell>
 												<TableCell className="px-3 py-2.5 tabular-nums">
-													{row.statementFrom}
-												</TableCell>
-												<TableCell className="px-3 py-2.5 tabular-nums">
-													{row.statementThrough}
+													{row.fillDate}
 												</TableCell>
 												<TableCell className="px-3 py-2.5 font-mono text-[11px]">
-													{row.billingNpi}
-												</TableCell>
-												<TableCell className="px-3 py-2.5 font-mono text-[11px]">
-													{row.primaryDiagnosis}
+													{row.rxReference}
 												</TableCell>
 												<TableCell className="px-3 py-2.5 text-right tabular-nums">
-													{formatCurrency(row.allowedAmount)}
+													{row.fillNo}
+												</TableCell>
+												<TableCell className="px-3 py-2.5 text-right tabular-nums">
+													{row.daysSupply || "—"}
+												</TableCell>
+												<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+													{row.dispensingNpi}
+												</TableCell>
+												<TableCell className="px-3 py-2.5">
+													{row.network}
+												</TableCell>
+												<TableCell className="px-3 py-2.5 text-right tabular-nums">
+													{formatCurrency(row.allowedCost)}
 												</TableCell>
 												<TableCell className="px-3 py-2.5 text-right tabular-nums">
 													{formatCurrency(row.planPaid)}
@@ -466,7 +538,7 @@ export function CmsEdgeClaimsTab() {
 													<span
 														className={cn(
 															CMS_EDGE_STATUS_PILL_CLASS,
-															MEDICAL_CLAIM_TXN_STYLES[row.transaction]
+															PHARMACY_CLAIM_TXN_STYLES[row.transaction]
 														)}
 													>
 														{row.transaction}
@@ -476,7 +548,7 @@ export function CmsEdgeClaimsTab() {
 													<span
 														className={cn(
 															CMS_EDGE_STATUS_PILL_CLASS,
-															MEDICAL_CLAIM_CMS_STATUS_STYLES[row.cmsStatus]
+															PHARMACY_CLAIM_CMS_STATUS_STYLES[row.cmsStatus]
 														)}
 													>
 														{row.cmsStatus}
@@ -505,14 +577,16 @@ export function CmsEdgeClaimsTab() {
 																	: "Show claim lines"}
 															</DropdownMenuItem>
 															<DropdownMenuItem
-																onClick={() => openClaimLineDetail(row.claimId)}
-															>
-																Open claim line detail
-															</DropdownMenuItem>
-															<DropdownMenuItem
 																onClick={() => setSelectedId(row.id)}
 															>
-																CMS EDGE claim view
+																View claim line detail
+															</DropdownMenuItem>
+															<DropdownMenuItem
+																onClick={() =>
+																	toast.message(`Revalidating ${row.claimId}`)
+																}
+															>
+																Revalidate
 															</DropdownMenuItem>
 														</DropdownMenuContent>
 													</DropdownMenu>
@@ -522,34 +596,48 @@ export function CmsEdgeClaimsTab() {
 												<CmsEdgeClaimLinesExpandPanel
 													colSpan={TABLE_COL_SPAN}
 													title="Claim Lines"
-													columns={MEDICAL_LINE_COLUMNS}
+													columns={PHARMACY_LINE_COLUMNS}
 													lines={row.lines.map((line) => ({
 														id: line.id,
 														cells: {
-															line: line.lineNumber,
-															serviceDate: line.serviceDate,
-															procedure: (
-																<span className="font-mono">
-																	{line.procedureCode}
+															claimId: (
+																<span className="font-mono font-medium text-primary">
+																	{line.claimId}
 																</span>
 															),
-															revenue: (
-																<span className="font-mono">
-																	{line.revenueCode}
-																</span>
+															ndc: (
+																<span className="font-mono">{line.ndc}</span>
 															),
-															allowed: formatCurrency(line.allowed),
+															fillDate: line.fillDate,
+															daysSupply: line.daysSupply || "—",
 															planPaid: formatCurrency(line.planPaid),
-															status: line.status,
+															transaction: (
+																<span
+																	className={cn(
+																		CMS_EDGE_STATUS_PILL_CLASS,
+																		PHARMACY_CLAIM_TXN_STYLES[line.transaction]
+																	)}
+																>
+																	{line.transaction}
+																</span>
+															),
+															cmsStatus: (
+																<span
+																	className={cn(
+																		CMS_EDGE_STATUS_PILL_CLASS,
+																		PHARMACY_CLAIM_CMS_STATUS_STYLES[
+																			line.cmsStatus
+																		]
+																	)}
+																>
+																	{line.cmsStatus}
+																</span>
+															),
 														},
 													}))}
-													onViewLineDetail={() =>
-														openClaimLineDetail(row.claimId)
-													}
-													viewAllHrefLabel="Open claim detail page"
-													onViewAllDetail={() =>
-														openClaimLineDetail(row.claimId)
-													}
+													onViewLineDetail={(lineId) => setSelectedId(lineId)}
+													viewAllHrefLabel="Open claim line detail"
+													onViewAllDetail={() => setSelectedId(row.id)}
 												/>
 											) : null}
 										</Fragment>
@@ -563,10 +651,10 @@ export function CmsEdgeClaimsTab() {
 
 			<section className="space-y-3">
 				<h3 className="text-sm font-semibold text-foreground">
-					Medical Validation Summary
+					Pharmacy Validation Summary
 				</h3>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-					{CMS_EDGE_MEDICAL_VALIDATION_SUMMARY.map((item) => {
+					{CMS_EDGE_PHARMACY_VALIDATION_SUMMARY.map((item) => {
 						const Icon = VALIDATION_ICONS[item.icon];
 						return (
 							<div key={item.id} className={cn(CMS_EDGE_KPI_CARD_CLASS, "p-3")}>

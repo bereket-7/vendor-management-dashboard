@@ -1,27 +1,33 @@
-import { apiClient } from "@/lib/api/client";
-import { withMockOrRemote } from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
+import { isVendorCoreLive } from "@/lib/vendor-core/client";
 
 import { complianceEndpoints } from "../../compliance-endpoints";
-import type { ApiComplianceRecordDto } from "../dto/complianceRecordDto";
 
 export { complianceEndpoints };
 
 export type ComplianceListResponse = {
-	results?: ApiComplianceRecordDto[] | null;
+	results?: Record<string, unknown>[] | null;
 	count?: number | null;
 };
 
 export async function listComplianceRecords(params?: Record<string, string>) {
-	return withMockOrRemote(
-		() => ({ results: [], count: 0 }),
-		() =>
-			apiClient<ComplianceListResponse>(complianceEndpoints.list(), { params })
-	);
+	if (isVendorCoreLive()) {
+		const page = await vendorCoreApi.listCertificates({
+			limit: 100,
+			vendor_id: params?.vendor_id,
+			status: params?.status,
+		});
+		return { results: page.results ?? [], count: page.count ?? 0 };
+	}
+	return { results: [], count: 0 };
 }
 
 export async function getComplianceRecord(id: string) {
-	return withMockOrRemote(
-		() => ({ id: "mock" }) as never,
-		() => apiClient<ApiComplianceRecordDto>(complianceEndpoints.detail(id))
-	);
+	if (isVendorCoreLive()) {
+		const page = await vendorCoreApi.listCertificates({ limit: 100 });
+		const match = (page.results ?? []).find((row) => String(row.id) === id);
+		if (!match) throw new Error("Certificate not found.");
+		return match;
+	}
+	throw new Error("Certificate detail requires the live API.");
 }

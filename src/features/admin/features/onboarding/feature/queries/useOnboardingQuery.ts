@@ -7,6 +7,7 @@ import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 import {
 	getOnboarding,
 	listOnboarding,
+	seedOnboarding,
 	updateOnboarding,
 } from "../api/onboardingApi";
 import type { OnboardingUpdateDto } from "../dto/onboardingDto";
@@ -42,6 +43,17 @@ export function useUpdateOnboardingMutation() {
 			queryClient.invalidateQueries({
 				queryKey: featureQueryKey(domain, "detail", variables.id),
 			});
+		},
+	});
+}
+
+export function useSeedOnboardingMutation() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (force?: boolean) => seedOnboarding(force),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: featureQueryKey(domain) });
+			queryClient.invalidateQueries({ queryKey: featureQueryKey("documents") });
 		},
 	});
 }

@@ -1,5 +1,6 @@
 import { vmsApi } from "@/features/shared/vms/api";
 import type { DocumentModel } from "@/features/shared/vms/types";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 
 import type {
 	DocumentsCreateDto,
@@ -9,6 +10,10 @@ import type {
 function requireRecord<T>(record: T | null): T {
 	if (!record) throw new Error("VMS record was not found");
 	return record;
+}
+
+export async function downloadDocumentFile(id: string, asAttachment = false) {
+	return vendorCoreApi.downloadDocument(id, asAttachment);
 }
 
 export async function listDocuments(): Promise<DocumentModel[]> {

@@ -1,5 +1,5 @@
-import { apiClient } from "@/lib/api/client";
-import { withMockOrRemote } from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
+import { isVendorCoreLive } from "@/lib/vendor-core/client";
 
 import { documentsEndpoints } from "../../documents-endpoints";
 import type { ApiDocumentsRecordDto } from "../dto/documentsRecordDto";
@@ -12,16 +12,19 @@ export type DocumentsListResponse = {
 };
 
 export async function listDocumentsRecords(params?: Record<string, string>) {
-	return withMockOrRemote(
-		() => ({ results: [], count: 0 }),
-		() =>
-			apiClient<DocumentsListResponse>(documentsEndpoints.list(), { params })
-	);
+	if (isVendorCoreLive()) {
+		const page = await vendorCoreApi.listDocuments({
+			limit: 100,
+			vendor_id: params?.vendor_id,
+		});
+		return { results: page.results ?? [], count: page.count ?? 0 };
+	}
+	return { results: [], count: 0 };
 }
 
 export async function getDocumentsRecord(id: string) {
-	return withMockOrRemote(
-		() => ({ id: "mock" }) as never,
-		() => apiClient<ApiDocumentsRecordDto>(documentsEndpoints.detail(id))
-	);
+	if (isVendorCoreLive()) {
+		return vendorCoreApi.getDocument(id);
+	}
+	throw new Error("Document detail requires the live API.");
 }

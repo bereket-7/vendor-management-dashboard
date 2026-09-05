@@ -54,4 +54,73 @@ export const roleApi = {
 			return null;
 		}
 	},
+
+	async create(input: {
+		name: string;
+		displayName?: string;
+		description?: string | null;
+		permissions?: string[];
+	}): Promise<RoleModel> {
+		if (isMockEnabled()) {
+			const model = toRoleModel({
+				id: `role-${Date.now()}`,
+				name: input.name,
+				display_name: input.displayName ?? input.name,
+				description: input.description,
+				permissions: input.permissions ?? [],
+				is_system_role: false,
+			});
+			if (!model) throw new Error("Invalid create response");
+			return model;
+		}
+		const dto = coreDtoToApiDto(
+			await vendorCoreApi.createRole({
+				name: input.name,
+				display_name: input.displayName ?? input.name,
+				description: input.description,
+				permissions: input.permissions,
+			})
+		);
+		const model = toRoleModel(dto);
+		if (!model) throw new Error("Invalid create response");
+		return model;
+	},
+
+	async update(
+		id: string,
+		input: {
+			name?: string;
+			displayName?: string;
+			description?: string | null;
+			permissions?: string[];
+		}
+	): Promise<RoleModel> {
+		if (isMockEnabled()) {
+			const existing = MOCK_ROLES.find((r) => String(r.id) === id);
+			const model = toRoleModel({
+				...(existing ?? { id, name: input.name ?? "role", permissions: [] }),
+				display_name: input.displayName ?? input.name ?? existing?.display_name,
+				description: input.description,
+				permissions: input.permissions,
+			} as ApiRoleDto);
+			if (!model) throw new Error("Invalid update response");
+			return model;
+		}
+		const dto = coreDtoToApiDto(
+			await vendorCoreApi.updateRole(id, {
+				name: input.name,
+				display_name: input.displayName,
+				description: input.description,
+				permissions: input.permissions,
+			})
+		);
+		const model = toRoleModel(dto);
+		if (!model) throw new Error("Invalid update response");
+		return model;
+	},
+
+	async remove(id: string): Promise<void> {
+		if (isMockEnabled()) return;
+		await vendorCoreApi.deleteRole(id);
+	},
 };

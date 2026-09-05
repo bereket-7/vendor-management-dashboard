@@ -95,7 +95,7 @@ function fileIcon(ext?: string) {
 
 export function DocumentsPage() {
 	const router = useRouter();
-	const { documents, isLoading, error } = useDocumentsList();
+	const { documents, isLoading, error, refetch } = useDocumentsList();
 	const [search, setSearch] = useState("");
 	const [status, setStatus] = useState("all");
 	const [type, setType] = useState("all");
@@ -212,8 +212,11 @@ export function DocumentsPage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		await new Promise((r) => setTimeout(r, 450));
-		setRefreshing(false);
+		try {
+			await refetch();
+		} finally {
+			setRefreshing(false);
+		}
 	}
 
 	if (isLoading) {

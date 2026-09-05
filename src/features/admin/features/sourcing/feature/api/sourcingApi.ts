@@ -32,3 +32,16 @@ export async function updateSourcing(
 ): Promise<RfxModel> {
 	return requireRecord(await vmsApi.updateRfx(id, patch));
 }
+
+export async function awardSourcing(
+	id: string,
+	bidId: string
+): Promise<RfxModel> {
+	return vmsApi.awardRfx(id, bidId);
+}
+
+export async function submitSourcingBid(
+	input: Omit<BidModel, "id" | "submittedAt" | "status">
+): Promise<BidModel> {
+	return vmsApi.submitBid(input);
+}

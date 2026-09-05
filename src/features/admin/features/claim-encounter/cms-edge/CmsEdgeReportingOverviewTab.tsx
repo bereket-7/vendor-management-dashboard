@@ -15,7 +15,9 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
+	CMS_EDGE_KPI_CARD_CLASS,
 	CMS_EDGE_PAGE_STACK,
+	CMS_EDGE_PANEL_CLASS,
 	CmsEdgePageFooter,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
@@ -29,15 +31,7 @@ import { formatCount } from "@/features/admin/features/claim-encounter/mock-data
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-const PANEL =
-	"rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
-
-const STAT_SHADOW =
-	"shadow-[0_1px_2px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)]";
-
-const STAT_HOVER =
-	"hover:shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(15,23,42,0.10)] hover:-translate-y-px";
-
+const PANEL = CMS_EDGE_PANEL_CLASS;
 const REPORTING_BASE = "/admin/claim-encounter/regulatory/cms-edge-reporting";
 
 const KPI_VISUAL: Record<
@@ -155,11 +149,7 @@ function KpiGrid() {
 					<Link
 						key={kpi.id}
 						href={`${REPORTING_BASE}/${kpi.href}`}
-						className={cn(
-							"group relative overflow-hidden rounded-sm border border-border/70 bg-card p-4 transition-all duration-200 ease-out",
-							STAT_SHADOW,
-							STAT_HOVER
-						)}
+						className={cn("group", CMS_EDGE_KPI_CARD_CLASS)}
 					>
 						<span
 							aria-hidden

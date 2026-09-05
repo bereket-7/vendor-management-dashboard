@@ -150,6 +150,27 @@ export async function deleteMigrationCaseDocument(
 	return vendorCoreApi.deleteMigrationCaseDocument(caseId, documentId);
 }
 
+export async function getMigrationCaseDocument(
+	caseId: string,
+	documentId: string
+) {
+	return vendorCoreApi.getMigrationCaseDocument(caseId, documentId);
+}
+
+export async function restoreMigrationCaseDocument(
+	caseId: string,
+	documentId: string
+) {
+	return vendorCoreApi.restoreMigrationCaseDocument(caseId, documentId);
+}
+
+export async function hardDeleteMigrationCaseDocument(
+	caseId: string,
+	documentId: string
+) {
+	return vendorCoreApi.hardDeleteMigrationCaseDocument(caseId, documentId);
+}
+
 export async function uploadMigrationCaseDocument(id: string, file: File) {
 	return vendorCoreApi.uploadMigrationCaseDocument(id, file);
 }
@@ -220,6 +241,10 @@ export async function deleteMigrationCase(id: string) {
 
 export async function restoreMigrationCase(id: string) {
 	return vendorCoreApi.restoreMigrationCase(id).then(migrationCaseToRow);
+}
+
+export async function hardDeleteMigrationCase(id: string) {
+	return vendorCoreApi.hardDeleteMigrationCase(id);
 }
 
 export async function getWorkQueueKpiCards(params?: WorkQueueFilterQuery) {

@@ -62,7 +62,24 @@ async function proxy(req: NextRequest, pathParts: string[]) {
 	const responseHeaders = new Headers();
 	const upstreamType = upstream.headers.get("content-type");
 	if (upstreamType) responseHeaders.set("Content-Type", upstreamType);
+	const disposition = upstream.headers.get("content-disposition");
+	if (disposition) responseHeaders.set("Content-Disposition", disposition);
 	responseHeaders.set("Cache-Control", "no-store");
+
+	// Prefer JSON problem details when Django returns HTML 404 for missing API routes.
+	if (upstream.status === 404 && (upstreamType ?? "").includes("text/html")) {
+		return NextResponse.json(
+			{
+				status: "error",
+				message: `Vendor-core route not found: ${targetPath}`,
+				result: {
+					detail: `Upstream returned 404 for ${url.toString()}. Deploy the matching vendor-management-core endpoint, or point NEXT_PUBLIC_VENDOR_CORE_API_URL at a local API that has it.`,
+					instance: targetPath,
+				},
+			},
+			{ status: 404, headers: { "Cache-Control": "no-store" } }
+		);
+	}
 
 	return new NextResponse(body, {
 		status: upstream.status,

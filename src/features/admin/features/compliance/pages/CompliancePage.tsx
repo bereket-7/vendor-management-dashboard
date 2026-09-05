@@ -1,84 +1,168 @@
 "use client";
 
-import { Skeleton } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/features/shared/vms/StatusBadge";
-import { formatDate } from "@/features/shared/vms/utils";
-import { Link } from "@/i18n/navigation";
+import { useMemo } from "react";
 
-import { useCertificatesList } from "../feature/queries/useComplianceQuery";
+import { CheckCircle2, ShieldAlert, ShieldCheck, Timer } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { isVendorCoreLive } from "@/lib/vendor-core/client";
+
+import { ComplianceBoard } from "../feature/components/ComplianceBoard";
+import {
+	useCertificatesList,
+	useSeedComplianceMutation,
+	useUpdateComplianceMutation,
+} from "../feature/queries/useComplianceQuery";
 
 export function CompliancePage() {
 	const { certificates, isLoading, error } = useCertificatesList();
-	const flagged = certificates.filter((item) => item.riskFlag).length;
+	const seed = useSeedComplianceMutation();
+	const updateCert = useUpdateComplianceMutation();
 
-	if (isLoading)
+	const kpis = useMemo(() => {
+		const valid = certificates.filter((c) => c.status === "valid").length;
+		const expiring = certificates.filter((c) => c.status === "expiring").length;
+		const expired = certificates.filter((c) => c.status === "expired").length;
+		const pending = certificates.filter((c) => c.status === "pending").length;
+		const flagged = certificates.filter((c) => c.riskFlag).length;
+		return [
+			{
+				label: "Certificates",
+				value: String(certificates.length),
+				hint: "Live vendor certifications",
+				icon: ShieldCheck,
+				tone: "text-primary bg-primary/10",
+			},
+			{
+				label: "Valid",
+				value: String(valid),
+				hint: `${pending} pending verification`,
+				icon: CheckCircle2,
+				tone: "text-emerald-700 bg-emerald-500/10",
+			},
+			{
+				label: "Expiring soon",
+				value: String(expiring),
+				hint: "Needs renewal",
+				icon: Timer,
+				tone: "text-amber-700 bg-amber-500/10",
+			},
+			{
+				label: "Risk flags",
+				value: String(flagged),
+				hint: `${expired} expired or revoked`,
+				icon: ShieldAlert,
+				tone: "text-destructive bg-destructive/10",
+			},
+		];
+	}, [certificates]);
+
+	if (isLoading) {
 		return (
 			<div className="container space-y-5 py-8">
 				<Skeleton className="h-10 w-64" />
-				<Skeleton className="h-72 w-full" />
+				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+					{Array.from({ length: 4 }).map((_, i) => (
+						<Skeleton key={i} className="h-28 rounded-xl" />
+					))}
+				</div>
+				<Skeleton className="h-[480px] w-full rounded-xl" />
 			</div>
 		);
+	}
 
 	return (
 		<div className="container space-y-6 py-8">
-			<div className="flex flex-wrap items-end justify-between gap-4">
+			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight">
 						Compliance certificates
 					</h1>
 					<p className="text-sm text-muted-foreground">
-						Monitor certification validity and supplier risk.
+						Drag tickets between columns to update certification status.
 					</p>
 				</div>
-				<div className="rounded-md border px-4 py-2 text-sm">
-					<span className="font-semibold tabular-nums">{flagged}</span> risk
-					flags
-				</div>
+				{isVendorCoreLive() ? (
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9"
+						disabled={seed.isPending}
+						onClick={() =>
+							seed.mutate(undefined, {
+								onSuccess: (res) => {
+									toast.success(
+										res.created > 0
+											? `Seeded ${res.created} certificate(s)`
+											: "All vendors already have certificates."
+									);
+								},
+								onError: (err) =>
+									toast.error(
+										err instanceof Error ? err.message : "Seed failed"
+									),
+							})
+						}
+					>
+						{seed.isPending ? "Seeding…" : "Seed"}
+					</Button>
+				) : null}
 			</div>
+
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				{kpis.map((kpi) => {
+					const Icon = kpi.icon;
+					return (
+						<Card key={kpi.label} className="shadow-sm">
+							<CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+								<CardTitle className="text-sm font-medium text-muted-foreground">
+									{kpi.label}
+								</CardTitle>
+								<span
+									className={cn(
+										"inline-flex size-8 items-center justify-center rounded-lg",
+										kpi.tone
+									)}
+								>
+									<Icon className="size-4" />
+								</span>
+							</CardHeader>
+							<CardContent>
+								<p className="text-2xl font-semibold tabular-nums">
+									{kpi.value}
+								</p>
+								<CardDescription className="mt-1">{kpi.hint}</CardDescription>
+							</CardContent>
+						</Card>
+					);
+				})}
+			</div>
+
 			{error ? (
 				<p className="text-sm text-destructive">{error.message}</p>
+			) : certificates.length === 0 ? (
+				<p className="text-sm text-muted-foreground">
+					No certificates available. Use Seed to create live records from
+					existing vendors.
+				</p>
 			) : (
-				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-					{certificates.map((certificate) => (
-						<article
-							key={certificate.id}
-							className={`rounded-xl border border-border bg-card shadow-sm p-5 ${certificate.riskFlag ? "border-destructive/50" : ""}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="min-w-0">
-									<h2 className="truncate font-semibold">{certificate.name}</h2>
-									<Link
-										href={`/admin/vendors/${certificate.vendorId}`}
-										className="text-sm text-muted-foreground hover:underline"
-									>
-										{certificate.vendorName}
-									</Link>
-								</div>
-								<StatusBadge status={certificate.status} />
-							</div>
-							<dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
-								<div>
-									<dt className="text-xs text-muted-foreground">Issuer</dt>
-									<dd className="mt-1">{certificate.issuer}</dd>
-								</div>
-								<div>
-									<dt className="text-xs text-muted-foreground">Expires</dt>
-									<dd className="mt-1">{formatDate(certificate.expiresAt)}</dd>
-								</div>
-							</dl>
-							{certificate.riskFlag && (
-								<p className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-									Action required: certificate risk detected.
-								</p>
-							)}
-						</article>
-					))}
-					{certificates.length === 0 && (
-						<p className="text-sm text-muted-foreground">
-							No certificates available.
-						</p>
-					)}
-				</div>
+				<ComplianceBoard
+					certificates={certificates}
+					busy={updateCert.isPending}
+					onStatusChange={(id, status) =>
+						updateCert.mutateAsync({ id, status })
+					}
+				/>
 			)}
 		</div>
 	);
