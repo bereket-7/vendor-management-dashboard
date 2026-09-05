@@ -3189,6 +3189,152 @@ export const CMS_RESPONSE_STATUS_STYLES: Record<CmsResponseStatus, string> = {
 	Error: "bg-red-500/15 text-red-800 dark:bg-red-500/20 dark:text-red-300",
 };
 
+export type CmsEdgeResponseDetailFile = {
+	id: string;
+	name: string;
+	kind: string;
+	sizeLabel: string;
+	format: string;
+	primary?: boolean;
+};
+
+export type CmsEdgeResponseDetailNote = {
+	id: string;
+	dateTime: string;
+	source: string;
+	note: string;
+};
+
+export type CmsEdgeResponseDetail = CmsResponseRow & {
+	fileSize: string;
+	fileFormat: string;
+	description: string;
+	totalRecords: number;
+	acceptanceRate: number;
+	warnings: number;
+	files: CmsEdgeResponseDetailFile[];
+	notes: CmsEdgeResponseDetailNote[];
+	resultHighlights: { label: string; value: string }[];
+};
+
+/** Resolve a CMS EDGE response detail by list row id. */
+export function getCmsEdgeResponseDetail(
+	id: string
+): CmsEdgeResponseDetail | null {
+	const row = CMS_EDGE_RESPONSES_LIST.find((item) => item.id === id);
+	if (!row) return null;
+
+	const totalRecords = row.accepted + row.rejected;
+	const acceptanceRate = totalRecords
+		? Math.round((row.accepted / totalRecords) * 1000) / 10
+		: 0;
+	const base = row.responseFile.replace(/\.[^.]+$/, "");
+	const format = row.responseFile.split(".").pop()?.toUpperCase() ?? "XML";
+
+	const files: CmsEdgeResponseDetailFile[] = [
+		{
+			id: "response-payload",
+			name: row.responseFile,
+			kind: row.responseType,
+			sizeLabel:
+				row.status === "Pending"
+					? "—"
+					: row.responseType === "Error Report"
+						? "640 KB"
+						: "3.8 MB",
+			format,
+			primary: true,
+		},
+	];
+
+	if (row.status !== "Pending") {
+		files.push({
+			id: "response-summary",
+			name: `${base}_Summary.json`,
+			kind: "Parsed summary",
+			sizeLabel: "18 KB",
+			format: "JSON",
+		});
+	}
+
+	if (row.rejected > 0 || row.responseType === "Error Report") {
+		files.push({
+			id: "error-extract",
+			name: `${base}_ErrorExtract.csv`,
+			kind: "Rejected record extract",
+			sizeLabel: "96 KB",
+			format: "CSV",
+		});
+	}
+
+	const notes: CmsEdgeResponseDetailNote[] = [
+		{
+			id: `${row.id}-n1`,
+			dateTime: row.dateReceived,
+			source: "CMS EDGE",
+			note: `${row.responseType} received for ${row.relatedSubmission}.`,
+		},
+		{
+			id: `${row.id}-n2`,
+			dateTime: row.dateReceived,
+			source: "System",
+			note:
+				row.status === "Pending"
+					? "Response file queued for parsing. Counts will update when processing completes."
+					: row.status === "Error"
+						? "Error report indicates blocking validation failures. Review rejected extract before resubmission."
+						: `Processed ${totalRecords.toLocaleString()} records · ${acceptanceRate}% accepted.`,
+		},
+	];
+
+	const resultHighlights =
+		row.status === "Pending"
+			? [
+					{ label: "Processing state", value: "Awaiting CMS completion" },
+					{ label: "Related submission", value: row.relatedSubmission },
+					{ label: "Environment", value: row.environment },
+				]
+			: [
+					{
+						label: "Acceptance rate",
+						value: `${acceptanceRate}%`,
+					},
+					{
+						label: "Accepted records",
+						value: row.accepted.toLocaleString(),
+					},
+					{
+						label: "Rejected records",
+						value: row.rejected.toLocaleString(),
+					},
+					{
+						label: "Related submission",
+						value: row.relatedSubmission,
+					},
+				];
+
+	return {
+		...row,
+		fileSize: files[0]?.sizeLabel ?? "—",
+		fileFormat: format,
+		description:
+			row.status === "Pending"
+				? `Pending ${row.responseType.toLowerCase()} for ${row.fileType} in ${row.environment}.`
+				: row.status === "Error"
+					? `CMS returned an error report for ${row.fileType}. Review rejected records and remediate before resubmit.`
+					: `CMS ${row.responseType.toLowerCase()} for ${row.fileType} (${row.reportingPeriod}). Accepted and rejected record counts included.`,
+		totalRecords,
+		acceptanceRate,
+		warnings:
+			row.status === "Completed" && row.rejected > 0
+				? Math.min(48, Math.round(row.rejected * 0.08))
+				: 0,
+		files,
+		notes,
+		resultHighlights,
+	};
+}
+
 // ─── Submissions tab ────────────────────────────────────────────────────────
 
 export type SubmissionStatus = "Accepted" | "Processing" | "Failed";
@@ -3437,7 +3583,168 @@ export const CMS_EDGE_SUBMISSION_DETAILS: Record<
 			{ label: "Error Report", status: "Not Available" },
 		],
 	},
+	"SUB-2027-000003": {
+		submissionType: "Pharmacy",
+		reportingPeriod: "Q2 2027",
+		fileName: "EDGE_Q2_2027_Pharmacy.xml",
+		submittedDateTime: "05/03/2027 02:18 PM ET",
+		submittedBy: "jdoe@bhphealth.com",
+		status: "Failed",
+		totalRecords: 31_045,
+		acceptedRecords: 0,
+		acceptedPercent: 0,
+		rejectedRecords: 31_045,
+		rejectedPercent: 100,
+		warnings: 214,
+		cmsResponses: [
+			{ label: "Acceptance Report", status: "Not Available" },
+			{ label: "Validation Report", status: "Received" },
+			{ label: "Error Report", status: "Received" },
+		],
+	},
+	"SUB-2027-000005": {
+		submissionType: "Enrollment",
+		reportingPeriod: "Q2 2027",
+		fileName: "EDGE_Q2_2027_Enrollment_Prod.xml",
+		submittedDateTime: "05/05/2027 10:30 AM ET",
+		submittedBy: "asmith@bhphealth.com",
+		status: "Processing",
+		totalRecords: 12_640,
+		acceptedRecords: 0,
+		acceptedPercent: 0,
+		rejectedRecords: 0,
+		rejectedPercent: 0,
+		warnings: 0,
+		cmsResponses: [
+			{ label: "Acceptance Report", status: "Pending" },
+			{ label: "Validation Report", status: "Pending" },
+			{ label: "Error Report", status: "Not Available" },
+		],
+	},
 };
+
+export type CmsEdgeSubmissionDetail = {
+	id: string;
+	fileType: SubmissionFileType;
+	environment: SubmissionEnvironment;
+	reportingPeriod: string;
+	fileName: string;
+	submittedDateTime: string;
+	submittedBy: string;
+	status: SubmissionStatus;
+	totalRecords: number;
+	acceptedRecords: number;
+	acceptedPercent: number;
+	rejectedRecords: number;
+	rejectedPercent: number;
+	warnings: number;
+	cmsResponses: SubmissionCmsResponseItem[];
+	/** 0-based index into CMS_EDGE_SUBMISSION_PROCESS_STEPS for current stage */
+	lifecycleStepIndex: number;
+};
+
+function lifecycleStepForStatus(status: SubmissionStatus): number {
+	if (status === "Processing") return 2;
+	if (status === "Failed") return 2;
+	return 3;
+}
+
+function defaultFileName(
+	fileType: SubmissionFileType,
+	period: string,
+	environment: SubmissionEnvironment
+) {
+	const slug = fileType.replace(/\s+/g, "_");
+	return `EDGE_${period.replace(/\s+/g, "_")}_${slug}_${environment}.xml`;
+}
+
+/** Resolve list row + optional rich detail for a submission ID. */
+export function getCmsEdgeSubmissionDetail(
+	id: string
+): CmsEdgeSubmissionDetail | null {
+	const row = CMS_EDGE_SUBMISSION_HISTORY.find((item) => item.id === id);
+	if (!row) return null;
+
+	const rich = CMS_EDGE_SUBMISSION_DETAILS[id];
+	if (rich) {
+		return {
+			id,
+			fileType: row.fileType,
+			environment: row.environment,
+			reportingPeriod: rich.reportingPeriod,
+			fileName: rich.fileName,
+			submittedDateTime: rich.submittedDateTime,
+			submittedBy: rich.submittedBy,
+			status: rich.status,
+			totalRecords: rich.totalRecords,
+			acceptedRecords: rich.acceptedRecords,
+			acceptedPercent: rich.acceptedPercent,
+			rejectedRecords: rich.rejectedRecords,
+			rejectedPercent: rich.rejectedPercent,
+			warnings: rich.warnings,
+			cmsResponses: rich.cmsResponses,
+			lifecycleStepIndex: lifecycleStepForStatus(rich.status),
+		};
+	}
+
+	const isAccepted = row.status === "Accepted";
+	const isFailed = row.status === "Failed";
+	const acceptedRecords = isAccepted
+		? Math.round(row.records * 0.997)
+		: isFailed
+			? 0
+			: 0;
+	const rejectedRecords = isAccepted
+		? row.records - acceptedRecords
+		: isFailed
+			? row.records
+			: 0;
+	const acceptedPercent = row.records
+		? Math.round((acceptedRecords / row.records) * 1000) / 10
+		: 0;
+	const rejectedPercent = row.records
+		? Math.round((rejectedRecords / row.records) * 1000) / 10
+		: 0;
+
+	return {
+		id,
+		fileType: row.fileType,
+		environment: row.environment,
+		reportingPeriod: row.reportingPeriod,
+		fileName: defaultFileName(
+			row.fileType,
+			row.reportingPeriod,
+			row.environment
+		),
+		submittedDateTime: `${row.submittedDateTime} ET`,
+		submittedBy: row.submittedBy,
+		status: row.status,
+		totalRecords: row.records,
+		acceptedRecords,
+		acceptedPercent,
+		rejectedRecords,
+		rejectedPercent,
+		warnings: isFailed ? Math.round(row.records * 0.007) : 0,
+		cmsResponses: isAccepted
+			? [
+					{ label: "Acceptance Report", status: "Received" },
+					{ label: "Validation Report", status: "Received" },
+					{ label: "Error Report", status: "Not Available" },
+				]
+			: isFailed
+				? [
+						{ label: "Acceptance Report", status: "Not Available" },
+						{ label: "Validation Report", status: "Received" },
+						{ label: "Error Report", status: "Received" },
+					]
+				: [
+						{ label: "Acceptance Report", status: "Pending" },
+						{ label: "Validation Report", status: "Pending" },
+						{ label: "Error Report", status: "Not Available" },
+					],
+		lifecycleStepIndex: lifecycleStepForStatus(row.status),
+	};
+}
 
 export const CMS_EDGE_SUBMISSION_NOTES: SubmissionNoteRow[] = [
 	{
@@ -4930,6 +5237,134 @@ export const VOID_STATUS_STYLES: Record<VoidReplacementRow["status"], string> =
 		Rejected: "bg-red-500/15 text-red-800 dark:bg-red-500/20 dark:text-red-300",
 	};
 
+export type CmsEdgeExceptionDetailNote = {
+	id: string;
+	dateTime: string;
+	source: string;
+	note: string;
+};
+
+export type CmsEdgeExceptionDetail = ExceptionRow & {
+	detectedAt: string;
+	sourceFile: string;
+	relatedSubmission: string;
+	fieldPath: string;
+	expectedValue: string;
+	actualValue: string;
+	remediation: string;
+	impactSummary: string;
+	corrections: CorrectionRow[];
+	voidReplacements: VoidReplacementRow[];
+	notes: CmsEdgeExceptionDetailNote[];
+};
+
+const EXCEPTION_REMEDIATION: Record<ExceptionErrorType, string> = {
+	"Missing Field":
+		"Backfill the required field from the source system, then draft a correction for resubmission.",
+	"Invalid Value":
+		"Normalize the value to the CMS EDGE allowed format/code set and revalidate before resubmit.",
+	Duplicate:
+		"Confirm the surviving record, void or remove duplicates, then resubmit the corrected file.",
+	"Cross-file":
+		"Reconcile against the referenced file (enrollment / NDC / provider), then correct the mismatched key.",
+	Schema:
+		"Reorder or reshape elements to match the EDGE schema for this file type, then regenerate.",
+};
+
+/** Resolve an exception detail by list row id (e.g. EXC-000912). */
+export function getCmsEdgeExceptionDetail(
+	id: string
+): CmsEdgeExceptionDetail | null {
+	const row = CMS_EDGE_EXCEPTIONS_LIST.find((item) => item.id === id);
+	if (!row) return null;
+
+	const seq = Number(row.id.replace(/\D/g, "")) || 900;
+	const day = String((seq % 12) + 1).padStart(2, "0");
+	const hour = String((seq % 10) + 8).padStart(2, "0");
+	const detectedAt = `${day}/05/2027 ${hour}:15 AM`;
+
+	const fileSlug = row.dataset.replace(/\s+/g, "");
+	const sourceFile = `EDGE_${row.reportingPeriod.replace(/\s+/g, "_")}_${fileSlug}.xml`;
+	const relatedSubmission = `SUB-2027-${String(seq % 12 || 12).padStart(6, "0")}`;
+
+	const fieldByType: Record<ExceptionErrorType, string> = {
+		"Missing Field":
+			row.dataset === "Enrollment" ? "subscriberId" : "billingProvider.npi",
+		"Invalid Value":
+			row.dataset === "Pharmacy" ? "quantityDispensed" : "diagnosis[0].code",
+		Duplicate: "recordHash",
+		"Cross-file": "ndcCode",
+		Schema: "claimHeader.sequence",
+	};
+
+	const expectedByType: Record<ExceptionErrorType, string> = {
+		"Missing Field": "Non-empty CMS EDGE identifier",
+		"Invalid Value": "Value within EDGE allowed set / range",
+		Duplicate: "Unique record key within file",
+		"Cross-file": "Key present in reference file",
+		Schema: "Elements in EDGE schema order",
+	};
+
+	const actualByType: Record<ExceptionErrorType, string> = {
+		"Missing Field": "null / omitted",
+		"Invalid Value": "Out-of-range or malformed value",
+		Duplicate: "Matches prior row in same submission",
+		"Cross-file": "Key not found in reference",
+		Schema: "Out-of-order element detected",
+	};
+
+	const corrections = CMS_EDGE_CORRECTIONS_LIST.filter(
+		(item) => item.exceptionId === row.id
+	);
+	const voidReplacements = CMS_EDGE_VOID_REPLACEMENTS_LIST.filter(
+		(item) => item.originalClaimId === row.recordId
+	);
+
+	const notes: CmsEdgeExceptionDetailNote[] = [
+		{
+			id: `${row.id}-n1`,
+			dateTime: detectedAt,
+			source: "CMS EDGE validation",
+			note: `${row.errorCode} · ${row.description}`,
+		},
+		{
+			id: `${row.id}-n2`,
+			dateTime: detectedAt,
+			source: "System",
+			note: `Routed to ${row.owner} · severity ${row.severity} · status ${row.status}.`,
+		},
+	];
+
+	if (corrections[0]) {
+		notes.push({
+			id: `${row.id}-n3`,
+			dateTime: corrections[0].updatedAt,
+			source: corrections[0].owner,
+			note: `Correction ${corrections[0].id}: ${corrections[0].changeSummary}`,
+		});
+	}
+
+	return {
+		...row,
+		detectedAt,
+		sourceFile,
+		relatedSubmission,
+		fieldPath: fieldByType[row.errorType],
+		expectedValue: expectedByType[row.errorType],
+		actualValue: actualByType[row.errorType],
+		remediation: EXCEPTION_REMEDIATION[row.errorType],
+		impactSummary:
+			row.severity === "Critical"
+				? "Blocks acceptance for this record until corrected and resubmitted."
+				: row.severity === "High"
+					? "Likely reject or high-risk variance if left unresolved this period."
+					: "Non-blocking or low volume impact; still track for period close.",
+		corrections,
+		voidReplacements,
+		notes,
+	};
+}
+
 // ─── Reconciliation tab ─────────────────────────────────────────────────────
 
 export type ReconciliationEnvironment = "Test" | "Validation" | "Production";
@@ -5105,3 +5540,160 @@ export const RECON_STATUS_DOT: Record<ReconciliationStatus, string> = {
 	"Review Required": "bg-amber-500",
 	Variance: "bg-red-500",
 };
+
+export const RECON_STATUS_STYLES: Record<ReconciliationStatus, string> = {
+	Balanced:
+		"bg-emerald-500/15 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300",
+	"Review Required":
+		"bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200",
+	Variance: "bg-red-500/15 text-red-800 dark:bg-red-500/20 dark:text-red-300",
+};
+
+export type CmsEdgeReconPipelineStep = {
+	id: string;
+	title: string;
+	count: number;
+	deltaFromPrevious: number | null;
+};
+
+export type CmsEdgeReconVarianceSlice = {
+	id: string;
+	label: string;
+	count: number;
+	pct: number;
+	tone: ReconciliationVarianceReason["tone"];
+};
+
+export type CmsEdgeReconDetailNote = {
+	id: string;
+	dateTime: string;
+	source: string;
+	note: string;
+};
+
+export type CmsEdgeReconciliationDetail = ReconciliationDatasetRow & {
+	runId: string;
+	lastRunAt: string;
+	acceptanceRate: number;
+	rejectRate: number;
+	pipeline: CmsEdgeReconPipelineStep[];
+	varianceSlices: CmsEdgeReconVarianceSlice[];
+	relatedSubmission: string;
+	exceptionDataset: string;
+	summary: string;
+	notes: CmsEdgeReconDetailNote[];
+};
+
+function datasetToExceptionLabel(dataset: string): string {
+	if (dataset.startsWith("Enrollment")) return "Enrollment";
+	if (dataset.startsWith("Medical")) return "Medical";
+	if (dataset.startsWith("Pharmacy")) return "Pharmacy";
+	return "Supplemental Diagnosis";
+}
+
+/** Resolve a reconciliation dataset detail by list row id. */
+export function getCmsEdgeReconciliationDetail(
+	id: string
+): CmsEdgeReconciliationDetail | null {
+	const row = CMS_EDGE_RECON_DATASETS.find((item) => item.id === id);
+	if (!row) return null;
+
+	const acceptanceRate = row.submitted
+		? Math.round((row.cmsAccepted / row.submitted) * 1000) / 10
+		: 100;
+	const rejectRate = row.submitted
+		? Math.round((row.cmsRejected / row.submitted) * 1000) / 10
+		: 0;
+
+	const pipelineCounts = [
+		row.source,
+		row.fileGenerated,
+		row.submitted,
+		row.cmsAccepted,
+	];
+	const pipeline: CmsEdgeReconPipelineStep[] = CMS_EDGE_RECON_FLOW.map(
+		(step, index) => {
+			const count = pipelineCounts[index] ?? 0;
+			const previous = index === 0 ? null : (pipelineCounts[index - 1] ?? 0);
+			return {
+				id: step.id,
+				title: step.title,
+				count,
+				deltaFromPrevious: previous === null ? null : count - previous,
+			};
+		}
+	);
+
+	const reasonTotal = CMS_EDGE_RECON_VARIANCE_REASONS.reduce(
+		(sum, item) => sum + item.count,
+		0
+	);
+	const varianceSlices: CmsEdgeReconVarianceSlice[] =
+		row.variance === 0
+			? []
+			: CMS_EDGE_RECON_VARIANCE_REASONS.map((reason) => {
+					const share = reasonTotal ? reason.count / reasonTotal : 0;
+					const count = Math.round(row.variance * share);
+					return {
+						id: reason.id,
+						label: reason.label,
+						count,
+						pct: Math.round(share * 1000) / 10,
+						tone: reason.tone,
+					};
+				});
+
+	const seq = Math.abs(
+		row.id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+	);
+	const relatedSubmission = `SUB-2027-${String((seq % 12) + 1).padStart(6, "0")}`;
+	const lastRunAt = `05/${String((seq % 12) + 1).padStart(2, "0")}/2027 06:40 AM`;
+
+	const summary =
+		row.status === "Balanced"
+			? `${row.dataset} is balanced for ${row.reportingPeriod} (${row.environment}). Source through CMS accepted align with no open variance.`
+			: row.status === "Variance"
+				? `${row.dataset} shows a material variance of ${row.variance.toLocaleString()} records between source and CMS accepted. Investigate rejections and exclusions before period close.`
+				: `${row.dataset} needs review: ${row.variance.toLocaleString()} variance across the EDGE funnel (${row.cmsRejected.toLocaleString()} CMS rejects).`;
+
+	const notes: CmsEdgeReconDetailNote[] = [
+		{
+			id: `${row.id}-n1`,
+			dateTime: lastRunAt,
+			source: "Reconciliation engine",
+			note: `Run completed for ${row.dataset} · ${row.environment} · ${row.reportingPeriod}.`,
+		},
+		{
+			id: `${row.id}-n2`,
+			dateTime: lastRunAt,
+			source: "System",
+			note:
+				row.variance === 0
+					? "No variance detected. Dataset marked Balanced."
+					: `Variance ${row.variance.toLocaleString()} · acceptance ${acceptanceRate}% · rejects ${row.cmsRejected.toLocaleString()}.`,
+		},
+	];
+
+	if (row.status !== "Balanced") {
+		notes.push({
+			id: `${row.id}-n3`,
+			dateTime: lastRunAt,
+			source: "Ops",
+			note: "Open exceptions and pending corrections contribute to residual variance. Drill into exception queue for this dataset.",
+		});
+	}
+
+	return {
+		...row,
+		runId: `RCN-${row.reportingPeriod.replace(/\s+/g, "")}-${row.id.replace("recon-", "").toUpperCase()}`,
+		lastRunAt,
+		acceptanceRate,
+		rejectRate,
+		pipeline,
+		varianceSlices,
+		relatedSubmission,
+		exceptionDataset: datasetToExceptionLabel(row.dataset),
+		summary,
+		notes,
+	};
+}
