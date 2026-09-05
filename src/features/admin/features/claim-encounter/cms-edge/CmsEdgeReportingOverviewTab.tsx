@@ -20,12 +20,18 @@ import {
 	CMS_EDGE_PANEL_CLASS,
 	CmsEdgePageFooter,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import type {
+	ReportingOverviewActivityItem,
+	ReportingOverviewAttentionItem,
+	ReportingOverviewCard,
+	ReportingOverviewHealth,
+	ReportingOverviewPipelineStep,
+} from "@/features/admin/features/claim-encounter/cms-edge/feature/mappers/cms-edgeLiveMappers";
 import {
-	CMS_EDGE_REPORTING_OVERVIEW_ACTIVITY,
-	CMS_EDGE_REPORTING_OVERVIEW_ATTENTION,
 	CMS_EDGE_REPORTING_OVERVIEW_HEALTH,
 	CMS_EDGE_REPORTING_OVERVIEW_KPIS,
 	CMS_EDGE_REPORTING_OVERVIEW_PIPELINE,
+	useCmsEdgeReportingOverviewQuery,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
 import { Link } from "@/i18n/navigation";
@@ -33,9 +39,10 @@ import { cn } from "@/lib/utils";
 
 const PANEL = CMS_EDGE_PANEL_CLASS;
 const REPORTING_BASE = "/admin/claim-encounter/regulatory/cms-edge-reporting";
+const DEFAULT_PERIOD = "q2-2027";
 
 const KPI_VISUAL: Record<
-	(typeof CMS_EDGE_REPORTING_OVERVIEW_KPIS)[number]["id"],
+	ReportingOverviewCard["id"],
 	{ icon: LucideIcon; well: string; accent: string; valueTone: string }
 > = {
 	submissions: {
@@ -78,8 +85,7 @@ const ACTIVITY_DOT = {
 	danger: "bg-red-500",
 } as const;
 
-function HealthBanner() {
-	const health = CMS_EDGE_REPORTING_OVERVIEW_HEALTH;
+function HealthBanner({ health }: { health: ReportingOverviewHealth }) {
 	const rate = health.acceptanceRate;
 
 	return (
@@ -91,7 +97,14 @@ function HealthBanner() {
 							Cycle status
 						</p>
 						<span className="inline-flex items-center gap-1.5 rounded-sm border border-primary-foreground/25 bg-primary-foreground/10 px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
-							<span className="size-1.5 rounded-full bg-amber-300" />
+							<span
+								className={cn(
+									"size-1.5 rounded-full",
+									health.status === "On Track"
+										? "bg-emerald-300"
+										: "bg-amber-300"
+								)}
+							/>
 							{health.status}
 						</span>
 					</div>
@@ -138,10 +151,10 @@ function HealthBanner() {
 	);
 }
 
-function KpiGrid() {
+function KpiGrid({ cards }: { cards: ReportingOverviewCard[] }) {
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-			{CMS_EDGE_REPORTING_OVERVIEW_KPIS.map((kpi) => {
+			{cards.map((kpi) => {
 				const visual = KPI_VISUAL[kpi.id];
 				const Icon = visual.icon;
 
@@ -206,7 +219,13 @@ function KpiGrid() {
 	);
 }
 
-function PipelineStrip() {
+function PipelineStrip({
+	pipeline,
+	periodLabel,
+}: {
+	pipeline: ReportingOverviewPipelineStep[];
+	periodLabel: string;
+}) {
 	return (
 		<section className={cn(PANEL, "overflow-hidden")}>
 			<div className="flex items-center justify-between border-b border-border/50 px-4 py-2.5">
@@ -214,13 +233,12 @@ function PipelineStrip() {
 					Reporting pipeline
 				</p>
 				<span className="text-[11px] text-muted-foreground">
-					Q2 2027 · Production
+					{periodLabel} · Production
 				</span>
 			</div>
 			<ol className="grid gap-0 sm:grid-cols-4">
-				{CMS_EDGE_REPORTING_OVERVIEW_PIPELINE.map((step, index) => {
-					const isLast =
-						index === CMS_EDGE_REPORTING_OVERVIEW_PIPELINE.length - 1;
+				{pipeline.map((step, index) => {
+					const isLast = index === pipeline.length - 1;
 					const Icon =
 						step.state === "done"
 							? CheckCircle2
@@ -263,7 +281,7 @@ function PipelineStrip() {
 	);
 }
 
-function AttentionList() {
+function AttentionList({ items }: { items: ReportingOverviewAttentionItem[] }) {
 	return (
 		<section className={cn(PANEL, "overflow-hidden")}>
 			<div className="flex items-center justify-between border-b border-border/50 px-4 py-2.5">
@@ -271,44 +289,50 @@ function AttentionList() {
 					Needs attention
 				</p>
 				<span className="rounded-sm bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-amber-800 dark:text-amber-200">
-					{CMS_EDGE_REPORTING_OVERVIEW_ATTENTION.length}
+					{items.length}
 				</span>
 			</div>
-			<ul className="divide-y divide-border/50">
-				{CMS_EDGE_REPORTING_OVERVIEW_ATTENTION.map((item) => (
-					<li key={item.id}>
-						<Link
-							href={`${REPORTING_BASE}/${item.href}`}
-							className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
-						>
-							<span
-								className={cn(
-									"mt-0.5 inline-flex shrink-0 rounded-sm px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-									SEVERITY_STYLES[item.severity]
-								)}
+			{items.length === 0 ? (
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					Nothing needs attention right now.
+				</p>
+			) : (
+				<ul className="divide-y divide-border/50">
+					{items.map((item) => (
+						<li key={item.id}>
+							<Link
+								href={`${REPORTING_BASE}/${item.href}`}
+								className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
 							>
-								{item.severity}
-							</span>
-							<div className="min-w-0 flex-1">
-								<p className="text-[13px] font-medium text-foreground">
-									{item.title}
-								</p>
-								<p className="mt-0.5 text-[11px] text-muted-foreground">
-									{item.detail}
-								</p>
-							</div>
-							<span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-								{item.age}
-							</span>
-						</Link>
-					</li>
-				))}
-			</ul>
+								<span
+									className={cn(
+										"mt-0.5 inline-flex shrink-0 rounded-sm px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+										SEVERITY_STYLES[item.severity]
+									)}
+								>
+									{item.severity}
+								</span>
+								<div className="min-w-0 flex-1">
+									<p className="text-[13px] font-medium text-foreground">
+										{item.title}
+									</p>
+									<p className="mt-0.5 text-[11px] text-muted-foreground">
+										{item.detail}
+									</p>
+								</div>
+								<span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+									{item.age}
+								</span>
+							</Link>
+						</li>
+					))}
+				</ul>
+			)}
 		</section>
 	);
 }
 
-function ActivityFeed() {
+function ActivityFeed({ items }: { items: ReportingOverviewActivityItem[] }) {
 	return (
 		<section className={cn(PANEL, "overflow-hidden")}>
 			<div className="border-b border-border/50 px-4 py-2.5">
@@ -316,43 +340,104 @@ function ActivityFeed() {
 					Recent activity
 				</p>
 			</div>
-			<ul className="divide-y divide-border/40 px-1 py-1">
-				{CMS_EDGE_REPORTING_OVERVIEW_ACTIVITY.map((item) => (
-					<li key={item.id} className="flex items-start gap-3 px-3 py-2.5">
-						<span
-							className={cn(
-								"mt-1.5 size-2 shrink-0 rounded-full",
-								ACTIVITY_DOT[item.tone]
-							)}
-						/>
-						<div className="min-w-0 flex-1">
-							<p className="text-[13px] font-medium text-foreground">
-								{item.title}
-							</p>
-							<p className="mt-0.5 text-[11px] text-muted-foreground">
-								{item.meta}
-							</p>
-						</div>
-						<span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-							{item.time}
-						</span>
-					</li>
-				))}
-			</ul>
+			{items.length === 0 ? (
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					No recent submission activity.
+				</p>
+			) : (
+				<ul className="divide-y divide-border/40 px-1 py-1">
+					{items.map((item) => (
+						<li key={item.id} className="flex items-start gap-3 px-3 py-2.5">
+							<span
+								className={cn(
+									"mt-1.5 size-2 shrink-0 rounded-full",
+									ACTIVITY_DOT[item.tone]
+								)}
+							/>
+							<div className="min-w-0 flex-1">
+								<p className="text-[13px] font-medium text-foreground">
+									{item.title}
+								</p>
+								<p className="mt-0.5 text-[11px] text-muted-foreground">
+									{item.meta}
+								</p>
+							</div>
+							<span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+								{item.time}
+							</span>
+						</li>
+					))}
+				</ul>
+			)}
 		</section>
 	);
 }
 
 export function CmsEdgeReportingOverviewTab() {
+	const overviewQuery = useCmsEdgeReportingOverviewQuery(DEFAULT_PERIOD);
+	const data = overviewQuery.data;
+	const isLoading = overviewQuery.isLoading || overviewQuery.isFetching;
+
+	const emptyHealth: ReportingOverviewHealth = {
+		status: "Loading",
+		acceptanceRate: 0,
+		daysToDeadline: CMS_EDGE_REPORTING_OVERVIEW_HEALTH.daysToDeadline,
+		deadlineLabel: CMS_EDGE_REPORTING_OVERVIEW_HEALTH.deadlineLabel,
+		environment: "Production",
+		lastSync: "—",
+	};
+	const emptyCards: ReportingOverviewCard[] =
+		CMS_EDGE_REPORTING_OVERVIEW_KPIS.map((card) => ({
+			...card,
+			value: 0,
+			hint: isLoading ? "Loading…" : "No live data",
+			delta: "—",
+			deltaTone: "neutral" as const,
+		}));
+	const emptyPipeline: ReportingOverviewPipelineStep[] =
+		CMS_EDGE_REPORTING_OVERVIEW_PIPELINE.map((step) => ({
+			...step,
+			detail: isLoading ? "Loading…" : "Awaiting data",
+			state: "pending" as const,
+		}));
+
+	const health = data?.health ?? emptyHealth;
+	const cards = data?.cards ?? emptyCards;
+	const pipeline = data?.pipeline ?? emptyPipeline;
+	const attention = data?.attention ?? [];
+	const activity = data?.activity ?? [];
+
 	return (
 		<div className={CMS_EDGE_PAGE_STACK}>
-			<HealthBanner />
-			<KpiGrid />
-			<PipelineStrip />
+			{isLoading && !data ? (
+				<section
+					className={cn(
+						PANEL,
+						"px-4 py-8 text-center text-sm text-muted-foreground"
+					)}
+				>
+					Loading reporting overview…
+				</section>
+			) : null}
+
+			{overviewQuery.isError ? (
+				<section
+					className={cn(
+						PANEL,
+						"px-4 py-8 text-center text-sm text-destructive"
+					)}
+				>
+					Failed to load reporting overview.
+				</section>
+			) : null}
+
+			<HealthBanner health={health} />
+			<KpiGrid cards={cards} />
+			<PipelineStrip pipeline={pipeline} periodLabel="Q2 2027" />
 
 			<div className="grid gap-3 lg:grid-cols-2">
-				<AttentionList />
-				<ActivityFeed />
+				<AttentionList items={attention} />
+				<ActivityFeed items={activity} />
 			</div>
 
 			<CmsEdgePageFooter />
