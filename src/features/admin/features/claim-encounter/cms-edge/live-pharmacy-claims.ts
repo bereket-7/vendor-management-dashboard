@@ -144,12 +144,12 @@ export function pharmacyClaimRowListDtosToRows(
 			fillDate: formatDate(row.date_of_service),
 			rxReference: row.reference_id || "—",
 			fillNo: 1,
-			daysSupply: 0,
-			dispensingNpi: "—",
+			daysSupply: Number(row.days_supply ?? 0),
+			dispensingNpi: row.service_provider_id?.trim() || "—",
 			network: "Retail" as PharmacyClaimNetwork,
 			allowedCost: allowed,
 			planPaid,
-			transaction: "Original",
+			transaction: mapTransaction(row.is_reversed),
 			cmsStatus: mapListCmsStatus(row),
 		};
 	});
@@ -463,6 +463,71 @@ export function derivePharmacyClaimKpis(rows: CmsEdgePharmacyClaimRow[]) {
 			tone: "text-sky-700 bg-sky-500/10",
 			valueClassName: "text-foreground",
 			icon: "user" as const,
+		},
+	];
+}
+
+/** Live filter-tab badge counts (replaces hard-coded mock badges). */
+export function derivePharmacyFilterTabBadges(rows: CmsEdgePharmacyClaimRow[]) {
+	return {
+		errors: rows.filter((r) => r.cmsStatus === "Error").length,
+		warnings: rows.filter((r) => r.cmsStatus === "Warning").length,
+		voids: rows.filter(
+			(r) => r.transaction === "Void" || r.transaction === "Replacement"
+		).length,
+	};
+}
+
+/** Lightweight validation summary cards derived from current rows. */
+export function derivePharmacyValidationSummary(
+	rows: CmsEdgePharmacyClaimRow[]
+) {
+	const invalidNdc = rows.filter(
+		(r) => !r.ndc || r.ndc === "—" || r.ndc.trim() === ""
+	).length;
+	const missingDays = rows.filter(
+		(r) => !r.daysSupply || r.daysSupply <= 0
+	).length;
+	const invalidNpi = rows.filter(
+		(r) =>
+			!r.dispensingNpi ||
+			r.dispensingNpi === "—" ||
+			!/^\d{10}$/.test(r.dispensingNpi)
+	).length;
+	const financialMismatch = rows.filter((r) => {
+		const allowed = Number(r.allowedCost ?? 0);
+		const paid = Number(r.planPaid ?? 0);
+		return allowed > 0 && paid > allowed + 0.01;
+	}).length;
+
+	return [
+		{
+			id: "invalid-ndc",
+			label: "Invalid NDC",
+			count: invalidNdc,
+			icon: "ban" as const,
+			tone: "text-red-700 bg-red-500/10",
+		},
+		{
+			id: "missing-days",
+			label: "Missing Days Supply",
+			count: missingDays,
+			icon: "calendar" as const,
+			tone: "text-amber-800 bg-amber-500/10",
+		},
+		{
+			id: "invalid-npi",
+			label: "Invalid Dispensing Provider NPI",
+			count: invalidNpi,
+			icon: "user" as const,
+			tone: "text-violet-700 bg-violet-500/10",
+		},
+		{
+			id: "financial",
+			label: "Financial Mismatch",
+			count: financialMismatch,
+			icon: "dollar" as const,
+			tone: "text-sky-700 bg-sky-500/10",
 		},
 	];
 }

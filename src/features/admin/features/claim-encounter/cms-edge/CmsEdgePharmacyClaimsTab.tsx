@@ -12,7 +12,6 @@ import {
 	ChevronRight,
 	CircleDollarSign,
 	FileText,
-	Link2,
 	type LucideIcon,
 	MoreVertical,
 	Search,
@@ -65,11 +64,12 @@ import {
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import {
 	derivePharmacyClaimKpis,
+	derivePharmacyFilterTabBadges,
+	derivePharmacyValidationSummary,
 	groupPharmacyClaimsByClaimNo,
 } from "@/features/admin/features/claim-encounter/cms-edge/live-pharmacy-claims";
 import {
 	CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS,
-	CMS_EDGE_PHARMACY_VALIDATION_SUMMARY,
 	CMS_EDGE_REPORTING_PERIODS,
 	PHARMACY_CLAIM_CMS_STATUS_STYLES,
 	PHARMACY_CLAIM_TXN_STYLES,
@@ -91,11 +91,7 @@ const VALIDATION_ICONS = {
 	calendar: CalendarDays,
 	user: User,
 	dollar: CircleDollarSign,
-	link: Link2,
-} satisfies Record<
-	(typeof CMS_EDGE_PHARMACY_VALIDATION_SUMMARY)[number]["icon"],
-	LucideIcon
->;
+} satisfies Record<"ban" | "calendar" | "user" | "dollar", LucideIcon>;
 
 const PHARMACY_LINE_COLUMNS = [
 	{ key: "claimId", label: "Claim / Line ID" },
@@ -161,6 +157,16 @@ export function CmsEdgePharmacyClaimsTab() {
 
 		return groupPharmacyClaimsByClaimNo(list);
 	}, [filterTab, pharmacyClaims, deferredSearch]);
+
+	const filterBadges = useMemo(
+		() => derivePharmacyFilterTabBadges(pharmacyClaims),
+		[pharmacyClaims]
+	);
+
+	const validationSummary = useMemo(
+		() => derivePharmacyValidationSummary(pharmacyClaims),
+		[pharmacyClaims]
+	);
 
 	const kpis = useMemo(
 		() => derivePharmacyClaimKpis(rows.flatMap((g) => g.lines)),
@@ -339,6 +345,22 @@ export function CmsEdgePharmacyClaimsTab() {
 				<div className="flex flex-wrap items-center gap-1 border-b border-border/50 px-3">
 					{CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS.map((tab) => {
 						const active = filterTab === tab.id;
+						const badge =
+							tab.id === "errors"
+								? filterBadges.errors
+								: tab.id === "warnings"
+									? filterBadges.warnings
+									: tab.id === "voids"
+										? filterBadges.voids
+										: null;
+						const badgeTone =
+							tab.id === "errors"
+								? "error"
+								: tab.id === "warnings"
+									? "warning"
+									: tab.id === "voids"
+										? "void"
+										: null;
 						return (
 							<button
 								key={tab.id}
@@ -352,14 +374,14 @@ export function CmsEdgePharmacyClaimsTab() {
 								)}
 							>
 								{tab.label}
-								{tab.badge != null && tab.badgeTone ? (
+								{badge != null && badgeTone && badge > 0 ? (
 									<span
 										className={cn(
 											"inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
-											PHARMACY_FILTER_BADGE_STYLES[tab.badgeTone]
+											PHARMACY_FILTER_BADGE_STYLES[badgeTone]
 										)}
 									>
-										{tab.badge}
+										{badge}
 									</span>
 								) : null}
 								{active ? (
@@ -457,7 +479,9 @@ export function CmsEdgePharmacyClaimsTab() {
 										colSpan={TABLE_COL_SPAN}
 										className="px-3 py-8 text-center text-muted-foreground"
 									>
-										No pharmacy claims match this filter.
+										{pharmacyClaims.length === 0
+											? "No pharmacy claims yet. Use More → Seed pharmacy claims after the core seed API is deployed."
+											: "No pharmacy claims match this filter."}
 									</TableCell>
 								</TableRow>
 							) : (
@@ -654,7 +678,7 @@ export function CmsEdgePharmacyClaimsTab() {
 					Pharmacy Validation Summary
 				</h3>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-					{CMS_EDGE_PHARMACY_VALIDATION_SUMMARY.map((item) => {
+					{validationSummary.map((item) => {
 						const Icon = VALIDATION_ICONS[item.icon];
 						return (
 							<div key={item.id} className={cn(CMS_EDGE_KPI_CARD_CLASS, "p-3")}>
@@ -671,16 +695,11 @@ export function CmsEdgePharmacyClaimsTab() {
 										<p className="text-[11px] font-medium leading-snug text-muted-foreground">
 											{item.label}
 										</p>
-										<p
-											className={cn(
-												"mt-0.5 text-lg font-semibold tabular-nums",
-												item.valueClassName
-											)}
-										>
-											{item.value}
+										<p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+											{item.count.toLocaleString("en-US")}
 										</p>
 										<p className="mt-0.5 text-[11px] text-muted-foreground">
-											{item.hint}
+											From current results
 										</p>
 									</div>
 								</div>

@@ -843,14 +843,18 @@ export type PharmacyClaimRowListDto = {
 	member_id: string | null;
 	row_number: number;
 	claim_no: string;
+	original_claim_no?: string;
+	is_reversed?: boolean;
 	date_of_service: string | null;
 	cardholder_id: string;
 	patient_first_name: string;
 	patient_last_name: string;
 	product_id: string;
 	drug_name: string;
+	days_supply?: number | null;
 	total_amount_paid: number | null;
 	patient_pay_amount: number | null;
+	service_provider_id?: string;
 	client_id: string;
 	created_at: string;
 };
