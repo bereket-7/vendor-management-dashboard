@@ -6,11 +6,17 @@ import {
 	ArrowLeft,
 	ArrowUpDown,
 	CheckCircle2,
+	ExternalLink,
+	Eye,
 	FileOutput,
+	Inbox,
+	type LucideIcon,
+	MoreHorizontal,
 	Radio,
 	RefreshCw,
+	Search,
 	Send,
-	Timer,
+	X,
 	XCircle,
 } from "lucide-react";
 import {
@@ -28,8 +34,13 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -52,15 +63,13 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import {
-	ClaimKpiGrid,
-	ClaimPageHeader,
-} from "@/features/admin/features/claim-encounter/components/ClaimPageChrome";
+	CMS_EDGE_PANEL_CLASS,
+	CMS_EDGE_TABLE_CONTAINER,
+	CmsEdgeSectionPanel,
+	CmsEdgeTableScroll,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
-	ClaimFilterBar,
-	ClaimSectionCard,
 	ClaimTablePagination,
-	FilterField,
-	MetricBar,
 	pct,
 	usePagedRows,
 } from "@/features/admin/features/claim-encounter/components/ClaimQueueChrome";
@@ -78,14 +87,91 @@ import {
 	formatCurrency,
 	getVendorFile,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
-import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { CLAIM_VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 const WORKSPACE_H = "h-[calc(100svh-5rem)]";
+const PANEL = CMS_EDGE_PANEL_CLASS;
+
+const toolbarBtn =
+	"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
+
+const selectField = cn(
+	"h-8 w-auto min-w-[7.5rem] rounded-sm border border-border bg-background text-xs shadow-none transition-colors duration-200",
+	"hover:border-foreground/20",
+	"focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+);
+
+const th =
+	"h-9 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-foreground";
+const td = "px-3 py-2.5 text-[12px] align-middle text-foreground";
 
 type SortKey = "reviewedAt" | "records" | "vendor" | "decision";
+
+function DecisionPill({ status }: { status: ClaimVendorFile["reviewStatus"] }) {
+	const accepted = status === "accepted";
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold capitalize",
+				accepted
+					? "border-emerald-200/80 bg-emerald-50 text-emerald-800"
+					: "border-rose-200/80 bg-rose-50 text-rose-800"
+			)}
+		>
+			{accepted ? (
+				<CheckCircle2 className="size-2.5" />
+			) : (
+				<XCircle className="size-2.5" />
+			)}
+			{status}
+		</span>
+	);
+}
+
+function SendStatusPill({
+	status,
+}: {
+	status: ClaimVendorFile["outboundSendStatus"];
+}) {
+	if (!status) {
+		return <span className="text-xs text-muted-foreground">—</span>;
+	}
+	const styles =
+		status === "sent"
+			? "border-sky-200/80 bg-sky-50 text-sky-900"
+			: status === "queued"
+				? "border-amber-200/80 bg-amber-50 text-amber-950"
+				: "border-violet-200/80 bg-violet-50 text-violet-900";
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold capitalize",
+				styles
+			)}
+		>
+			<span
+				className={cn(
+					"size-1.5 rounded-full",
+					status === "sent" && "bg-sky-500",
+					status === "queued" && "bg-amber-500",
+					status === "notified" && "bg-violet-500"
+				)}
+			/>
+			{status}
+		</span>
+	);
+}
+
+function TxBadge({ type }: { type: ClaimVendorFile["transactionType"] }) {
+	return (
+		<span className="rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-muted-foreground">
+			{type}
+		</span>
+	);
+}
 
 export function OutboundVendorFilePage() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
@@ -106,7 +192,7 @@ export function OutboundVendorFilePage() {
 		[programFilter]
 	);
 
-	const vendors = VENDOR_NAMES;
+	const vendors = CLAIM_VENDOR_NAMES;
 
 	const rows = useMemo(() => {
 		const filtered = base.filter((f) => {
@@ -127,6 +213,8 @@ export function OutboundVendorFilePage() {
 				f.fileId,
 				f.fileName,
 				f.vendor,
+				f.program,
+				f.transactionType,
 				f.sourceInboundFileId,
 				f.reviewedBy,
 				...f.rejectReasons.map((r) => `${r.code} ${r.description}`),
@@ -181,24 +269,49 @@ export function OutboundVendorFilePage() {
 		const claimsDenied = base.reduce((s, f) => s + f.denied, 0);
 		const claimsTotal = claimsAccepted + claimsDenied;
 		const acceptRate = pct(claimsAccepted, claimsTotal || 1);
+		const withTurnaround = base.filter((f) => f.avgResponseMinutes != null);
 		const avgTurnaround =
-			base.filter((f) => f.avgResponseMinutes != null).length === 0
+			withTurnaround.length === 0
 				? 0
 				: Math.round(
-						base.reduce((s, f) => s + (f.avgResponseMinutes ?? 0), 0) /
-							base.filter((f) => f.avgResponseMinutes != null).length
+						withTurnaround.reduce(
+							(s, f) => s + (f.avgResponseMinutes ?? 0),
+							0
+						) / withTurnaround.length
 					);
 
 		const decisionPie = [
-			{ name: "Accepted", value: accepted.length, fill: "#13446c" },
-			{ name: "Denied", value: denied.length, fill: "#ef4444" },
-		];
+			{ name: "Accepted", value: accepted.length, fill: "#059669" },
+			{ name: "Denied", value: denied.length, fill: "#f43f5e" },
+		].filter((d) => d.value > 0);
 
 		const sendPipeline = [
-			{ name: "Queued", value: queued.length, fill: "#13446c66" },
-			{ name: "Sent", value: sent.length, fill: "#13446c" },
-			{ name: "Notified", value: notified.length, fill: "#13446caa" },
+			{
+				id: "queued" as const,
+				name: "Queued",
+				value: queued.length,
+				fill: "#f59e0b",
+				tone: "bg-amber-500",
+			},
+			{
+				id: "sent" as const,
+				name: "Sent",
+				value: sent.length,
+				fill: "#0ea5e9",
+				tone: "bg-sky-500",
+			},
+			{
+				id: "notified" as const,
+				name: "Notified",
+				value: notified.length,
+				fill: "#8b5cf6",
+				tone: "bg-violet-500",
+			},
 		];
+		const pipelineTotal = Math.max(
+			1,
+			sendPipeline.reduce((s, row) => s + row.value, 0)
+		);
 
 		const reasonCounts = REJECT_REASON_CATALOG.map((r) => ({
 			code: r.code,
@@ -239,11 +352,13 @@ export function OutboundVendorFilePage() {
 		)
 			.map(([name, v]) => ({
 				name,
+				short: name.length > 14 ? `${name.slice(0, 12).trimEnd()}…` : name,
 				accepted: v.accepted,
 				denied: v.denied,
+				total: v.accepted + v.denied,
 				rate: pct(v.accepted, v.accepted + v.denied || 1),
 			}))
-			.sort((a, b) => b.accepted + b.denied - (a.accepted + a.denied));
+			.sort((a, b) => b.total - a.total);
 
 		return {
 			accepted,
@@ -257,11 +372,14 @@ export function OutboundVendorFilePage() {
 			acceptRate,
 			avgTurnaround,
 			decisionPie,
+			decisionTotal: accepted.length + denied.length,
 			sendPipeline,
+			pipelineTotal,
 			reasonCounts,
 			byReviewer,
 			vendorAccept,
 			maxReason: Math.max(1, ...reasonCounts.map((r) => r.count)),
+			maxReviewer: Math.max(1, ...byReviewer.map((r) => r.files)),
 		};
 	}, [base]);
 
@@ -296,51 +414,96 @@ export function OutboundVendorFilePage() {
 		setRefreshing(true);
 		await new Promise((r) => setTimeout(r, 400));
 		setRefreshing(false);
-		toast.success("Outbound list refreshed");
+		toast.success("Outbound refreshed");
 	}
 
-	const kpis = [
+	const STAT_SHADOW =
+		"shadow-[0_1px_2px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)]";
+	const STAT_SHADOW_HOVER =
+		"hover:shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(15,23,42,0.10)]";
+
+	const packageTotal = Math.max(base.length, 1);
+	const outboundKpis: {
+		id: string;
+		label: string;
+		value: number;
+		hint: string;
+		icon: LucideIcon;
+		accent: string;
+		valueTone: string;
+		iconTone: string;
+		ring: string;
+		active: boolean;
+		onClick: () => void;
+	}[] = [
 		{
-			label: "Reviewed packages",
-			value: formatCount(base.length),
-			hint: programFilter,
+			id: "packages",
+			label: "Total packages",
+			value: base.length,
+			hint: `${programFilter} reviewed`,
 			icon: FileOutput,
-			tone: "text-primary bg-primary/10",
+			accent: "from-sky-500/80 to-sky-400/40",
+			valueTone: "text-sky-700 dark:text-sky-300",
+			iconTone: "text-sky-700 bg-sky-500/10 dark:text-sky-300",
+			ring: "ring-sky-500/20",
+			active:
+				sendStatus === "all" &&
+				decision === "all" &&
+				reasonCode === "all" &&
+				!search.trim(),
+			onClick: () => {
+				clearFilters();
+			},
 		},
 		{
-			label: "Accept rate",
-			value: `${analytics.acceptRate}%`,
-			hint: `${formatCount(analytics.claimsAccepted)} / ${formatCount(analytics.claimsTotal)} claims`,
-			icon: CheckCircle2,
-			tone: "text-emerald-700 bg-emerald-500/10",
-		},
-		{
-			label: "Denied pkgs",
-			value: formatCount(analytics.denied.length),
-			hint: "Gainwell denials",
-			icon: XCircle,
-			tone: "text-red-700 bg-red-500/10",
-		},
-		{
-			label: "Queued send",
-			value: formatCount(analytics.queued.length),
-			hint: "Awaiting Gainwell",
+			id: "queued",
+			label: "Queued",
+			value: analytics.queued.length,
+			hint: `${pct(analytics.queued.length, packageTotal)}% awaiting send`,
 			icon: Send,
-			tone: "text-amber-700 bg-amber-500/10",
+			accent: "from-amber-500/80 to-amber-400/40",
+			valueTone: "text-amber-700 dark:text-amber-300",
+			iconTone: "text-amber-700 bg-amber-500/10 dark:text-amber-200",
+			ring: "ring-amber-500/20",
+			active: sendStatus === "queued",
+			onClick: () => {
+				setSendStatus((s) => (s === "queued" ? "all" : "queued"));
+				setDecision("all");
+				setPage(1);
+			},
 		},
 		{
+			id: "sent",
 			label: "Sent",
-			value: formatCount(analytics.sent.length),
-			hint: "Delivered",
+			value: analytics.sent.length,
+			hint: `${pct(analytics.sent.length, packageTotal)}% in flight`,
 			icon: Radio,
-			tone: "text-sky-700 bg-sky-500/10",
+			accent: "from-emerald-500/80 to-emerald-400/40",
+			valueTone: "text-emerald-700 dark:text-emerald-300",
+			iconTone: "text-emerald-700 bg-emerald-500/10 dark:text-emerald-300",
+			ring: "ring-emerald-500/20",
+			active: sendStatus === "sent",
+			onClick: () => {
+				setSendStatus((s) => (s === "sent" ? "all" : "sent"));
+				setPage(1);
+			},
 		},
 		{
-			label: "Avg turnaround",
-			value: `${analytics.avgTurnaround}m`,
-			hint: "Review → outbound",
-			icon: Timer,
-			tone: "text-violet-700 bg-violet-500/10",
+			id: "denied",
+			label: "Denied",
+			value: analytics.denied.length,
+			hint: `${pct(analytics.denied.length, packageTotal)}% vendor notified`,
+			icon: XCircle,
+			accent: "from-rose-500/80 to-rose-400/40",
+			valueTone: "text-rose-700 dark:text-rose-300",
+			iconTone: "text-rose-700 bg-rose-500/10 dark:text-rose-300",
+			ring: "ring-rose-500/20",
+			active: decision === "denied",
+			onClick: () => {
+				setDecision((d) => (d === "denied" ? "all" : "denied"));
+				setSendStatus("notified");
+				setPage(1);
+			},
 		},
 	];
 
@@ -355,344 +518,447 @@ export function OutboundVendorFilePage() {
 
 	return (
 		<div className="space-y-4">
-			<ClaimPageHeader
-				title="Outbound Vendor File"
-				description={`Accepted to Gainwell + denied claims · ${programFilter}`}
-				actions={
-					<div className="flex flex-wrap gap-1.5">
-						<Button asChild variant="outline" size="sm" className="h-9">
-							<Link href="/admin/claim-encounter/inbound">Inbound queue</Link>
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-9"
-							onClick={handleRefresh}
-							disabled={refreshing}
+			{/* Header — CMS EDGE Reporting rhythm */}
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
+				<div className="min-w-0 space-y-1">
+					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+						Outbound
+					</h1>
+					<p className="text-sm text-muted-foreground">
+						Reviewed packages ready to send
+					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-2">
+					<Button
+						asChild
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"bg-primary text-primary-foreground shadow-none hover:bg-primary/90"
+						)}
+					>
+						<Link href="/admin/claim-encounter/inbound">
+							<Inbox className="size-3.5" />
+							Inbound
+						</Link>
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
+						onClick={handleRefresh}
+						disabled={refreshing}
+					>
+						<RefreshCw
+							className={cn("size-3.5", refreshing && "animate-spin")}
+						/>
+						Refresh
+					</Button>
+				</div>
+			</div>
+
+			{/* KPI grid — reporting submissions pattern */}
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				{outboundKpis.map((kpi) => {
+					const Icon = kpi.icon;
+					return (
+						<button
+							key={kpi.id}
+							type="button"
+							onClick={kpi.onClick}
+							className={cn(
+								"group relative overflow-hidden rounded-sm border bg-card p-4 text-left transition-all duration-200 ease-out",
+								STAT_SHADOW,
+								STAT_SHADOW_HOVER,
+								"hover:-translate-y-px hover:border-border",
+								kpi.active
+									? cn("border-transparent ring-1", kpi.ring)
+									: "border-border/70"
+							)}
 						>
-							<RefreshCw
-								className={cn("mr-1.5 size-3.5", refreshing && "animate-spin")}
+							<span
+								aria-hidden
+								className={cn(
+									"absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b",
+									kpi.accent
+								)}
 							/>
-							Refresh
-						</Button>
+							<div className="flex items-start justify-between gap-3 pl-1.5">
+								<div className="min-w-0">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+										{kpi.label}
+									</p>
+									<p
+										className={cn(
+											"mt-1.5 text-2xl font-semibold tracking-tight tabular-nums",
+											kpi.valueTone
+										)}
+									>
+										{kpi.value.toLocaleString()}
+									</p>
+									<p className="mt-1.5 text-xs text-muted-foreground">
+										{kpi.hint}
+									</p>
+								</div>
+								<span
+									className={cn(
+										"flex size-9 shrink-0 items-center justify-center rounded-sm ring-1 ring-inset ring-black/5 transition-transform duration-200 group-hover:scale-105 dark:ring-white/10",
+										kpi.iconTone
+									)}
+								>
+									<Icon className="size-[18px]" aria-hidden />
+								</span>
+							</div>
+						</button>
+					);
+				})}
+			</div>
+
+			{/* Filters — reporting-style panel */}
+			<section className={cn(PANEL, "px-3 py-2.5 sm:px-3")}>
+				<div className="flex flex-col gap-2.5">
+					<div className="relative">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							value={search}
+							onChange={(e) => {
+								setSearch(e.target.value);
+								setPage(1);
+							}}
+							placeholder="Search file ID, vendor, TX type, reviewer…"
+							className="h-8 rounded-sm border-border bg-background pl-8 text-xs shadow-none focus-visible:ring-primary/15"
+						/>
+						{search ? (
+							<button
+								type="button"
+								aria-label="Clear search"
+								className="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+								onClick={() => {
+									setSearch("");
+									setPage(1);
+								}}
+							>
+								<X className="size-3.5" />
+							</button>
+						) : null}
 					</div>
-				}
-			/>
+					<div className="flex flex-wrap items-center gap-2">
+						<Select
+							value={vendor}
+							onValueChange={(v) => {
+								setVendor(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[8.5rem]")}>
+								<SelectValue placeholder="Vendor" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All vendors</SelectItem>
+								{vendors.map((v) => (
+									<SelectItem key={v} value={v}>
+										{v}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={decision}
+							onValueChange={(v) => {
+								setDecision(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={selectField}>
+								<SelectValue placeholder="Decision" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All decisions</SelectItem>
+								<SelectItem value="accepted">Accepted</SelectItem>
+								<SelectItem value="denied">Denied</SelectItem>
+							</SelectContent>
+						</Select>
+						<Select
+							value={sendStatus}
+							onValueChange={(v) => {
+								setSendStatus(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={selectField}>
+								<SelectValue placeholder="Send" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All send</SelectItem>
+								<SelectItem value="queued">Queued</SelectItem>
+								<SelectItem value="sent">Sent</SelectItem>
+								<SelectItem value="notified">Notified</SelectItem>
+							</SelectContent>
+						</Select>
+						<Select
+							value={reasonCode}
+							onValueChange={(v) => {
+								setReasonCode(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[8rem]")}>
+								<SelectValue placeholder="Reason" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All reasons</SelectItem>
+								{REJECT_REASON_CATALOG.map((r) => (
+									<SelectItem key={r.code} value={r.code}>
+										{r.code}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={`${sortKey}:${sortDir}`}
+							onValueChange={(v) => {
+								const [k, d] = v.split(":") as [SortKey, "asc" | "desc"];
+								setSortKey(k);
+								setSortDir(d);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[10rem]")}>
+								<SelectValue placeholder="Sort" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="reviewedAt:desc">Newest reviewed</SelectItem>
+								<SelectItem value="reviewedAt:asc">Oldest reviewed</SelectItem>
+								<SelectItem value="records:desc">Most claims</SelectItem>
+								<SelectItem value="records:asc">Fewest claims</SelectItem>
+								<SelectItem value="decision:asc">Decision A–Z</SelectItem>
+								<SelectItem value="vendor:asc">Vendor A–Z</SelectItem>
+							</SelectContent>
+						</Select>
+						{hasActiveFilters ? (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-8 px-2.5 text-xs text-muted-foreground"
+								onClick={clearFilters}
+							>
+								Clear
+							</Button>
+						) : null}
+					</div>
+				</div>
+			</section>
 
-			<ClaimKpiGrid items={kpis} />
-
-			{/* Review queue — directly under stats */}
-			<ClaimFilterBar
-				search={search}
-				onSearchChange={(v) => {
-					setSearch(v);
-					setPage(1);
-				}}
-				searchPlaceholder="File ID, inbound source, vendor, reviewer, reason…"
-				hasActiveFilters={hasActiveFilters}
-				onClear={clearFilters}
-			>
-				<FilterField label="Vendor">
-					<Select
-						value={vendor}
-						onValueChange={(v) => {
-							setVendor(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[150px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All vendors</SelectItem>
-							{vendors.map((v) => (
-								<SelectItem key={v} value={v}>
-									{v}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</FilterField>
-				<FilterField label="Decision">
-					<Select
-						value={decision}
-						onValueChange={(v) => {
-							setDecision(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[140px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All</SelectItem>
-							<SelectItem value="accepted">Accepted</SelectItem>
-							<SelectItem value="denied">Denied</SelectItem>
-						</SelectContent>
-					</Select>
-				</FilterField>
-				<FilterField label="Send status">
-					<Select
-						value={sendStatus}
-						onValueChange={(v) => {
-							setSendStatus(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[140px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All</SelectItem>
-							<SelectItem value="queued">Queued</SelectItem>
-							<SelectItem value="sent">Sent</SelectItem>
-							<SelectItem value="notified">Notified</SelectItem>
-						</SelectContent>
-					</Select>
-				</FilterField>
-				<FilterField label="Reason">
-					<Select
-						value={reasonCode}
-						onValueChange={(v) => {
-							setReasonCode(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[150px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All reasons</SelectItem>
-							{REJECT_REASON_CATALOG.map((r) => (
-								<SelectItem key={r.code} value={r.code}>
-									{r.code}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</FilterField>
-				<FilterField label="Sort">
-					<Select
-						value={`${sortKey}:${sortDir}`}
-						onValueChange={(v) => {
-							const [k, d] = v.split(":") as [SortKey, "asc" | "desc"];
-							setSortKey(k);
-							setSortDir(d);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[180px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="reviewedAt:desc">Reviewed (newest)</SelectItem>
-							<SelectItem value="reviewedAt:asc">Reviewed (oldest)</SelectItem>
-							<SelectItem value="records:desc">Claims (high→low)</SelectItem>
-							<SelectItem value="records:asc">Claims (low→high)</SelectItem>
-							<SelectItem value="decision:asc">Decision A–Z</SelectItem>
-							<SelectItem value="vendor:asc">Vendor A–Z</SelectItem>
-						</SelectContent>
-					</Select>
-				</FilterField>
-			</ClaimFilterBar>
-
-			<Card className="gap-1 bg-card/70 py-2">
-				<CardHeader className="px-3 pb-0.5 pt-0">
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<div>
-							<CardTitle className="text-sm font-medium">
-								Reviewed outbound
-							</CardTitle>
-							<p className="text-[11px] text-muted-foreground">
-								{rows.length} matching · open a package for claims + EDI
-							</p>
-						</div>
-						<span className="text-[11px] tabular-nums text-muted-foreground">
-							{formatCount(rows.reduce((s, f) => s + f.records, 0))} claims in
-							view
+			{/* Table — CMS EDGE reporting layout */}
+			<section className={cn(PANEL, "overflow-hidden")}>
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
+					<p className="text-sm font-semibold text-foreground">
+						Reviewed outbound{" "}
+						<span className="font-normal text-muted-foreground">
+							({rows.length})
 						</span>
-					</div>
-				</CardHeader>
-				<CardContent className="px-0 pb-0">
-					<div className="overflow-x-auto border-t border-border/50">
-						<Table>
-							<TableHeader>
+					</p>
+					<span className="text-xs tabular-nums text-muted-foreground">
+						{formatCount(rows.reduce((s, f) => s + f.records, 0))} claims
+					</span>
+				</div>
+
+				<CmsEdgeTableScroll>
+					<Table
+						containerClassName={CMS_EDGE_TABLE_CONTAINER}
+						className="w-full min-w-[1080px] text-xs"
+					>
+						<TableHeader>
+							<TableRow className="border-b border-border/50 bg-muted/30 hover:bg-muted/30">
+								<TableHead className={cn(th, "w-12 pl-4 text-center")}>
+									#
+								</TableHead>
+								<TableHead className={th}>File ID</TableHead>
+								<TableHead className={th}>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1"
+										onClick={() => toggleSort("vendor")}
+									>
+										Vendor
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={th}>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1"
+										onClick={() => toggleSort("decision")}
+									>
+										Decision
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={cn(th, "text-right")}>
+									<button
+										type="button"
+										className="ml-auto inline-flex items-center gap-1"
+										onClick={() => toggleSort("records")}
+									>
+										Claims
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={th}>Reasons</TableHead>
+								<TableHead className={th}>Send</TableHead>
+								<TableHead className={th}>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1"
+										onClick={() => toggleSort("reviewedAt")}
+									>
+										Reviewed
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={cn(th, "pr-4 text-right")}>
+									Action
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{pageRows.length === 0 ? (
 								<TableRow className="hover:bg-transparent">
-									<TableHead className="pl-3 sm:pl-4">Outbound file</TableHead>
-									<TableHead>
-										<button
-											type="button"
-											className="inline-flex items-center gap-1"
-											onClick={() => toggleSort("vendor")}
-										>
-											Vendor
-											<ArrowUpDown className="size-3 opacity-60" />
-										</button>
-									</TableHead>
-									<TableHead>
-										<button
-											type="button"
-											className="inline-flex items-center gap-1"
-											onClick={() => toggleSort("decision")}
-										>
-											Decision
-											<ArrowUpDown className="size-3 opacity-60" />
-										</button>
-									</TableHead>
-									<TableHead className="text-right">
-										<button
-											type="button"
-											className="ml-auto inline-flex items-center gap-1"
-											onClick={() => toggleSort("records")}
-										>
-											Claims
-											<ArrowUpDown className="size-3 opacity-60" />
-										</button>
-									</TableHead>
-									<TableHead>Rejection reasons</TableHead>
-									<TableHead>Send status</TableHead>
-									<TableHead>
-										<button
-											type="button"
-											className="inline-flex items-center gap-1"
-											onClick={() => toggleSort("reviewedAt")}
-										>
-											Reviewed
-											<ArrowUpDown className="size-3 opacity-60" />
-										</button>
-									</TableHead>
-									<TableHead className="pr-3 sm:pr-4">Actions</TableHead>
+									<TableCell
+										colSpan={9}
+										className="px-4 py-12 text-center text-sm text-muted-foreground"
+									>
+										{hasActiveFilters
+											? "No outbound packages match your filters."
+											: "No outbound packages for this program."}
+									</TableCell>
 								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{pageRows.map((row) => (
+							) : (
+								pageRows.map((row, index) => (
 									<TableRow
 										key={row.id}
-										className="cursor-pointer hover:bg-muted/30"
+										className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/25"
 										onClick={() => setSelectedFileId(row.fileId)}
 									>
-										<TableCell className="pl-3 sm:pl-4">
-											<div className="min-w-0">
-												<p className="font-mono text-xs font-medium">
-													{row.fileId}
-												</p>
-												<p className="truncate text-[11px] text-muted-foreground">
+										<TableCell
+											className={cn(
+												td,
+												"w-12 pl-4 text-center tabular-nums text-muted-foreground"
+											)}
+										>
+											{(safePage - 1) * pageSize + index + 1}
+										</TableCell>
+										<TableCell className={td}>
+											<div className="min-w-0 space-y-0.5">
+												<div className="flex flex-wrap items-center gap-1.5">
+													<span className="font-mono text-[11px] font-medium text-primary">
+														{row.fileId}
+													</span>
+													<TxBadge type={row.transactionType} />
+													<span className="text-[10px] text-muted-foreground">
+														{row.program}
+													</span>
+												</div>
+												<p className="max-w-[260px] truncate text-[11px] text-muted-foreground">
 													{row.sourceInboundFileId
 														? `From ${row.sourceInboundFileId}`
 														: row.fileName}
 												</p>
 											</div>
 										</TableCell>
-										<TableCell className="text-sm">{row.vendor}</TableCell>
-										<TableCell>
-											<span
-												className={cn(
-													"rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-													row.reviewStatus === "accepted"
-														? "bg-primary/15 text-primary"
-														: "bg-red-100 text-red-800"
-												)}
-											>
-												{row.reviewStatus}
-											</span>
+										<TableCell className={cn(td, "font-medium")}>
+											{row.vendor}
 										</TableCell>
-										<TableCell className="text-right text-sm tabular-nums">
+										<TableCell className={td}>
+											<DecisionPill status={row.reviewStatus} />
+										</TableCell>
+										<TableCell
+											className={cn(td, "text-right font-medium tabular-nums")}
+										>
 											<div>
-												<p>{formatCount(row.records)}</p>
-												<p className="text-[10px] text-muted-foreground">
-													<span className="text-primary">
+												{formatCount(row.records)}
+												<p className="text-[10px] font-normal text-muted-foreground">
+													<span className="text-emerald-700">
 														{row.accepted} ok
 													</span>
 													{" · "}
-													<span className="text-red-700">{row.denied} dn</span>
+													<span className="text-rose-700">{row.denied} dn</span>
 												</p>
 											</div>
 										</TableCell>
-										<TableCell className="max-w-[220px]">
+										<TableCell className={td}>
 											{row.rejectReasons.length === 0 ? (
-												<span className="text-xs text-muted-foreground">—</span>
+												<span className="text-muted-foreground">—</span>
 											) : (
-												<div className="space-y-0.5">
+												<div className="flex flex-wrap gap-1">
 													{row.rejectReasons.map((r) => (
-														<p
+														<span
 															key={r.code}
-															className="truncate text-xs"
 															title={r.description}
+															className="rounded-sm border border-rose-200/80 bg-rose-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-rose-800"
 														>
-															<span className="font-mono font-semibold text-red-800">
-																{r.code}
-															</span>
-															<span className="text-muted-foreground">
-																{" "}
-																· {r.description}
-															</span>
-														</p>
+															{r.code}
+														</span>
 													))}
 												</div>
 											)}
 										</TableCell>
-										<TableCell>
-											<span
-												className={cn(
-													"rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-													row.outboundSendStatus === "sent"
-														? "bg-sky-100 text-sky-900"
-														: row.outboundSendStatus === "queued"
-															? "bg-amber-100 text-amber-900"
-															: "bg-violet-100 text-violet-900"
-												)}
-											>
-												{row.outboundSendStatus ?? "—"}
-											</span>
+										<TableCell className={td}>
+											<SendStatusPill status={row.outboundSendStatus} />
 										</TableCell>
-										<TableCell className="text-xs tabular-nums text-muted-foreground">
+										<TableCell
+											className={cn(td, "tabular-nums text-muted-foreground")}
+										>
 											<div>
 												<p>{row.reviewedAt ?? "—"}</p>
 												<p className="text-[10px]">{row.reviewedBy}</p>
 											</div>
 										</TableCell>
 										<TableCell
-											className="pr-3 sm:pr-4"
+											className={cn(td, "pr-4 text-right")}
 											onClick={(e) => e.stopPropagation()}
 										>
-											<div className="flex gap-1">
-												<Button
-													variant="outline"
-													size="sm"
-													className="h-7 text-xs"
-													onClick={() => setSelectedFileId(row.fileId)}
-												>
-													Open claims
-												</Button>
-												<Button
-													asChild
-													variant="ghost"
-													size="sm"
-													className="h-7 text-xs"
-												>
-													<Link
-														href={`/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}`}
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														variant="ghost"
+														size="icon"
+														className="size-7 text-muted-foreground hover:text-foreground"
+														aria-label={`Actions for ${row.fileId}`}
 													>
-														Full page
-													</Link>
-												</Button>
-											</div>
+														<MoreHorizontal className="size-3.5" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end" className="w-44">
+													<DropdownMenuItem
+														onClick={() => setSelectedFileId(row.fileId)}
+													>
+														<Eye className="mr-2 size-3.5" />
+														Open claims
+													</DropdownMenuItem>
+													<DropdownMenuItem asChild>
+														<Link
+															href={`/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}`}
+														>
+															<ExternalLink className="mr-2 size-3.5" />
+															Full page
+														</Link>
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
 										</TableCell>
 									</TableRow>
-								))}
-								{pageRows.length === 0 && (
-									<TableRow>
-										<TableCell
-											colSpan={8}
-											className="h-24 text-center text-muted-foreground"
-										>
-											No reviewed outbound files match the current filters.
-										</TableCell>
-									</TableRow>
-								)}
-							</TableBody>
-						</Table>
-					</div>
+								))
+							)}
+						</TableBody>
+					</Table>
+				</CmsEdgeTableScroll>
+
+				<div className="border-t border-border/50">
 					<ClaimTablePagination
 						total={rows.length}
 						page={safePage}
@@ -705,259 +971,506 @@ export function OutboundVendorFilePage() {
 						}}
 						noun="packages"
 					/>
-				</CardContent>
-			</Card>
+				</div>
+			</section>
 
-			{/* Analytics — below review queue */}
-			<div className="grid gap-3 lg:grid-cols-3">
-				<ClaimSectionCard
+			<div className="grid gap-3 lg:grid-cols-3 lg:items-stretch">
+				<CmsEdgeSectionPanel
 					title="Decision mix"
-					description="Package-level MFC outcomes"
+					subtitle="Package-level MFC outcomes"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<div className="h-[160px]">
-						<ResponsiveContainer width="100%" height="100%">
-							<PieChart>
-								<Pie
-									data={analytics.decisionPie}
-									dataKey="value"
-									nameKey="name"
-									innerRadius={44}
-									outerRadius={68}
-									paddingAngle={3}
-								>
-									{analytics.decisionPie.map((d) => (
-										<Cell key={d.name} fill={d.fill} />
-									))}
-								</Pie>
-								<Tooltip />
-							</PieChart>
-						</ResponsiveContainer>
-					</div>
-					<div className="mt-1 grid grid-cols-2 gap-2">
-						<button
-							type="button"
-							className={cn(
-								"rounded-md border px-2 py-1.5 text-left text-xs",
-								decision === "accepted"
-									? "border-primary/30 bg-primary/10"
-									: "border-border/50 hover:bg-muted/40"
-							)}
-							onClick={() => {
-								setDecision((d) => (d === "accepted" ? "all" : "accepted"));
-								setPage(1);
-							}}
-						>
-							<p className="text-muted-foreground">Accepted</p>
-							<p className="text-base font-semibold tabular-nums text-primary">
-								{analytics.accepted.length}
-							</p>
-						</button>
-						<button
-							type="button"
-							className={cn(
-								"rounded-md border px-2 py-1.5 text-left text-xs",
-								decision === "denied"
-									? "border-red-300 bg-red-50 dark:bg-red-950/30"
-									: "border-border/50 hover:bg-muted/40"
-							)}
-							onClick={() => {
-								setDecision((d) => (d === "denied" ? "all" : "denied"));
-								setPage(1);
-							}}
-						>
-							<p className="text-muted-foreground">Denied</p>
-							<p className="text-base font-semibold tabular-nums text-red-700">
-								{analytics.denied.length}
-							</p>
-						</button>
-					</div>
-					<div className="mt-2">
-						<div className="mb-1 flex justify-between text-[11px]">
-							<span className="text-muted-foreground">Claim accept rate</span>
-							<span className="font-medium tabular-nums">
-								{analytics.acceptRate}%
-							</span>
+					{analytics.decisionPie.length === 0 ? (
+						<div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+							No packages in scope
 						</div>
-						<Progress value={analytics.acceptRate} className="h-1.5" />
-					</div>
-				</ClaimSectionCard>
+					) : (
+						<div className="flex flex-1 flex-col justify-center gap-4">
+							<div className="flex items-center gap-3">
+								<div className="relative h-[112px] w-[112px] shrink-0">
+									<ResponsiveContainer width="100%" height="100%">
+										<PieChart>
+											<Pie
+												data={analytics.decisionPie}
+												dataKey="value"
+												nameKey="name"
+												innerRadius="58%"
+												outerRadius="88%"
+												paddingAngle={2}
+												stroke="none"
+												isAnimationActive={false}
+											>
+												{analytics.decisionPie.map((d) => (
+													<Cell key={d.name} fill={d.fill} />
+												))}
+											</Pie>
+											<Tooltip content={<OutboundChartTooltip />} />
+										</PieChart>
+									</ResponsiveContainer>
+									<div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-center">
+										<p className="text-lg font-bold tabular-nums leading-none text-foreground">
+											{analytics.decisionTotal}
+										</p>
+										<p className="mt-0.5 text-[9px] leading-tight text-muted-foreground">
+											Packages
+										</p>
+									</div>
+								</div>
+								<div className="min-w-0 flex-1 space-y-1.5">
+									{analytics.decisionPie.map((d) => {
+										const isAccepted = d.name === "Accepted";
+										const active = isAccepted
+											? decision === "accepted"
+											: decision === "denied";
+										return (
+											<button
+												key={d.name}
+												type="button"
+												onClick={() => {
+													setDecision((cur) =>
+														cur === (isAccepted ? "accepted" : "denied")
+															? "all"
+															: isAccepted
+																? "accepted"
+																: "denied"
+													);
+													setPage(1);
+												}}
+												className={cn(
+													"flex w-full items-center justify-between gap-2 rounded-sm border px-2 py-1.5 text-left text-xs transition",
+													active
+														? isAccepted
+															? "border-emerald-300/80 bg-emerald-50 dark:bg-emerald-950/30"
+															: "border-rose-300/80 bg-rose-50 dark:bg-rose-950/30"
+														: "border-border/60 hover:bg-muted/40"
+												)}
+											>
+												<span className="flex min-w-0 items-center gap-1.5 font-medium">
+													<span
+														className="size-2 shrink-0 rounded-full"
+														style={{ backgroundColor: d.fill }}
+													/>
+													<span className="truncate">{d.name}</span>
+												</span>
+												<span className="shrink-0 tabular-nums text-muted-foreground">
+													{d.value}
+													<span className="ml-1 text-[10px]">
+														(
+														{pct(d.value, Math.max(1, analytics.decisionTotal))}
+														%)
+													</span>
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+							<div className="space-y-1.5 border-t border-border/40 pt-3">
+								<div className="flex items-center justify-between text-[10px]">
+									<span className="text-muted-foreground">
+										Claim accept rate
+									</span>
+									<span className="font-semibold tabular-nums text-foreground">
+										{analytics.acceptRate}%
+									</span>
+								</div>
+								<div className="h-1.5 overflow-hidden rounded-full bg-muted">
+									<div
+										className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all"
+										style={{ width: `${analytics.acceptRate}%` }}
+									/>
+								</div>
+							</div>
+						</div>
+					)}
+				</CmsEdgeSectionPanel>
 
-				<ClaimSectionCard
+				<CmsEdgeSectionPanel
 					title="Transmission pipeline"
-					description="Where accepted / denied packages stand"
+					subtitle="Where packages stand after review"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<div className="h-[160px]">
-						<ResponsiveContainer width="100%" height="100%">
-							<BarChart data={analytics.sendPipeline}>
-								<CartesianGrid strokeDasharray="3 3" vertical={false} />
-								<XAxis dataKey="name" tick={{ fontSize: 11 }} />
-								<YAxis
-									allowDecimals={false}
-									width={28}
-									tick={{ fontSize: 11 }}
-								/>
-								<Tooltip />
-								<Bar dataKey="value" radius={[4, 4, 0, 0]}>
-									{analytics.sendPipeline.map((s) => (
-										<Cell key={s.name} fill={s.fill} />
-									))}
-								</Bar>
-							</BarChart>
-						</ResponsiveContainer>
+					<div className="flex flex-1 flex-col gap-3">
+						<div className="flex h-9 shrink-0 overflow-hidden rounded-sm ring-1 ring-inset ring-border/60">
+							{analytics.sendPipeline.map((stage) => {
+								const widthPct = Math.max(
+									stage.value > 0 ? 14 : 0,
+									(stage.value / analytics.pipelineTotal) * 100
+								);
+								if (stage.value === 0) return null;
+								return (
+									<button
+										key={stage.id}
+										type="button"
+										title={`${stage.name}: ${stage.value}`}
+										onClick={() => {
+											setSendStatus((s) => (s === stage.id ? "all" : stage.id));
+											setPage(1);
+										}}
+										className={cn(
+											"relative flex min-w-0 items-center justify-center text-[11px] font-semibold text-white transition hover:brightness-110",
+											stage.tone,
+											sendStatus === stage.id &&
+												"ring-2 ring-inset ring-white/40"
+										)}
+										style={{ width: `${widthPct}%` }}
+									>
+										<span className="truncate px-1 tabular-nums">
+											{stage.value}
+										</span>
+									</button>
+								);
+							})}
+							{analytics.sendPipeline.every((s) => s.value === 0) ? (
+								<div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+									No pipeline volume
+								</div>
+							) : null}
+						</div>
+						<ul className="flex flex-1 flex-col justify-evenly gap-1.5">
+							{analytics.sendPipeline.map((stage) => {
+								const share = pct(stage.value, analytics.pipelineTotal);
+								const active = sendStatus === stage.id;
+								return (
+									<li key={stage.id} className="min-h-0">
+										<button
+											type="button"
+											onClick={() => {
+												setSendStatus((s) =>
+													s === stage.id ? "all" : stage.id
+												);
+												setPage(1);
+											}}
+											className={cn(
+												"flex h-full w-full flex-col justify-center rounded-sm border px-2 py-2 text-left transition",
+												active
+													? "border-primary/30 bg-primary/5"
+													: "border-transparent hover:bg-muted/40"
+											)}
+										>
+											<div className="mb-1 flex items-center justify-between gap-2 text-xs">
+												<span className="flex items-center gap-1.5 font-medium">
+													<span
+														className="size-2 rounded-full"
+														style={{ backgroundColor: stage.fill }}
+													/>
+													{stage.name}
+												</span>
+												<span className="tabular-nums text-muted-foreground">
+													{stage.value}{" "}
+													<span className="text-[10px]">({share}%)</span>
+												</span>
+											</div>
+											<div className="h-1.5 overflow-hidden rounded-full bg-muted">
+												<div
+													className="h-full rounded-full transition-all"
+													style={{
+														width: `${Math.max(stage.value > 0 ? 4 : 0, share)}%`,
+														backgroundColor: stage.fill,
+													}}
+												/>
+											</div>
+										</button>
+									</li>
+								);
+							})}
+						</ul>
 					</div>
-					<div className="mt-2 flex flex-wrap gap-1.5">
-						{(
-							[
-								{ id: "all", label: "All" },
-								{ id: "queued", label: "Queued" },
-								{ id: "sent", label: "Sent" },
-								{ id: "notified", label: "Notified" },
-							] as const
-						).map((chip) => (
-							<button
-								key={chip.id}
-								type="button"
-								onClick={() => {
-									setSendStatus(chip.id);
-									setPage(1);
-								}}
-								className={cn(
-									"rounded-full border px-2.5 py-1 text-[11px] font-medium",
-									sendStatus === chip.id
-										? "border-primary/40 bg-primary/10 text-primary"
-										: "border-border/60 text-muted-foreground hover:bg-muted/40"
-								)}
-							>
-								{chip.label}
-							</button>
-						))}
-					</div>
-				</ClaimSectionCard>
+				</CmsEdgeSectionPanel>
 
-				<ClaimSectionCard
+				<CmsEdgeSectionPanel
 					title="Top rejection reasons"
-					description="Most frequent codes on outbound packages"
+					subtitle="Codes on denied / partial packages"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<div className="space-y-2">
-						{analytics.reasonCounts.slice(0, 5).map((r) => (
-							<button
-								key={r.code}
-								type="button"
-								className="w-full text-left"
-								onClick={() => {
-									setReasonCode((cur) => (cur === r.code ? "all" : r.code));
-									setDecision("denied");
-									setPage(1);
-								}}
-								title={r.description}
-							>
-								<MetricBar
-									label={r.code}
-									value={r.count}
-									max={analytics.maxReason}
-									suffix="pkgs"
-									tone={reasonCode === r.code ? "bg-red-600" : "bg-red-400/80"}
-								/>
-								<p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-									{r.description}
-								</p>
-							</button>
-						))}
-						{analytics.reasonCounts.length === 0 ? (
-							<p className="text-xs text-muted-foreground">
-								No rejection reasons in this program view.
-							</p>
-						) : null}
-					</div>
-				</ClaimSectionCard>
+					{analytics.reasonCounts.length === 0 ? (
+						<p className="flex flex-1 items-center justify-center text-center text-xs text-muted-foreground">
+							No rejection reasons in this program view.
+						</p>
+					) : (
+						<ul className="flex flex-1 flex-col justify-evenly gap-1.5">
+							{analytics.reasonCounts.slice(0, 3).map((r, index) => {
+								const share = pct(r.count, analytics.maxReason);
+								const active = reasonCode === r.code;
+								return (
+									<li key={r.code} className="min-h-0">
+										<button
+											type="button"
+											className={cn(
+												"flex h-full w-full flex-col justify-center rounded-sm border px-2 py-2 text-left transition",
+												active
+													? "border-rose-300/70 bg-rose-50/80 dark:bg-rose-950/25"
+													: "border-transparent hover:bg-muted/40"
+											)}
+											onClick={() => {
+												setReasonCode((cur) =>
+													cur === r.code ? "all" : r.code
+												);
+												setDecision("denied");
+												setPage(1);
+											}}
+											title={r.description}
+										>
+											<div className="mb-1 flex items-center justify-between gap-2">
+												<span className="flex min-w-0 items-center gap-1.5">
+													<span className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted text-[10px] font-semibold tabular-nums text-muted-foreground">
+														{index + 1}
+													</span>
+													<span className="truncate font-mono text-[11px] font-semibold tracking-tight">
+														{r.code}
+													</span>
+												</span>
+												<span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+													{r.count} pkgs
+												</span>
+											</div>
+											<p className="mb-1 truncate text-[10px] text-muted-foreground">
+												{r.description}
+											</p>
+											<div className="h-1.5 overflow-hidden rounded-full bg-muted">
+												<div
+													className={cn(
+														"h-full rounded-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all",
+														active && "from-rose-700 to-rose-500"
+													)}
+													style={{
+														width: `${Math.max(8, share)}%`,
+													}}
+												/>
+											</div>
+										</button>
+									</li>
+								);
+							})}
+						</ul>
+					)}
+				</CmsEdgeSectionPanel>
 			</div>
 
 			<div className="grid gap-3 lg:grid-cols-2">
-				<ClaimSectionCard
+				<CmsEdgeSectionPanel
 					title="Reviewer throughput"
-					description="Who signed off outbound packages"
+					subtitle="Who signed off outbound packages"
+					bodyClassName="p-4"
 				>
-					<div className="overflow-x-auto">
-						<Table>
-							<TableHeader>
-								<TableRow className="hover:bg-transparent">
-									<TableHead className="pl-0">Reviewer</TableHead>
-									<TableHead className="text-right">Files</TableHead>
-									<TableHead className="text-right">Accepted</TableHead>
-									<TableHead className="pr-0 text-right">Denied</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{analytics.byReviewer.map((r) => (
-									<TableRow key={r.name} className="hover:bg-muted/30">
-										<TableCell className="pl-0 text-sm font-medium">
-											{r.name}
-										</TableCell>
-										<TableCell className="text-right tabular-nums text-sm">
-											{r.files}
-										</TableCell>
-										<TableCell className="text-right tabular-nums text-sm text-primary">
-											{r.accepted}
-										</TableCell>
-										<TableCell className="pr-0 text-right tabular-nums text-sm text-red-700">
-											{r.denied}
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					</div>
-				</ClaimSectionCard>
+					{analytics.byReviewer.length === 0 ? (
+						<p className="py-8 text-center text-xs text-muted-foreground">
+							No reviewer activity in scope.
+						</p>
+					) : (
+						<ul className="space-y-3">
+							{analytics.byReviewer.map((r) => {
+								const acceptShare =
+									r.files > 0 ? (r.accepted / r.files) * 100 : 0;
+								const denyShare = r.files > 0 ? (r.denied / r.files) * 100 : 0;
+								const otherShare = Math.max(0, 100 - acceptShare - denyShare);
+								return (
+									<li key={r.name} className="space-y-1.5">
+										<div className="flex items-baseline justify-between gap-2 text-xs">
+											<span className="truncate font-medium text-foreground">
+												{r.name}
+											</span>
+											<span className="shrink-0 tabular-nums text-muted-foreground">
+												{r.files} files ·{" "}
+												<span className="text-emerald-700 dark:text-emerald-400">
+													{r.accepted} ok
+												</span>
+												{" · "}
+												<span className="text-rose-700 dark:text-rose-400">
+													{r.denied} denied
+												</span>
+											</span>
+										</div>
+										<div className="flex h-2 overflow-hidden rounded-full bg-muted ring-1 ring-inset ring-black/5 dark:ring-white/10">
+											{acceptShare > 0 ? (
+												<div
+													className="h-full bg-emerald-500"
+													style={{ width: `${acceptShare}%` }}
+													title={`Accepted ${r.accepted}`}
+												/>
+											) : null}
+											{denyShare > 0 ? (
+												<div
+													className="h-full bg-rose-500"
+													style={{ width: `${denyShare}%` }}
+													title={`Denied ${r.denied}`}
+												/>
+											) : null}
+											{otherShare > 0 ? (
+												<div
+													className="h-full bg-slate-300/80 dark:bg-slate-600/60"
+													style={{ width: `${otherShare}%` }}
+													title="Other"
+												/>
+											) : null}
+										</div>
+										<div
+											className="h-1 overflow-hidden rounded-full bg-muted/60"
+											title="Share of program volume"
+										>
+											<div
+												className="h-full rounded-full bg-foreground/20"
+												style={{
+													width: `${pct(r.files, analytics.maxReviewer)}%`,
+												}}
+											/>
+										</div>
+									</li>
+								);
+							})}
+						</ul>
+					)}
+				</CmsEdgeSectionPanel>
 
-				<ClaimSectionCard
+				<CmsEdgeSectionPanel
 					title="Vendor claim outcomes"
-					description="Accepted vs denied claim volume by vendor"
+					subtitle="Accepted vs denied claim volume by vendor"
+					bodyClassName="px-2 pb-3 pt-2"
 				>
-					<div className="h-[200px]">
-						<ResponsiveContainer width="100%" height="100%">
-							<BarChart
-								data={analytics.vendorAccept.slice(0, 6)}
-								margin={{ left: 0, right: 8, top: 4, bottom: 0 }}
-							>
-								<CartesianGrid strokeDasharray="3 3" vertical={false} />
-								<XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
-								<YAxis
-									allowDecimals={false}
-									width={32}
-									tick={{ fontSize: 11 }}
-								/>
-								<Tooltip />
-								<Bar
-									dataKey="accepted"
-									stackId="a"
-									fill="#13446c"
-									radius={[0, 0, 0, 0]}
-									cursor="pointer"
-									onClick={(data) => {
-										const name = (data as { name?: string })?.name;
-										if (!name) return;
-										setVendor((cur) => (cur === name ? "all" : name));
-										setPage(1);
-									}}
-								/>
-								<Bar
-									dataKey="denied"
-									stackId="a"
-									fill="#ef4444"
-									radius={[4, 4, 0, 0]}
-									cursor="pointer"
-									onClick={(data) => {
-										const name = (data as { name?: string })?.name;
-										if (!name) return;
-										setVendor((cur) => (cur === name ? "all" : name));
-										setPage(1);
-									}}
-								/>
-							</BarChart>
-						</ResponsiveContainer>
-					</div>
-				</ClaimSectionCard>
+					{analytics.vendorAccept.length === 0 ? (
+						<p className="py-8 text-center text-xs text-muted-foreground">
+							No vendor outcomes in scope.
+						</p>
+					) : (
+						<>
+							<div className="mb-1 flex items-center justify-end gap-3 px-2 text-[10px] text-muted-foreground">
+								<span className="inline-flex items-center gap-1.5">
+									<span className="size-2 rounded-full bg-emerald-500" />
+									Accepted
+								</span>
+								<span className="inline-flex items-center gap-1.5">
+									<span className="size-2 rounded-full bg-rose-500" />
+									Denied
+								</span>
+							</div>
+							<div className="h-[220px]">
+								<ResponsiveContainer width="100%" height="100%">
+									<BarChart
+										layout="vertical"
+										data={analytics.vendorAccept.slice(0, 6)}
+										margin={{ left: 4, right: 16, top: 4, bottom: 4 }}
+										barCategoryGap={10}
+									>
+										<CartesianGrid
+											strokeDasharray="3 3"
+											horizontal={false}
+											stroke="hsl(var(--border))"
+											strokeOpacity={0.55}
+										/>
+										<XAxis
+											type="number"
+											allowDecimals={false}
+											tick={{
+												fontSize: 10,
+												fill: "hsl(var(--muted-foreground))",
+											}}
+											axisLine={false}
+											tickLine={false}
+										/>
+										<YAxis
+											type="category"
+											dataKey="short"
+											width={96}
+											tick={{
+												fontSize: 11,
+												fill: "hsl(var(--muted-foreground))",
+											}}
+											axisLine={false}
+											tickLine={false}
+										/>
+										<Tooltip
+											cursor={{ fill: "hsl(var(--muted))", opacity: 0.35 }}
+											content={<OutboundChartTooltip />}
+										/>
+										<Bar
+											dataKey="accepted"
+											name="Accepted"
+											stackId="a"
+											fill="#059669"
+											barSize={14}
+											cursor="pointer"
+											onClick={(data) => {
+												const name = (data as { name?: string })?.name;
+												if (!name) return;
+												setVendor((cur) => (cur === name ? "all" : name));
+												setPage(1);
+											}}
+										/>
+										<Bar
+											dataKey="denied"
+											name="Denied"
+											stackId="a"
+											fill="#f43f5e"
+											radius={[0, 4, 4, 0]}
+											barSize={14}
+											cursor="pointer"
+											onClick={(data) => {
+												const name = (data as { name?: string })?.name;
+												if (!name) return;
+												setVendor((cur) => (cur === name ? "all" : name));
+												setPage(1);
+											}}
+										/>
+									</BarChart>
+								</ResponsiveContainer>
+							</div>
+						</>
+					)}
+				</CmsEdgeSectionPanel>
 			</div>
+		</div>
+	);
+}
+
+function OutboundChartTooltip({
+	active,
+	payload,
+	label,
+}: {
+	active?: boolean;
+	payload?: Array<{
+		name?: string;
+		value?: number | string;
+		color?: string;
+		payload?: { name?: string };
+	}>;
+	label?: string | number;
+}) {
+	if (!active || !payload?.length) return null;
+	const title =
+		typeof label === "string" || typeof label === "number"
+			? String(label)
+			: (payload[0]?.payload?.name ?? "");
+
+	return (
+		<div className="rounded-sm border border-border/70 bg-card px-2.5 py-1.5 text-xs shadow-md">
+			{title ? (
+				<p className="mb-1 font-medium text-foreground">{title}</p>
+			) : null}
+			<ul className="space-y-0.5">
+				{payload.map((entry) => (
+					<li
+						key={`${entry.name}-${entry.value}`}
+						className="flex items-center justify-between gap-4 tabular-nums text-muted-foreground"
+					>
+						<span className="inline-flex items-center gap-1.5">
+							<span
+								className="size-1.5 rounded-full"
+								style={{ backgroundColor: entry.color }}
+							/>
+							{entry.name}
+						</span>
+						<span className="font-medium text-foreground">
+							{typeof entry.value === "number"
+								? entry.value.toLocaleString()
+								: entry.value}
+						</span>
+					</li>
+				))}
+			</ul>
 		</div>
 	);
 }
@@ -994,72 +1507,95 @@ function OutboundFileWorkspace({
 	);
 
 	return (
-		<div className={cn(WORKSPACE_H, "flex min-h-0 flex-col")}>
-			<header className="shrink-0 border-b border-border/50 pb-2">
-				<div className="flex flex-wrap items-center justify-between gap-2">
-					<div className="min-w-0">
+		<div className={cn(WORKSPACE_H, "flex min-h-0 flex-col gap-3")}>
+			<header className="shrink-0 border-b border-border/60 pb-3">
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="min-w-0 space-y-2">
 						<button
 							type="button"
 							onClick={onBack}
-							className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+							className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition hover:text-foreground"
 						>
 							<ArrowLeft className="size-3" />
-							Outbound list
+							Outbound
 						</button>
-						<div className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
-							<h1 className="truncate text-sm font-medium tracking-tight">
+						<div className="flex flex-wrap items-center gap-2">
+							<h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
 								{file.fileName}
 							</h1>
-							<span
-								className={cn(
-									"rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-									file.reviewStatus === "accepted"
-										? "bg-emerald-100 text-emerald-800"
-										: "bg-red-100 text-red-800"
-								)}
-							>
-								{file.reviewStatus}
-							</span>
+							<DecisionPill status={file.reviewStatus} />
+							<SendStatusPill status={file.outboundSendStatus} />
+							<TxBadge type={file.transactionType} />
 						</div>
-						<p className="truncate text-[11px] text-muted-foreground">
-							{file.vendor} · {file.fileId}
-							{" · "}
-							<span className="text-emerald-700">{acceptedCount} accepted</span>
-							{" · "}
-							<span className="text-red-700">{deniedCount} denied</span>
-							{focused ? (
+						<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+							<span className="truncate">{file.vendor}</span>
+							<span className="text-border">·</span>
+							<span>{file.program}</span>
+							<span className="text-border">·</span>
+							<span className="font-mono tabular-nums">{file.fileId}</span>
+							{file.sourceInboundFileId ? (
 								<>
-									{" · "}
-									<span className="font-mono text-foreground">
-										{focused.claimId}
+									<span className="text-border">·</span>
+									<span className="font-mono tabular-nums">
+										← {file.sourceInboundFileId}
 									</span>
 								</>
 							) : null}
-						</p>
+						</div>
+						<div className="flex flex-wrap items-center gap-1.5">
+							<span className="inline-flex items-center gap-1 rounded-sm border border-emerald-200/70 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+								<CheckCircle2 className="size-2.5" />
+								{acceptedCount} ok
+							</span>
+							<span className="inline-flex items-center gap-1 rounded-sm border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+								<XCircle className="size-2.5" />
+								{deniedCount} denied
+							</span>
+							{focused ? (
+								<span className="inline-flex items-center gap-1 rounded-sm border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+									{focused.claimId}
+								</span>
+							) : null}
+						</div>
 					</div>
+					<Button
+						asChild
+						variant="outline"
+						size="sm"
+						className={cn(toolbarBtn, "border-border/80")}
+					>
+						<Link
+							href={`/admin/claim-encounter/files/${encodeURIComponent(file.fileId)}`}
+						>
+							<ExternalLink className="size-3.5" />
+							Open
+						</Link>
+					</Button>
 				</div>
 			</header>
 
-			<div className="mt-2 min-h-0 flex-1">
+			<div className="min-h-0 flex-1">
 				<ResizablePanelGroup
 					direction="horizontal"
-					className="h-full rounded-lg border border-border/50"
+					className={cn(PANEL, "h-full overflow-hidden")}
 				>
 					<ResizablePanel
 						defaultSize={28}
 						minSize={16}
-						maxSize={42}
-						className="bg-card/70"
+						maxSize={40}
+						className="bg-muted/10"
 					>
 						<div className="flex h-full min-h-0 flex-col">
-							<div className="shrink-0 border-b border-border/50 px-2.5 py-1.5">
-								<p className="text-xs font-medium">Claims ({claims.length})</p>
-								<p className="text-[10px] text-muted-foreground">
-									Accepted & denied · EDI updates per selection
+							<div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
+								<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+									Claims
 								</p>
+								<span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+									{claims.length}
+								</span>
 							</div>
 							<ScrollArea className="min-h-0 flex-1" scrollbarClassName="w-1.5">
-								<div className="divide-y divide-border/40 p-1">
+								<div className="space-y-0.5 p-1.5">
 									{claims.map((c, index) => (
 										<ClaimDecisionCard
 											key={c.id}
@@ -1071,6 +1607,11 @@ function OutboundFileWorkspace({
 											onSelect={() => setFocusedClaimId(c.claimId)}
 										/>
 									))}
+									{claims.length === 0 ? (
+										<p className="px-2 py-8 text-center text-xs text-muted-foreground">
+											No claims on this package
+										</p>
+									) : null}
 								</div>
 							</ScrollArea>
 						</div>
@@ -1078,15 +1619,13 @@ function OutboundFileWorkspace({
 
 					<ResizableHandle withHandle />
 
-					<ResizablePanel defaultSize={72} minSize={45} className="min-w-0">
-						<div className="flex h-full min-h-0 flex-col">
-							<EdiViewerLoader
-								load={load}
-								fileName={file.fileName}
-								focusClaimIndex={focusClaimIndex}
-								className="h-full min-h-0 rounded-none border-0"
-							/>
-						</div>
+					<ResizablePanel defaultSize={72} minSize={48} className="min-w-0">
+						<EdiViewerLoader
+							load={load}
+							fileName={file.fileName}
+							focusClaimIndex={focusClaimIndex}
+							className="h-full min-h-0 rounded-none border-0"
+						/>
 					</ResizablePanel>
 				</ResizablePanelGroup>
 			</div>
@@ -1109,30 +1648,41 @@ function ClaimDecisionCard({
 	const isRejected = claim.mfcReviewStatus === "rejected";
 	const isAccepted = claim.mfcReviewStatus === "accepted";
 	const isNegative = isDenied || isRejected;
+	const reasonCodes = isNegative
+		? claim.rejectReasons.map((r) => r.code).slice(0, 3)
+		: [];
 
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
 			className={cn(
-				"w-full rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/40",
-				active && "bg-primary/8 ring-1 ring-primary/20 hover:bg-primary/10"
+				"w-full rounded-sm border border-transparent px-2.5 py-2 text-left transition",
+				"hover:border-border/50 hover:bg-card",
+				active &&
+					"border-primary/20 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-primary/15"
 			)}
 		>
 			<div className="flex items-start justify-between gap-2">
 				<div className="min-w-0">
-					<p className="font-mono text-[11px] font-semibold">{claim.claimId}</p>
-					<p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+					<p className="truncate font-mono text-[11px] font-semibold tracking-tight">
+						{claim.claimId}
+					</p>
+					<p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
 						#{index + 1} · {claim.memberId}
 					</p>
 				</div>
 				<div className="flex shrink-0 flex-col items-end gap-1">
 					<span
 						className={cn(
-							"inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium capitalize",
-							isAccepted && "bg-emerald-100 text-emerald-800",
-							isNegative && "bg-red-100 text-red-800",
-							!isAccepted && !isNegative && "bg-amber-100 text-amber-900"
+							"inline-flex items-center gap-0.5 rounded-sm border px-1.5 py-0.5 text-[9px] font-semibold capitalize",
+							isAccepted &&
+								"border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300",
+							isNegative &&
+								"border-rose-200/80 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300",
+							!isAccepted &&
+								!isNegative &&
+								"border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
 						)}
 					>
 						{isAccepted ? (
@@ -1148,33 +1698,20 @@ function ClaimDecisionCard({
 				</div>
 			</div>
 
-			{isNegative && claim.rejectReasons.length > 0 ? (
-				<div className="mt-2 space-y-1 border-t border-border/40 pt-2">
-					<p className="text-[9px] font-semibold uppercase tracking-wide text-red-700/80">
-						{isDenied ? "Denial reasons" : "Rejection reasons"}
-					</p>
-					<ul className="space-y-1">
-						{claim.rejectReasons.map((r) => (
-							<li
-								key={r.code}
-								className="rounded border border-red-200/60 bg-red-50/80 px-1.5 py-1 dark:border-red-900/40 dark:bg-red-950/30"
-							>
-								<p className="font-mono text-[10px] font-semibold text-red-800 dark:text-red-300">
-									{r.code}
-								</p>
-								<p className="text-[10px] leading-snug text-red-700/90 dark:text-red-400/90">
-									{r.description}
-								</p>
-							</li>
-						))}
-					</ul>
+			{reasonCodes.length > 0 ? (
+				<div className="mt-1.5 flex flex-wrap gap-1">
+					{reasonCodes.map((code) => (
+						<span
+							key={code}
+							className="rounded-sm border border-rose-200/60 bg-rose-50/90 px-1 py-0.5 font-mono text-[9px] font-medium text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300"
+							title={
+								claim.rejectReasons.find((r) => r.code === code)?.description
+							}
+						>
+							{code}
+						</span>
+					))}
 				</div>
-			) : null}
-
-			{isAccepted ? (
-				<p className="mt-1.5 text-[10px] text-emerald-700/90">
-					Accepted · ready for Gainwell
-				</p>
 			) : null}
 		</button>
 	);
