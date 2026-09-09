@@ -21,13 +21,13 @@ import {
 import type { MeasureExclusionsDetail } from "@/features/admin/features/claim-encounter/quality-performance/measure-library/mock-data";
 
 const REASON_COLORS = [
-	"#3b82f6",
-	"#8b5cf6",
-	"#f59e0b",
-	"#ef4444",
-	"#64748b",
-	"#06b6d4",
-	"#ec4899",
+	"var(--primary)",
+	"color-mix(in oklch, var(--primary) 72%, white)",
+	"color-mix(in oklch, var(--primary) 48%, white)",
+	"#d97706",
+	"#dc2626",
+	"color-mix(in oklch, var(--primary) 58%, white)",
+	"color-mix(in oklch, var(--primary) 38%, white)",
 ];
 
 export function MeasureDetailExclusionsTab({
@@ -73,8 +73,8 @@ export function MeasureDetailExclusionsTab({
 					action={<PdfLink label="View Full Exclusions Definition (PDF)" />}
 					bodyClassName="space-y-3 p-0"
 				>
-					<div className="rounded-lg border border-amber-200/60 bg-amber-50/40 px-3 py-2">
-						<p className="text-xs font-medium uppercase tracking-wide text-amber-800/80">
+					<div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/40">
+						<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-amber-800 dark:text-amber-200">
 							Overview
 						</p>
 						<p className="mt-2 text-sm leading-relaxed text-foreground">

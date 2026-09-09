@@ -23,7 +23,9 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import {
+	CMS_EDGE_PANEL_CLASS,
 	CMS_EDGE_STATUS_PILL_CLASS,
+	CMS_EDGE_TABLE_CLASS,
 	CMS_EDGE_TABLE_CONTAINER,
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
@@ -35,15 +37,29 @@ export const MEASURE_GRID_GAP = "gap-3";
 export const MEASURE_PANEL_BODY = "p-3";
 export const MEASURE_PANEL_BODY_STACK = "space-y-3 p-3";
 export const MEASURE_CALLOUT =
-	"rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground";
+	"rounded-sm border border-primary/15 bg-primary/5 px-3 py-2.5 text-sm leading-relaxed text-foreground";
+export const MEASURE_CHART_FRAME =
+	"min-h-[220px] rounded-sm border border-primary/10 bg-primary/[0.03] p-2";
 
-/** Table styling — readable defaults for measure detail pages */
-export const MEASURE_TABLE_CLASS = "text-sm";
+/** Primary light→dark for charts; emerald for goal lines */
+export const MEASURE_PRIMARY_CHART_SCALE = [
+	"color-mix(in oklch, var(--primary) 38%, white)",
+	"color-mix(in oklch, var(--primary) 58%, white)",
+	"color-mix(in oklch, var(--primary) 78%, white)",
+	"var(--primary)",
+] as const;
+export const MEASURE_CHART_PRIMARY = "var(--primary)";
+export const MEASURE_CHART_GOAL = "#16a34a";
+
+/** Table styling — aligned with CMS EDGE / QP tables */
+export const MEASURE_TABLE_CLASS = cn(CMS_EDGE_TABLE_CLASS, "text-sm");
 export const MEASURE_TABLE_HEAD =
-	"h-9 bg-muted/40 px-3 text-xs font-semibold tracking-wide text-foreground";
+	"h-9 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-foreground";
 export const MEASURE_TABLE_CELL =
-	"px-3 py-2 align-middle text-sm text-foreground";
+	"px-3 py-2.5 align-middle text-[12px] text-foreground";
 export const MEASURE_TABLE_MUTED = "text-muted-foreground";
+
+const PANEL = CMS_EDGE_PANEL_CLASS;
 
 export function PanelLink({
 	children,
@@ -91,11 +107,14 @@ export function MeasureStatusPill({
 	tone?: "success" | "warning" | "danger" | "info" | "neutral" | "purple";
 }) {
 	const toneClass = {
-		success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-		warning: "border-amber-200 bg-amber-50 text-amber-800",
-		danger: "border-red-200 bg-red-50 text-red-800",
-		info: "border-sky-200 bg-sky-50 text-sky-800",
-		purple: "border-violet-200 bg-violet-50 text-violet-800",
+		success:
+			"border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+		warning:
+			"border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+		danger:
+			"border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200",
+		info: "border-primary/30 bg-primary/10 text-primary",
+		purple: "border-primary/30 bg-primary/10 text-primary",
 		neutral: "border-border bg-muted text-muted-foreground",
 	}[tone];
 
@@ -169,9 +188,11 @@ export function MeasureSubsection({
 	children: ReactNode;
 }) {
 	return (
-		<div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-3">
+		<div className="space-y-2.5 rounded-sm border border-primary/10 bg-primary/[0.03] p-3">
 			<div>
-				<h4 className="text-sm font-semibold text-foreground">{title}</h4>
+				<h4 className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+					{title}
+				</h4>
 				{description ? (
 					<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
 						{description}
@@ -198,36 +219,40 @@ export function MeasureKpiCard({
 	tone?: "default" | "primary" | "success" | "warning" | "danger";
 	className?: string;
 }) {
-	const toneStyles = {
-		default: "border-border/70 bg-card",
-		primary: "border-primary/20 bg-primary/[0.03]",
-		success: "border-emerald-200/80 bg-emerald-50/50",
-		warning: "border-amber-200/80 bg-amber-50/50",
-		danger: "border-red-200/80 bg-red-50/50",
-	};
+	const accent = {
+		default: "border-l-border",
+		primary: "border-l-primary",
+		success: "border-l-emerald-600",
+		warning: "border-l-amber-500",
+		danger: "border-l-red-600",
+	}[tone];
+
+	const well = {
+		default: "bg-muted text-muted-foreground",
+		primary: "bg-primary text-primary-foreground",
+		success: "bg-emerald-600 text-white",
+		warning: "bg-amber-500 text-white",
+		danger: "bg-red-600 text-white",
+	}[tone];
 
 	const valueStyles = {
 		default: "text-foreground",
 		primary: "text-primary",
-		success: "text-emerald-700",
-		warning: "text-amber-700",
-		danger: "text-red-600",
+		success: "text-emerald-700 dark:text-emerald-300",
+		warning: "text-amber-700 dark:text-amber-300",
+		danger: "text-red-600 dark:text-red-400",
 	};
 
 	return (
-		<div
-			className={cn(
-				"rounded-lg border p-3 shadow-sm",
-				toneStyles[tone],
-				className
-			)}
-		>
+		<div className={cn(PANEL, "border-l-2 px-4 py-3.5", accent, className)}>
 			<div className="flex items-start justify-between gap-3">
 				<div className="min-w-0 flex-1">
-					<p className="text-xs font-medium text-muted-foreground">{label}</p>
+					<p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+						{label}
+					</p>
 					<p
 						className={cn(
-							"mt-0.5 text-xl font-semibold tabular-nums tracking-tight",
+							"mt-1.5 text-xl font-semibold tabular-nums tracking-tight",
 							valueStyles[tone]
 						)}
 					>
@@ -238,9 +263,14 @@ export function MeasureKpiCard({
 					) : null}
 				</div>
 				{Icon ? (
-					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-background/80 text-muted-foreground shadow-sm">
+					<span
+						className={cn(
+							"flex size-9 shrink-0 items-center justify-center rounded-full shadow-sm",
+							well
+						)}
+					>
 						<Icon className="size-4" aria-hidden />
-					</div>
+					</span>
 				) : null}
 			</div>
 		</div>
@@ -266,13 +296,12 @@ export function MeasureStatTile({
 					: "text-foreground";
 
 	return (
-		<div className="rounded-lg border border-border/60 bg-background px-3 py-2.5">
-			<p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+		<div className="rounded-sm border border-border/50 bg-card px-3 py-2.5">
+			<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+				{label}
+			</p>
 			<p
-				className={cn(
-					"mt-0.5 text-base font-semibold tabular-nums",
-					accentClass
-				)}
+				className={cn("mt-1 text-base font-semibold tabular-nums", accentClass)}
 			>
 				{value}
 			</p>
@@ -289,11 +318,11 @@ export function MeasurePipeline({
 		<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
 			{steps.map((step, index) => (
 				<div key={step.label} className="relative">
-					<div className="rounded-lg border border-border/60 bg-background px-3 py-2">
-						<p className="text-xs font-medium text-muted-foreground">
+					<div className="rounded-sm border border-border/50 bg-card px-3 py-2">
+						<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 							{step.label}
 						</p>
-						<p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
+						<p className="mt-1 text-lg font-semibold tabular-nums text-primary">
 							{typeof step.value === "number"
 								? step.value.toLocaleString()
 								: step.value}
@@ -333,7 +362,7 @@ export function MeasureActivityList({
 		<ul className="divide-y divide-border/50">
 			{items.map((item) => (
 				<li key={item.id} className="flex gap-3 px-3 py-2.5">
-					<div className="mt-1.5 size-2 shrink-0 rounded-full bg-primary/70" />
+					<div className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
 					<div className="min-w-0 flex-1 space-y-1">
 						<div className="flex flex-wrap items-start justify-between gap-2">
 							<p className="text-sm font-medium text-foreground">
@@ -464,16 +493,17 @@ export function MeasureGoalProgress({
 	statusTone: "met" | "near" | "below";
 }) {
 	const statusStyles = {
-		met: "border-emerald-200 bg-emerald-50 text-emerald-800",
-		near: "border-amber-200 bg-amber-50 text-amber-800",
-		below: "border-red-200 bg-red-50 text-red-800",
+		met: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+		near: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+		below:
+			"border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200",
 	};
 
 	return (
-		<div className="space-y-2 rounded-lg border border-border/50 bg-muted/15 p-3">
+		<div className="space-y-2 rounded-sm border border-primary/15 bg-primary/5 p-3">
 			<div className="flex flex-wrap items-end justify-between gap-3">
 				<div>
-					<p className="text-xs font-medium text-muted-foreground">
+					<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 						Performance Rate
 					</p>
 					<p className="text-2xl font-semibold tabular-nums text-primary">
@@ -481,7 +511,9 @@ export function MeasureGoalProgress({
 					</p>
 				</div>
 				<div className="text-right">
-					<p className="text-xs font-medium text-muted-foreground">Goal</p>
+					<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+						Goal
+					</p>
 					<p className="text-lg font-semibold tabular-nums text-foreground">
 						{goal.toFixed(2)}%
 					</p>
@@ -496,7 +528,7 @@ export function MeasureGoalProgress({
 					{status}
 				</span>
 			</div>
-			<div className="relative h-3 overflow-hidden rounded-full bg-muted">
+			<div className="relative h-3 overflow-hidden rounded-full bg-primary/15">
 				<div
 					className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all"
 					style={{ width: `${Math.min(rate, 100)}%` }}
@@ -508,7 +540,9 @@ export function MeasureGoalProgress({
 			</div>
 			<div className="flex justify-between text-[11px] text-muted-foreground">
 				<span>0%</span>
-				<span className="text-emerald-700">Goal at {goal.toFixed(0)}%</span>
+				<span className="text-emerald-700 dark:text-emerald-300">
+					Goal at {goal.toFixed(0)}%
+				</span>
 				<span>100%</span>
 			</div>
 		</div>
@@ -592,7 +626,7 @@ export function MeasureAsOfBar({
 	onRefresh?: () => void;
 }) {
 	return (
-		<div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/15 px-3 py-2 text-xs text-muted-foreground">
+		<div className="flex items-center justify-between gap-2 rounded-sm border border-primary/15 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
 			<span>
 				As of <span className="font-medium text-foreground">{asOf}</span>
 			</span>
@@ -704,10 +738,12 @@ export function MeasureSectionPanel({
 	bodyClassName?: string;
 }) {
 	return (
-		<section className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm">
-			<div className="flex shrink-0 items-start justify-between gap-2 border-b border-border/50 px-3 py-2">
+		<section className={cn("overflow-hidden", PANEL)}>
+			<div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-4 py-2.5">
 				<div className="min-w-0">
-					<h3 className="text-sm font-semibold text-foreground">{title}</h3>
+					<h3 className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+						{title}
+					</h3>
 					{subtitle ? (
 						<p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
 					) : null}

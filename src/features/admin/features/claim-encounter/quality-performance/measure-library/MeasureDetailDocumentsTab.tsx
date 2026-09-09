@@ -37,9 +37,10 @@ import type { MeasureDocumentsDetail } from "@/features/admin/features/claim-enc
 import { cn } from "@/lib/utils";
 
 const DOC_STATUS_STYLES: Record<string, string> = {
-	Current: "border-emerald-200 bg-emerald-50 text-emerald-800",
-	Reference: "border-sky-200 bg-sky-50 text-sky-800",
-	Submitted: "border-violet-200 bg-violet-50 text-violet-800",
+	Current:
+		"border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+	Reference: "border-primary/30 bg-primary/10 text-primary",
+	Submitted: "border-primary/40 bg-primary/15 text-primary",
 	Archived: "border-border bg-muted text-muted-foreground",
 };
 
@@ -99,9 +100,7 @@ export function MeasureDetailDocumentsTab({
 				/>
 			</div>
 
-			<div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
-				<MeasureAsOfBar asOf={data.summary.lastUpdated} />
-			</div>
+			<MeasureAsOfBar asOf={data.summary.lastUpdated} />
 
 			<div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
 				<MeasureSectionPanel

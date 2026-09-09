@@ -1728,11 +1728,21 @@ export const CBP_MEMBERS: MeasureMembersDetail = {
 			name: "Met Measure (Numerator)",
 			value: 14_869,
 			pct: 77.8,
-			color: "#22c55e",
+			color: "#16a34a",
 		},
-		{ name: "Not Met Measure", value: 4_243, pct: 19.0, color: "#f97316" },
-		{ name: "Excluded", value: 1_203, pct: 0, color: "#94a3b8" },
-		{ name: "Pending / In Review", value: 0, pct: 0, color: "#3b82f6" },
+		{ name: "Not Met Measure", value: 4_243, pct: 19.0, color: "#d97706" },
+		{
+			name: "Excluded",
+			value: 1_203,
+			pct: 0,
+			color: "color-mix(in oklch, var(--primary) 42%, white)",
+		},
+		{
+			name: "Pending / In Review",
+			value: 0,
+			pct: 0,
+			color: "var(--primary)",
+		},
 	],
 	byPlan: [
 		{
@@ -1944,11 +1954,21 @@ export const CBP_PROVIDERS: MeasureProvidersDetail = {
 		benchmark: 80.0,
 	},
 	byPerformanceLevel: [
-		{ level: "High", count: 344, pct: 31.2, color: "#15803d" },
-		{ level: "Above Average", count: 339, pct: 30.7, color: "#22c55e" },
-		{ level: "Average", count: 221, pct: 20.1, color: "#eab308" },
-		{ level: "Below Average", count: 128, pct: 11.6, color: "#f97316" },
-		{ level: "Low", count: 70, pct: 6.4, color: "#ef4444" },
+		{ level: "High", count: 344, pct: 31.2, color: "var(--primary)" },
+		{
+			level: "Above Average",
+			count: 339,
+			pct: 30.7,
+			color: "color-mix(in oklch, var(--primary) 75%, white)",
+		},
+		{
+			level: "Average",
+			count: 221,
+			pct: 20.1,
+			color: "color-mix(in oklch, var(--primary) 48%, white)",
+		},
+		{ level: "Below Average", count: 128, pct: 11.6, color: "#d97706" },
+		{ level: "Low", count: 70, pct: 6.4, color: "#dc2626" },
 	],
 	trend: [
 		{ month: "Jan 2025", rate: 74.12 },
@@ -2290,15 +2310,15 @@ export const CBP_GAP_CLOSURE: MeasureGapClosureDetail = {
 		inProcess: 1_147,
 	},
 	byStatus: [
-		{ name: "Closed", value: 947, pct: 22.33, color: "#22c55e" },
-		{ name: "In Process", value: 1_147, pct: 27.15, color: "#3b82f6" },
+		{ name: "Closed", value: 947, pct: 22.33, color: "#16a34a" },
+		{ name: "In Process", value: 1_147, pct: 27.15, color: "var(--primary)" },
 		{
 			name: "Open - Not Contacted",
 			value: 1_997,
 			pct: 47.06,
-			color: "#94a3b8",
+			color: "color-mix(in oklch, var(--primary) 42%, white)",
 		},
-		{ name: "Overdue", value: 1_152, pct: 27.02, color: "#ef4444" },
+		{ name: "Overdue", value: 1_152, pct: 27.02, color: "#dc2626" },
 	],
 	byReason: [
 		{

@@ -35,6 +35,9 @@ import {
 } from "@/components/ui/select";
 import { CMS_EDGE_STATUS_PILL_CLASS } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
+	MEASURE_CHART_FRAME,
+	MEASURE_CHART_GOAL,
+	MEASURE_CHART_PRIMARY,
 	MEASURE_TABLE_MUTED,
 	MEASURE_TAB_STACK,
 	MeasureDataTable,
@@ -177,7 +180,7 @@ export function MeasureDetailGapClosureTab({
 					subtitle="Monthly closure rate vs goal"
 					bodyClassName="p-0"
 				>
-					<div className="min-h-[220px] rounded-lg border border-border/50 bg-muted/10 p-2">
+					<div className={MEASURE_CHART_FRAME}>
 						<ResponsiveContainer width="100%" height={220}>
 							<LineChart
 								data={data.trend}
@@ -197,21 +200,21 @@ export function MeasureDetailGapClosureTab({
 								<Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
 								<ReferenceLine
 									y={data.goal}
-									stroke="#22c55e"
+									stroke={MEASURE_CHART_GOAL}
 									strokeDasharray="4 4"
 									label={{
 										value: `Goal ${data.goal}%`,
 										fontSize: 10,
-										fill: "#16a34a",
+										fill: MEASURE_CHART_GOAL,
 									}}
 								/>
 								<Line
 									type="monotone"
 									dataKey="rate"
 									name="Closure Rate"
-									stroke="#13446c"
+									stroke={MEASURE_CHART_PRIMARY}
 									strokeWidth={2.5}
-									dot={{ r: 4, fill: "#13446c" }}
+									dot={{ r: 4, fill: MEASURE_CHART_PRIMARY }}
 								/>
 							</LineChart>
 						</ResponsiveContainer>

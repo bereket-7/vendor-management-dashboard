@@ -81,8 +81,8 @@ export function MeasureDetailOverviewTab({
 					subtitle="Clinical definition, population scope, and calculation approach"
 					bodyClassName="space-y-3 p-0"
 				>
-					<div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<div className="rounded-sm border border-primary/15 bg-primary/5 px-3 py-2.5">
+						<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 							Description
 						</p>
 						<p className="mt-2 text-sm leading-relaxed text-foreground">
@@ -147,10 +147,7 @@ export function MeasureDetailOverviewTab({
 					>
 						<div className="flex flex-wrap gap-2">
 							<MeasureStatusPill label={measure.status} tone="success" />
-							<MeasureStatusPill
-								label={measure.reportingStatus}
-								tone="purple"
-							/>
+							<MeasureStatusPill label={measure.reportingStatus} tone="info" />
 						</div>
 
 						<div className="grid grid-cols-2 gap-3">
@@ -179,8 +176,8 @@ export function MeasureDetailOverviewTab({
 						title="Refresh Schedule"
 						bodyClassName="space-y-2 p-0"
 					>
-						<div className="flex items-start gap-3 rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5">
-							<CalendarClock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+						<div className="flex items-start gap-3 rounded-sm border border-primary/15 bg-primary/5 px-3 py-2.5">
+							<CalendarClock className="mt-0.5 size-4 shrink-0 text-primary" />
 							<div className="space-y-2 text-sm">
 								<div>
 									<p className="text-xs text-muted-foreground">

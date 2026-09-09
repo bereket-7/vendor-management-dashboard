@@ -33,6 +33,9 @@ import {
 } from "@/components/ui/select";
 import { CMS_EDGE_STATUS_PILL_CLASS } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
+	MEASURE_CHART_FRAME,
+	MEASURE_CHART_GOAL,
+	MEASURE_CHART_PRIMARY,
 	MEASURE_TABLE_MUTED,
 	MEASURE_TAB_STACK,
 	MeasureAsOfBar,
@@ -149,7 +152,7 @@ export function MeasureDetailProvidersTab({
 					subtitle="Average provider rate by month"
 					bodyClassName="p-0"
 				>
-					<div className="min-h-[240px] rounded-lg border border-border/50 bg-muted/10 p-2">
+					<div className={MEASURE_CHART_FRAME}>
 						<ResponsiveContainer width="100%" height={240}>
 							<LineChart
 								data={data.trend}
@@ -169,18 +172,22 @@ export function MeasureDetailProvidersTab({
 								<Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
 								<ReferenceLine
 									y={summary.benchmark}
-									stroke="#22c55e"
+									stroke={MEASURE_CHART_GOAL}
 									strokeDasharray="4 4"
-									label={{ value: "Benchmark", fontSize: 11, fill: "#16a34a" }}
+									label={{
+										value: "Benchmark",
+										fontSize: 11,
+										fill: MEASURE_CHART_GOAL,
+									}}
 								/>
 								<Legend wrapperStyle={{ fontSize: 12 }} />
 								<Line
 									type="monotone"
 									dataKey="rate"
 									name="Performance Rate"
-									stroke="#13446c"
+									stroke={MEASURE_CHART_PRIMARY}
 									strokeWidth={2.5}
-									dot={{ r: 4, fill: "#13446c" }}
+									dot={{ r: 4, fill: MEASURE_CHART_PRIMARY }}
 								/>
 							</LineChart>
 						</ResponsiveContainer>
