@@ -12,6 +12,7 @@ import {
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { CMS_EDGE_PANEL_CLASS } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
 	EdiViewerLoader,
 	fixtureKeyForTransaction,
@@ -20,7 +21,6 @@ import {
 import {
 	type ClaimLine,
 	claimsForFile,
-	formatCount,
 	formatCurrency,
 	getVendorFile,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
@@ -28,6 +28,7 @@ import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 const PAGE_H = "h-[calc(100svh-5rem)]";
+const PANEL = CMS_EDGE_PANEL_CLASS;
 
 export function ClaimFileDetailPage() {
 	const params = useParams<{ fileId: string }>();
@@ -71,18 +72,21 @@ export function ClaimFileDetailPage() {
 	const deniedCount = claims.filter(
 		(c) => c.mfcReviewStatus === "denied"
 	).length;
+	const negativeCount =
+		file?.direction === "outbound" ? deniedCount : rejectedCount;
+	const negativeLabel = file?.direction === "outbound" ? "denied" : "rejected";
 
 	if (!file) {
 		return (
-			<div className="space-y-4">
+			<div className="space-y-3">
 				<Link
 					href="/admin/claim-encounter/inbound"
-					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+					className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
 				>
-					<ArrowLeft className="size-3.5" />
+					<ArrowLeft className="size-3" />
 					Back
 				</Link>
-				<p className="text-sm text-destructive">File not found.</p>
+				<p className="text-sm text-destructive">File not found</p>
 			</div>
 		);
 	}
@@ -91,113 +95,115 @@ export function ClaimFileDetailPage() {
 		file.direction === "outbound"
 			? "/admin/claim-encounter/outbound"
 			: "/admin/claim-encounter/inbound";
+	const backLabel = file.direction === "outbound" ? "Outbound" : "Inbound";
 
 	return (
-		<div className={cn(PAGE_H, "flex min-h-0 flex-col")}>
-			<header className="shrink-0 border-b border-border/50 pb-2">
-				<div className="flex flex-wrap items-center justify-between gap-2">
-					<div className="min-w-0">
+		<div className={cn(PAGE_H, "flex min-h-0 flex-col gap-3")}>
+			<header className="shrink-0 border-b border-border/60 pb-3">
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="min-w-0 space-y-2">
 						<Link
 							href={backHref}
 							className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
 						>
 							<ArrowLeft className="size-3" />
-							{file.direction === "outbound" ? "Outbound" : "Inbound"} files
+							{backLabel}
 						</Link>
-						<div className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
-							<h1 className="truncate text-sm font-medium tracking-tight">
+						<div className="flex flex-wrap items-center gap-2">
+							<h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
 								{file.fileName}
 							</h1>
-							<span className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-								{file.direction} · {file.transactionType}
+							<span className="rounded-sm border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-muted-foreground">
+								{file.transactionType}
 							</span>
-						</div>
-						<p className="truncate text-[11px] text-muted-foreground">
-							{file.fileId} · {file.vendor} · {formatCount(file.records)} claims
-							{showClaimsPanel ? (
-								<>
-									{" "}
-									·{" "}
-									<span className="text-emerald-700">
-										{acceptedCount} accepted
-									</span>
-									{" · "}
-									{file.direction === "outbound" ? (
-										<span className="text-red-700">{deniedCount} denied</span>
-									) : (
-										<span className="text-red-700">
-											{rejectedCount} rejected
-										</span>
+							{file.reviewStatus !== "pending" ? (
+								<span
+									className={cn(
+										"inline-flex items-center gap-0.5 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold capitalize",
+										file.reviewStatus === "accepted"
+											? "border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+											: "border-rose-200/80 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300"
 									)}
-								</>
+								>
+									{file.reviewStatus === "accepted" ? (
+										<CheckCircle2 className="size-2.5" />
+									) : (
+										<XCircle className="size-2.5" />
+									)}
+									{file.reviewStatus}
+								</span>
 							) : null}
-							{focusedClaim ? (
-								<>
-									{" "}
-									· Viewing{" "}
-									<span className="font-mono text-foreground">
+						</div>
+						<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+							<span className="truncate">{file.vendor}</span>
+							<span className="text-border">·</span>
+							<span className="font-mono tabular-nums">{file.fileId}</span>
+							<span className="text-border">·</span>
+							<span className="tabular-nums">{file.records} claims</span>
+						</div>
+						{showClaimsPanel ? (
+							<div className="flex flex-wrap items-center gap-1.5">
+								<span className="inline-flex items-center gap-1 rounded-sm border border-emerald-200/70 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+									<CheckCircle2 className="size-2.5" />
+									{acceptedCount} ok
+								</span>
+								<span className="inline-flex items-center gap-1 rounded-sm border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+									<XCircle className="size-2.5" />
+									{negativeCount} {negativeLabel}
+								</span>
+								{focusedClaim ? (
+									<span className="inline-flex items-center gap-1 rounded-sm border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
 										{focusedClaim.claimId}
 									</span>
-								</>
-							) : null}
-						</p>
+								) : null}
+							</div>
+						) : null}
 					</div>
-					<div className="flex flex-wrap items-center gap-1.5">
-						{file.reviewStatus === "pending" ? (
-							<Button asChild size="sm" className="h-7 text-xs">
-								<Link
-									href={`/admin/claim-encounter/files/${encodeURIComponent(file.fileId)}/review`}
-								>
-									<ClipboardCheck className="mr-1 size-3.5" />
-									Review claims
-								</Link>
-							</Button>
-						) : (
-							<span
-								className={cn(
-									"rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-									file.reviewStatus === "accepted"
-										? "bg-emerald-100 text-emerald-800"
-										: "bg-red-100 text-red-800"
-								)}
+					{file.reviewStatus === "pending" ? (
+						<Button
+							asChild
+							size="sm"
+							className="h-9 gap-1.5 rounded-sm text-xs"
+						>
+							<Link
+								href={`/admin/claim-encounter/files/${encodeURIComponent(file.fileId)}/review`}
 							>
-								{file.reviewStatus}
-							</span>
-						)}
-					</div>
+								<ClipboardCheck className="size-3.5" />
+								Review
+							</Link>
+						</Button>
+					) : null}
 				</div>
 			</header>
 
-			<div className="mt-2 min-h-0 flex-1">
+			<div className="min-h-0 flex-1">
 				{showClaimsPanel ? (
 					<ResizablePanelGroup
 						direction="horizontal"
-						className="h-full rounded-lg border border-border/50"
+						className={cn(PANEL, "h-full overflow-hidden")}
 					>
 						<ResizablePanel
 							defaultSize={26}
 							minSize={16}
-							maxSize={42}
-							className="bg-card/70"
+							maxSize={40}
+							className="bg-muted/10"
 						>
 							<div className="flex h-full min-h-0 flex-col">
-								<div className="shrink-0 border-b border-border/50 px-2.5 py-1.5">
-									<p className="text-xs font-medium">
-										Claims ({claims.length})
+								<div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
+									<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+										Claims
 									</p>
-									<p className="text-[10px] text-muted-foreground">
-										Accepted and{" "}
-										{file.direction === "outbound" ? "denied" : "rejected"} ·
-										select to load claim EDI
-									</p>
+									<span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+										{claims.length}
+									</span>
 								</div>
 								<ScrollArea
 									className="min-h-0 flex-1"
 									scrollbarClassName="w-1.5"
 								>
-									<div className="divide-y divide-border/40 p-1">
+									<div className="space-y-0.5 p-1.5">
 										{claims.map((c, index) => (
-											<OutboundClaimCard
+											<DetailClaimCard
 												key={c.id}
 												claim={c}
 												index={index}
@@ -212,20 +218,22 @@ export function ClaimFileDetailPage() {
 
 						<ResizableHandle withHandle />
 
-						<ResizablePanel defaultSize={74} minSize={45} className="min-w-0">
-							<div className="flex h-full min-h-0 flex-col">
-								<EdiViewerLoader
-									load={load}
-									fileName={file.fileName}
-									focusClaimIndex={focusClaimIndex}
-									className="h-full min-h-0 rounded-none border-0"
-								/>
-							</div>
+						<ResizablePanel defaultSize={74} minSize={48} className="min-w-0">
+							<EdiViewerLoader
+								load={load}
+								fileName={file.fileName}
+								focusClaimIndex={focusClaimIndex}
+								className="h-full min-h-0 rounded-none border-0"
+							/>
 						</ResizablePanel>
 					</ResizablePanelGroup>
 				) : (
-					/* No left claims list — EDI fills height; stats + search stay sticky in viewer chrome */
-					<div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/50">
+					<div
+						className={cn(
+							PANEL,
+							"flex h-full min-h-0 flex-col overflow-hidden"
+						)}
+					>
 						<EdiViewerLoader
 							load={load}
 							fileName={file.fileName}
@@ -238,7 +246,7 @@ export function ClaimFileDetailPage() {
 	);
 }
 
-function OutboundClaimCard({
+function DetailClaimCard({
 	claim,
 	index,
 	active,
@@ -253,32 +261,41 @@ function OutboundClaimCard({
 	const isRejected = claim.mfcReviewStatus === "rejected";
 	const isAccepted = claim.mfcReviewStatus === "accepted";
 	const isNegative = isDenied || isRejected;
+	const reasonCodes = isNegative
+		? claim.rejectReasons.map((r) => r.code).slice(0, 3)
+		: [];
 
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
 			className={cn(
-				"w-full rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/40",
-				active && "bg-primary/8 ring-1 ring-primary/20 hover:bg-primary/10"
+				"w-full rounded-sm border border-transparent px-2.5 py-2 text-left transition",
+				"hover:border-border/50 hover:bg-card",
+				active &&
+					"border-primary/20 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-primary/15"
 			)}
 		>
 			<div className="flex items-start justify-between gap-2">
 				<div className="min-w-0">
-					<p className="font-mono text-[11px] font-semibold leading-tight">
+					<p className="truncate font-mono text-[11px] font-semibold tracking-tight">
 						{claim.claimId}
 					</p>
-					<p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+					<p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
 						#{index + 1} · {claim.memberId}
 					</p>
 				</div>
 				<div className="flex shrink-0 flex-col items-end gap-1">
 					<span
 						className={cn(
-							"inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium capitalize",
-							isAccepted && "bg-emerald-100 text-emerald-800",
-							isNegative && "bg-red-100 text-red-800",
-							!isAccepted && !isNegative && "bg-amber-100 text-amber-900"
+							"inline-flex items-center gap-0.5 rounded-sm border px-1.5 py-0.5 text-[9px] font-semibold capitalize",
+							isAccepted &&
+								"border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300",
+							isNegative &&
+								"border-rose-200/80 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300",
+							!isAccepted &&
+								!isNegative &&
+								"border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
 						)}
 					>
 						{isAccepted ? (
@@ -294,33 +311,20 @@ function OutboundClaimCard({
 				</div>
 			</div>
 
-			{isNegative && claim.rejectReasons.length > 0 ? (
-				<div className="mt-2 space-y-1 border-t border-border/40 pt-2">
-					<p className="text-[9px] font-semibold uppercase tracking-wide text-red-700/80">
-						{isDenied ? "Denial reasons" : "Rejection reasons"}
-					</p>
-					<ul className="space-y-1">
-						{claim.rejectReasons.map((r) => (
-							<li
-								key={r.code}
-								className="rounded border border-red-200/60 bg-red-50/80 px-1.5 py-1 dark:border-red-900/40 dark:bg-red-950/30"
-							>
-								<p className="font-mono text-[10px] font-semibold text-red-800 dark:text-red-300">
-									{r.code}
-								</p>
-								<p className="text-[10px] leading-snug text-red-700/90 dark:text-red-400/90">
-									{r.description}
-								</p>
-							</li>
-						))}
-					</ul>
+			{reasonCodes.length > 0 ? (
+				<div className="mt-1.5 flex flex-wrap gap-1">
+					{reasonCodes.map((code) => (
+						<span
+							key={code}
+							className="rounded-sm border border-rose-200/60 bg-rose-50/90 px-1 py-0.5 font-mono text-[9px] font-medium text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300"
+							title={
+								claim.rejectReasons.find((r) => r.code === code)?.description
+							}
+						>
+							{code}
+						</span>
+					))}
 				</div>
-			) : null}
-
-			{isAccepted ? (
-				<p className="mt-1.5 text-[10px] text-emerald-700/90">
-					Accepted · queued / sent to Gainwell
-				</p>
 			) : null}
 		</button>
 	);

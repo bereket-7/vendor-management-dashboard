@@ -165,6 +165,8 @@ export function ClaimFilterBar({
 	hasActiveFilters,
 	onClear,
 	children,
+	className,
+	tone = "default",
 }: {
 	search: string;
 	onSearchChange: (v: string) => void;
@@ -172,21 +174,54 @@ export function ClaimFilterBar({
 	hasActiveFilters: boolean;
 	onClear: () => void;
 	children?: ReactNode;
+	className?: string;
+	tone?: "default" | "primary";
 }) {
+	const primary = tone === "primary";
+
 	return (
-		<div className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
+		<div
+			data-tone={tone}
+			className={cn(
+				"group",
+				primary
+					? cn(
+							"rounded-sm border border-primary/20 bg-primary p-3.5 text-primary-foreground shadow-[0_1px_3px_rgba(15,23,42,0.12),0_4px_12px_rgba(15,23,42,0.06)] sm:p-4",
+							"[&_[role=combobox]]:border-primary-foreground/25 [&_[role=combobox]]:bg-primary-foreground/10 [&_[role=combobox]]:text-primary-foreground [&_[role=combobox]]:shadow-none",
+							"[&_[role=combobox]]:hover:bg-primary-foreground/15 [&_[role=combobox]]:hover:text-primary-foreground",
+							"[&_[role=combobox]]:focus:ring-primary-foreground/20 [&_[role=combobox]]:data-[placeholder]:text-primary-foreground/55",
+							"[&_[role=combobox]_svg]:text-primary-foreground/60"
+						)
+					: "rounded-xl border border-border bg-card p-3.5 shadow-sm",
+				className
+			)}
+		>
 			<div className="flex flex-wrap items-end gap-2">
 				<div className="min-w-[180px] flex-1 space-y-1">
-					<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+					<label
+						className={cn(
+							"text-[11px] font-semibold uppercase tracking-[0.08em]",
+							primary ? "text-primary-foreground/70" : "text-muted-foreground"
+						)}
+					>
 						Search
 					</label>
 					<div className="relative">
-						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Search
+							className={cn(
+								"pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2",
+								primary ? "text-primary-foreground/55" : "text-muted-foreground"
+							)}
+						/>
 						<Input
 							value={search}
 							onChange={(e) => onSearchChange(e.target.value)}
 							placeholder={searchPlaceholder}
-							className="h-9 pl-8"
+							className={cn(
+								"h-9 pl-8",
+								primary &&
+									"border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground shadow-none placeholder:text-primary-foreground/45 focus-visible:border-primary-foreground/40 focus-visible:ring-primary-foreground/20"
+							)}
 						/>
 					</div>
 				</div>
@@ -196,7 +231,11 @@ export function ClaimFilterBar({
 						type="button"
 						variant="ghost"
 						size="sm"
-						className="h-9 text-xs"
+						className={cn(
+							"h-9 text-xs",
+							primary &&
+								"text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+						)}
 						onClick={onClear}
 					>
 						<X className="mr-1 size-3.5" />
@@ -257,7 +296,7 @@ export function FilterField({
 }) {
 	return (
 		<div className={cn("min-w-[140px] space-y-1", className)}>
-			<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+			<label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground group-data-[tone=primary]:text-primary-foreground/70">
 				{label}
 			</label>
 			{children}

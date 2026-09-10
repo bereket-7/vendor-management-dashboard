@@ -1,24 +1,28 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
-	ChevronDown,
+	AlertTriangle,
+	ArrowRight,
+	Banknote,
+	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
+	Clock3,
 	Code2,
 	Download,
-	Filter,
+	FileInput,
+	MessageSquareReply,
 	MoreHorizontal,
-	Printer,
+	RefreshCw,
 	Search,
-	X,
+	SlidersHorizontal,
+	XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -27,12 +31,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
@@ -41,10 +51,14 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
-import { ClaimPageHeader } from "@/features/admin/features/claim-encounter/components/ClaimPageChrome";
-import { usePagedRows } from "@/features/admin/features/claim-encounter/components/ClaimQueueChrome";
+import {
+	CMS_EDGE_KPI_CARD_CLASS,
+	CMS_EDGE_PAGE_STACK,
+	CMS_EDGE_PANEL_CLASS,
+	CMS_EDGE_TABLE_CONTAINER,
+	CmsEdgeTableScroll,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import { EdiViewerDialog } from "@/features/admin/features/claim-encounter/edi";
 import {
 	type ClaimLine,
@@ -55,18 +69,19 @@ import {
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
 import {
 	useDeleteClaimLine,
-	useMockClaimLinesQuery,
-	useSeedClaimLines,
 	useVendorCoreClaimLines,
 } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { claimLineDtosToClaimLines } from "@/features/admin/features/claim-encounter/live-claims";
+import { CLAIM_LINES } from "@/features/admin/features/claim-encounter/mock-data";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import { Link, useRouter } from "@/i18n/navigation";
 import { downloadCsv, stampFilename } from "@/lib/export/csv";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
+
+const PANEL = CMS_EDGE_PANEL_CLASS;
 
 const MEMBER_NAMES = [
 	"Jordan Lee",
@@ -78,12 +93,9 @@ const MEMBER_NAMES = [
 	"Liam Ortiz",
 	"Harper Diaz",
 ];
-
 const PAYERS = ["MDH Medicaid", "DHCF QHP", "BHP Commercial", "Gainwell"];
 const GROUPS = ["GRP-4401", "GRP-5510", "GRP-6622", "GRP-7733"];
 const PLANS = ["MDH Standard", "DHCF Plus", "BHP Select", "Essential Care"];
-const CPT_CODES = ["99213", "99214", "80053", "87070", "J3490", "D0120"];
-const DIAG_CODES = ["E11.9", "I10", "J06.9", "M54.5", "Z00.00"];
 
 type ClaimWorkbenchRow = ClaimLine & {
 	memberName: string;
@@ -101,38 +113,24 @@ type ClaimWorkbenchRow = ClaimLine & {
 	displayClaimType: string;
 };
 
-type ServiceLine = {
-	id: string;
-	code: string;
-	modifier: string;
-	diagnosis: string;
-	units: number;
-	charge: number;
-	allowed: number;
-	paid: number;
-	status: string;
-};
+const toolbarBtn =
+	"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
 
-const DETAIL_TABS = [
-	"Claim Summary",
-	"Member",
-	"Services",
-	"Providers",
-	"Financial",
-	"Responses",
-	"History",
-	"Attachments",
-	"Notes",
-] as const;
+const compactFieldClass = cn(
+	"h-8 rounded-sm border border-border bg-background text-xs shadow-none transition-colors duration-200",
+	"hover:border-foreground/20",
+	"focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+);
+
+const th =
+	"h-9 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-foreground";
+const td = "px-3 py-2.5 text-[12px] align-middle text-foreground";
 
 function toClaimType(label: string) {
-	if (label.toLowerCase().includes("pharm")) return "Pharmacy";
-	if (
-		label.toLowerCase().includes("dental") ||
-		label.toLowerCase().includes("vision")
-	)
-		return "Dental";
-	if (label.toLowerCase().includes("encounter")) return "Encounter";
+	const value = label.toLowerCase();
+	if (value.includes("pharm")) return "Pharmacy";
+	if (value.includes("dental") || value.includes("vision")) return "Dental";
+	if (value.includes("encounter")) return "Encounter";
 	return "Medical";
 }
 
@@ -173,62 +171,79 @@ function enrichClaim(line: ClaimLine, index: number): ClaimWorkbenchRow {
 	};
 }
 
-function serviceLinesFor(claim: ClaimWorkbenchRow): ServiceLine[] {
-	const count = 2 + (Number(claim.id.replace(/\D/g, "")) % 3);
-	const lines: ServiceLine[] = [];
-	for (let i = 0; i < count; i++) {
-		const charge = Math.round(claim.amountBilled / count);
-		const paid =
-			claim.claimStatus === "Paid"
-				? charge
-				: claim.claimStatus === "Partial"
-					? Math.round(charge * 0.6)
-					: 0;
-		lines.push({
-			id: `${claim.id}-svc-${i + 1}`,
-			code: CPT_CODES[
-				(Number(claim.id.replace(/\D/g, "")) + i) % CPT_CODES.length
-			]!,
-			modifier: i === 0 ? "25" : "",
-			diagnosis:
-				DIAG_CODES[
-					(Number(claim.id.replace(/\D/g, "")) + i) % DIAG_CODES.length
-				]!,
-			units: 1 + (i % 2),
-			charge,
-			allowed: Math.round(charge * 0.85),
-			paid,
-			status: claim.claimStatus,
-		});
-	}
-	return lines;
+function showcaseRow(): ClaimWorkbenchRow {
+	return {
+		id: SHOWCASE_CLAIM_DETAIL.id,
+		claimId: SHOWCASE_CLAIM_DETAIL.claimId,
+		memberId: SHOWCASE_CLAIM_DETAIL.memberId,
+		provider: SHOWCASE_CLAIM_DETAIL.provider,
+		vendor: SHOWCASE_CLAIM_DETAIL.vendor,
+		account: "MED-ACC-1",
+		claimType: SHOWCASE_CLAIM_DETAIL.claimType,
+		dateOfService: SHOWCASE_CLAIM_DETAIL.dateOfService,
+		amountBilled: SHOWCASE_CLAIM_DETAIL.amountBilled,
+		amountPaid: SHOWCASE_CLAIM_DETAIL.amountPaid,
+		submissionStatus: "accepted",
+		gainwellStatus: "paid",
+		mfcReviewStatus: "accepted",
+		rejectReason: null,
+		rejectReasons: [],
+		responseFileName: SHOWCASE_CLAIM_DETAIL.edi835FileName,
+		traceId: SHOWCASE_CLAIM_DETAIL.traceId,
+		batchId: SHOWCASE_CLAIM_DETAIL.batchId,
+		fileId: SHOWCASE_CLAIM_DETAIL.fileId,
+		responseId: SHOWCASE_CLAIM_DETAIL.responseId,
+		program: SHOWCASE_CLAIM_DETAIL.program,
+		direction: "inbound",
+		memberName: SHOWCASE_CLAIM_DETAIL.memberName,
+		providerNpi: SHOWCASE_CLAIM_DETAIL.providerNpi,
+		payer: SHOWCASE_CLAIM_DETAIL.payer,
+		group: SHOWCASE_CLAIM_DETAIL.group,
+		plan: SHOWCASE_CLAIM_DETAIL.plan,
+		authNumber: SHOWCASE_CLAIM_DETAIL.authNumber,
+		rxNumber: "",
+		priority: SHOWCASE_CLAIM_DETAIL.priority,
+		claimStatus: SHOWCASE_CLAIM_DETAIL.status,
+		responseStatus: "Accepted",
+		receivedAt: SHOWCASE_CLAIM_DETAIL.receivedAt,
+		fileName: SHOWCASE_CLAIM_DETAIL.fileName,
+		displayClaimType: "Medical",
+	};
 }
 
-function Field({
-	label,
-	children,
-	className,
-}: {
-	label: string;
-	children: ReactNode;
-	className?: string;
-}) {
+function needsAttention(row: ClaimWorkbenchRow) {
 	return (
-		<label className={cn("flex min-w-0 flex-col gap-1", className)}>
-			<span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-				{label}
-			</span>
-			{children}
-		</label>
+		row.claimStatus === "Denied" ||
+		row.claimStatus === "Rejected" ||
+		row.claimStatus === "Partial" ||
+		row.priority === "Urgent"
 	);
 }
 
-function ClaimStatusBadge({ status }: { status: string }) {
-	return <StatusBadge status={status} />;
+function PriorityPill({
+	priority,
+}: {
+	priority: ClaimWorkbenchRow["priority"];
+}) {
+	if (priority === "Normal") return null;
+	return (
+		<span
+			className={cn(
+				"inline-flex rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold",
+				priority === "Urgent"
+					? "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+					: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+			)}
+		>
+			{priority}
+		</span>
+	);
 }
 
+/** Prefer claim-file fixtures (default on) so Claims mirrors inbound/outbound mock seed. */
 export function ClaimsPage() {
-	if (!isMockEnabled()) {
+	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
+	if (!useFixtures) {
 		return (
 			<VendorCoreGate title="Claims">
 				<ClaimsBody useLive />
@@ -240,146 +255,40 @@ export function ClaimsPage() {
 
 function ClaimsBody({ useLive }: { useLive: boolean }) {
 	const router = useRouter();
-	const programFilter = useAdminModuleStore((s) => s.fileType);
-	const claimLinesQ = useVendorCoreClaimLines(useLive);
-	const mockClaimLinesQ = useMockClaimLinesQuery();
-	const seedClaimLines = useSeedClaimLines();
+	const program = useAdminModuleStore((s) => s.fileType);
+	const liveQuery = useVendorCoreClaimLines(useLive);
 	const deleteClaimLine = useDeleteClaimLine();
 
-	const [filtersOpen, setFiltersOpen] = useState(false);
-	const [quickSearch, setQuickSearch] = useState("");
-
-	const [claimId, setClaimId] = useState("");
-	const [memberId, setMemberId] = useState("");
-	const [memberName, setMemberName] = useState("");
-	const [providerNpi, setProviderNpi] = useState("");
+	const [search, setSearch] = useState("");
 	const [vendor, setVendor] = useState("all");
-	const [authNumber, setAuthNumber] = useState("");
-	const [rxNumber, setRxNumber] = useState("");
-	const [dosFrom, setDosFrom] = useState("2026-07-01");
-	const [dosTo, setDosTo] = useState("2026-07-28");
-
 	const [claimStatus, setClaimStatus] = useState("all");
 	const [claimType, setClaimType] = useState("all");
 	const [payer, setPayer] = useState("all");
-	const [group, setGroup] = useState("all");
-	const [plan, setPlan] = useState("all");
-	const [serviceDatePreset, setServiceDatePreset] = useState("90");
 	const [responseStatus, setResponseStatus] = useState("all");
 	const [priority, setPriority] = useState("all");
-
-	const [applied, setApplied] = useState(0);
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(25);
-	const [selectedId, setSelectedId] = useState<string | null>(null);
-	const [detailTab, setDetailTab] =
-		useState<(typeof DETAIL_TABS)[number]>("Claim Summary");
-	const [ediOpen, setEdiOpen] = useState(false);
+	const [ediRow, setEdiRow] = useState<ClaimWorkbenchRow | null>(null);
+	const [refreshing, setRefreshing] = useState(false);
 
 	const allRows = useMemo(() => {
 		if (useLive) {
-			const lines = claimLineDtosToClaimLines(
-				claimLinesQ.data ?? [],
-				programFilter
+			return claimLineDtosToClaimLines(liveQuery.data ?? [], program).map(
+				enrichClaim
 			);
-			return lines.map((c, i) => enrichClaim(c, i));
 		}
 
-		const rows = (mockClaimLinesQ.data ?? [])
-			.filter((c) => c.program === programFilter)
-			.map((c, i) => enrichClaim(c, i));
-
-		const showcase: ClaimWorkbenchRow = {
-			id: SHOWCASE_CLAIM_DETAIL.id,
-			claimId: SHOWCASE_CLAIM_DETAIL.claimId,
-			memberId: SHOWCASE_CLAIM_DETAIL.memberId,
-			provider: SHOWCASE_CLAIM_DETAIL.provider,
-			vendor: SHOWCASE_CLAIM_DETAIL.vendor,
-			account: "MED-ACC-1",
-			claimType: SHOWCASE_CLAIM_DETAIL.claimType,
-			dateOfService: SHOWCASE_CLAIM_DETAIL.dateOfService,
-			amountBilled: SHOWCASE_CLAIM_DETAIL.amountBilled,
-			amountPaid: SHOWCASE_CLAIM_DETAIL.amountPaid,
-			submissionStatus: "accepted",
-			gainwellStatus: "paid",
-			mfcReviewStatus: "accepted",
-			rejectReason: null,
-			rejectReasons: [],
-			responseFileName: SHOWCASE_CLAIM_DETAIL.edi835FileName,
-			traceId: SHOWCASE_CLAIM_DETAIL.traceId,
-			batchId: SHOWCASE_CLAIM_DETAIL.batchId,
-			fileId: SHOWCASE_CLAIM_DETAIL.fileId,
-			responseId: SHOWCASE_CLAIM_DETAIL.responseId,
-			program: SHOWCASE_CLAIM_DETAIL.program,
-			direction: "inbound",
-			memberName: SHOWCASE_CLAIM_DETAIL.memberName,
-			providerNpi: SHOWCASE_CLAIM_DETAIL.providerNpi,
-			payer: SHOWCASE_CLAIM_DETAIL.payer,
-			group: SHOWCASE_CLAIM_DETAIL.group,
-			plan: SHOWCASE_CLAIM_DETAIL.plan,
-			authNumber: SHOWCASE_CLAIM_DETAIL.authNumber,
-			rxNumber: "",
-			priority: SHOWCASE_CLAIM_DETAIL.priority,
-			claimStatus: SHOWCASE_CLAIM_DETAIL.status,
-			responseStatus: "Accepted",
-			receivedAt: SHOWCASE_CLAIM_DETAIL.receivedAt,
-			fileName: SHOWCASE_CLAIM_DETAIL.fileName,
-			displayClaimType: "Medical",
-		};
-
-		if (programFilter === SHOWCASE_CLAIM_DETAIL.program) {
-			return [showcase, ...rows];
+		const rows = CLAIM_LINES.filter((line) => line.program === program).map(
+			enrichClaim
+		);
+		if (program === SHOWCASE_CLAIM_DETAIL.program) {
+			return [showcaseRow(), ...rows];
 		}
 		return rows;
-	}, [useLive, claimLinesQ.data, mockClaimLinesQ.data, programFilter]);
-
-	function openClaimDetail(row: ClaimWorkbenchRow) {
-		router.push(
-			`/admin/claim-encounter/claims/${encodeURIComponent(row.claimId)}`
-		);
-	}
-	const vendors = VENDOR_NAMES;
-
-	const activeFilterCount = useMemo(() => {
-		let n = 0;
-		if (claimId.trim()) n += 1;
-		if (memberId.trim()) n += 1;
-		if (memberName.trim()) n += 1;
-		if (providerNpi.trim()) n += 1;
-		if (vendor !== "all") n += 1;
-		if (authNumber.trim()) n += 1;
-		if (rxNumber.trim()) n += 1;
-		if (claimStatus !== "all") n += 1;
-		if (claimType !== "all") n += 1;
-		if (payer !== "all") n += 1;
-		if (group !== "all") n += 1;
-		if (plan !== "all") n += 1;
-		if (responseStatus !== "all") n += 1;
-		if (priority !== "all") n += 1;
-		if (dosFrom !== "2026-07-01" || dosTo !== "2026-07-28") n += 1;
-		return n;
-	}, [
-		claimId,
-		memberId,
-		memberName,
-		providerNpi,
-		vendor,
-		authNumber,
-		rxNumber,
-		claimStatus,
-		claimType,
-		payer,
-		group,
-		plan,
-		responseStatus,
-		priority,
-		dosFrom,
-		dosTo,
-	]);
+	}, [useLive, liveQuery.data, program]);
 
 	const filtered = useMemo(() => {
-		void applied;
-		const q = quickSearch.trim().toLowerCase();
+		const q = search.trim().toLowerCase();
 		return allRows.filter((row) => {
 			if (q) {
 				const hay = [
@@ -395,51 +304,12 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 					.toLowerCase();
 				if (!hay.includes(q)) return false;
 			}
-			if (
-				claimId.trim() &&
-				!row.claimId.toLowerCase().includes(claimId.trim().toLowerCase())
-			)
-				return false;
-			if (
-				memberId.trim() &&
-				!row.memberId.toLowerCase().includes(memberId.trim().toLowerCase())
-			)
-				return false;
-			if (
-				memberName.trim() &&
-				!row.memberName.toLowerCase().includes(memberName.trim().toLowerCase())
-			)
-				return false;
-			if (
-				providerNpi.trim() &&
-				!(
-					row.provider
-						.toLowerCase()
-						.includes(providerNpi.trim().toLowerCase()) ||
-					row.providerNpi.includes(providerNpi.trim())
-				)
-			)
-				return false;
 			if (vendor !== "all" && row.vendor !== vendor) return false;
-			if (
-				authNumber.trim() &&
-				!row.authNumber.toLowerCase().includes(authNumber.trim().toLowerCase())
-			)
-				return false;
-			if (
-				rxNumber.trim() &&
-				!row.rxNumber.toLowerCase().includes(rxNumber.trim().toLowerCase())
-			)
-				return false;
-			if (dosFrom && row.dateOfService < dosFrom) return false;
-			if (dosTo && row.dateOfService > dosTo) return false;
 			if (claimStatus !== "all" && row.claimStatus !== claimStatus)
 				return false;
 			if (claimType !== "all" && row.displayClaimType !== claimType)
 				return false;
 			if (payer !== "all" && row.payer !== payer) return false;
-			if (group !== "all" && row.group !== group) return false;
-			if (plan !== "all" && row.plan !== plan) return false;
 			if (responseStatus !== "all" && row.responseStatus !== responseStatus)
 				return false;
 			if (priority !== "all" && row.priority !== priority) return false;
@@ -447,73 +317,205 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 		});
 	}, [
 		allRows,
-		applied,
-		quickSearch,
-		claimId,
-		memberId,
-		memberName,
-		providerNpi,
+		search,
 		vendor,
-		authNumber,
-		rxNumber,
-		dosFrom,
-		dosTo,
 		claimStatus,
 		claimType,
 		payer,
-		group,
-		plan,
 		responseStatus,
 		priority,
 	]);
 
-	const { pageRows, pageCount, safePage } = usePagedRows(
-		filtered,
-		pageSize,
-		page,
-		setPage
-	);
+	const stats = useMemo(() => {
+		const paid = filtered.filter((r) => r.claimStatus === "Paid").length;
+		const pending = filtered.filter((r) => r.claimStatus === "Pending").length;
+		const denied = filtered.filter((r) => r.claimStatus === "Denied").length;
+		const rejected = filtered.filter(
+			(r) => r.claimStatus === "Rejected"
+		).length;
+		const partial = filtered.filter((r) => r.claimStatus === "Partial").length;
+		const attentionRows = filtered.filter(needsAttention);
+		const billed = filtered.reduce((s, r) => s + r.amountBilled, 0);
+		const paidAmt = filtered.reduce((s, r) => s + r.amountPaid, 0);
+		const payRate = billed > 0 ? Math.round((paidAmt / billed) * 1000) / 10 : 0;
+		const health =
+			denied + rejected > filtered.length * 0.15
+				? ("At Risk" as const)
+				: attentionRows.length > 0
+					? ("Watch" as const)
+					: ("On Track" as const);
+		return {
+			total: filtered.length,
+			paid,
+			pending,
+			denied,
+			rejected,
+			partial,
+			attention: attentionRows.length,
+			attentionRows,
+			billed,
+			paidAmt,
+			payRate,
+			health,
+		};
+	}, [filtered]);
 
-	const selected =
-		filtered.find((r) => r.id === selectedId) ??
-		(selectedId ? allRows.find((r) => r.id === selectedId) : null) ??
-		null;
-
-	const services = useMemo(
-		() => (selected ? serviceLinesFor(selected) : []),
-		[selected]
+	const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+	const safePage = Math.min(page, pageCount);
+	const pageRows = filtered.slice(
+		(safePage - 1) * pageSize,
+		safePage * pageSize
 	);
+	const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+	const rangeEnd = Math.min(safePage * pageSize, filtered.length);
+
+	const hasFilters =
+		Boolean(search.trim()) ||
+		vendor !== "all" ||
+		claimStatus !== "all" ||
+		claimType !== "all" ||
+		payer !== "all" ||
+		responseStatus !== "all" ||
+		priority !== "all";
+
+	const extraFilterCount =
+		(payer !== "all" ? 1 : 0) +
+		(responseStatus !== "all" ? 1 : 0) +
+		(priority !== "all" ? 1 : 0);
+
+	const loading = useLive && liveQuery.isLoading;
+
+	const kpis = [
+		{
+			id: "paid",
+			label: "Paid",
+			value: stats.paid,
+			hint: `${formatCurrency(stats.paidAmt)} settled`,
+			icon: CheckCircle2,
+			well: "bg-emerald-600",
+			accent: "from-emerald-600 to-emerald-400",
+			valueTone: "text-emerald-700 dark:text-emerald-300",
+			ring: "ring-emerald-500/25",
+			active: claimStatus === "Paid",
+			onClick: () => {
+				setClaimStatus((s) => (s === "Paid" ? "all" : "Paid"));
+				setPage(1);
+			},
+		},
+		{
+			id: "pending",
+			label: "Pending",
+			value: stats.pending,
+			hint: `${stats.partial} partial in flight`,
+			icon: Clock3,
+			well: "bg-primary",
+			accent: "from-primary to-primary/50",
+			valueTone: "text-primary",
+			ring: "ring-primary/25",
+			active: claimStatus === "Pending",
+			onClick: () => {
+				setClaimStatus((s) => (s === "Pending" ? "all" : "Pending"));
+				setPage(1);
+			},
+		},
+		{
+			id: "attention",
+			label: "Attention",
+			value: stats.attention,
+			hint: `${stats.denied} denied · ${stats.rejected} rejected`,
+			icon: AlertTriangle,
+			well: "bg-amber-500",
+			accent: "from-amber-500 to-amber-400",
+			valueTone: "text-amber-700 dark:text-amber-300",
+			ring: "ring-amber-500/25",
+			active: claimStatus === "Denied",
+			onClick: () => {
+				setClaimStatus((s) => (s === "Denied" ? "all" : "Denied"));
+				setPage(1);
+			},
+		},
+		{
+			id: "billed",
+			label: "Billed",
+			value: formatCurrency(stats.billed),
+			hint: `${stats.payRate}% paid ratio`,
+			icon: Banknote,
+			well: "bg-primary",
+			accent: "from-primary to-primary/40",
+			valueTone: "text-primary",
+			ring: "ring-primary/25",
+			active: false,
+			onClick: undefined as (() => void) | undefined,
+		},
+	] as const;
+
+	const lifecycle = [
+		{
+			id: "received",
+			label: "Received",
+			detail: `${formatCount(stats.total)} in queue`,
+			icon: FileInput,
+			state: "done" as const,
+		},
+		{
+			id: "review",
+			label: "Under review",
+			detail: `${formatCount(stats.pending + stats.partial)} open`,
+			icon: Clock3,
+			state:
+				stats.pending + stats.partial > 0
+					? ("active" as const)
+					: ("done" as const),
+		},
+		{
+			id: "response",
+			label: "Response",
+			detail: `${formatCount(stats.denied + stats.rejected)} adverse`,
+			icon: MessageSquareReply,
+			state:
+				stats.denied + stats.rejected > 0
+					? ("active" as const)
+					: ("pending" as const),
+		},
+		{
+			id: "settled",
+			label: "Settled",
+			detail: `${formatCount(stats.paid)} paid`,
+			icon: CheckCircle2,
+			state: stats.paid > 0 ? ("done" as const) : ("pending" as const),
+		},
+	];
 
 	function clearFilters() {
-		setQuickSearch("");
-		setClaimId("");
-		setMemberId("");
-		setMemberName("");
-		setProviderNpi("");
+		setSearch("");
 		setVendor("all");
-		setAuthNumber("");
-		setRxNumber("");
-		setDosFrom("2026-07-01");
-		setDosTo("2026-07-28");
 		setClaimStatus("all");
 		setClaimType("all");
 		setPayer("all");
-		setGroup("all");
-		setPlan("all");
-		setServiceDatePreset("90");
 		setResponseStatus("all");
 		setPriority("all");
 		setPage(1);
-		setApplied((n) => n + 1);
 	}
 
-	function runSearch() {
-		setPage(1);
-		setApplied((n) => n + 1);
-		setFiltersOpen(false);
+	function openClaim(row: ClaimWorkbenchRow) {
+		router.push(
+			`/admin/claim-encounter/claims/${encodeURIComponent(row.claimId)}`
+		);
 	}
 
-	function exportClaimsCsv() {
+	async function handleRefresh() {
+		setRefreshing(true);
+		try {
+			if (useLive) await liveQuery.refetch();
+			toast.success("Claims refreshed");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Refresh failed");
+		} finally {
+			setRefreshing(false);
+		}
+	}
+
+	function exportCsv() {
 		if (filtered.length === 0) {
 			toast.message("No claims to export with the current filters.");
 			return;
@@ -524,347 +526,406 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 				"Claim ID",
 				"Member",
 				"Member ID",
-				"Provider NPI",
+				"Provider",
 				"Vendor",
 				"Payer",
-				"Group",
-				"Plan",
 				"Claim Type",
 				"Claim Status",
 				"Response Status",
-				"Priority",
 				"Amount Billed",
+				"Amount Paid",
+				"DOS",
 				"Received At",
-				"File Name",
 			],
 			filtered.map((row) => [
 				row.claimId,
 				row.memberName,
 				row.memberId,
-				row.providerNpi,
+				row.provider,
 				row.vendor,
 				row.payer,
-				row.group,
-				row.plan,
 				row.displayClaimType,
 				row.claimStatus,
 				row.responseStatus,
-				row.priority,
 				row.amountBilled,
+				row.amountPaid,
+				row.dateOfService,
 				row.receivedAt,
-				row.fileName,
 			])
 		);
 		toast.success(`Downloaded CSV for ${filtered.length} claim(s).`);
 	}
 
+	async function softDelete(row: ClaimWorkbenchRow) {
+		try {
+			await deleteClaimLine.mutateAsync(row.id);
+			toast.success("Claim line soft-deleted.");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Delete failed.");
+		}
+	}
+
+	if (loading) {
+		return (
+			<div className="space-y-3">
+				<Skeleton className="h-10 w-full max-w-md" />
+				<Skeleton className="h-24 w-full" />
+				<Skeleton className="h-28 w-full" />
+				<Skeleton className="h-72 w-full" />
+			</div>
+		);
+	}
+
 	return (
-		<div className="space-y-4">
-			<ClaimPageHeader
-				title="Claims"
-				description="Search, review and manage claims across all vendors and payers."
-				actions={
-					<div className="flex flex-wrap gap-1.5">
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline" size="sm" className="h-9">
-									<Download className="mr-1.5 size-3.5" />
-									Export
-									<ChevronDown className="ml-1 size-3.5 opacity-60" />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end">
-								<DropdownMenuItem onClick={exportClaimsCsv}>
-									Export CSV
-								</DropdownMenuItem>
-								<DropdownMenuItem
-									onClick={() =>
-										toast.info("Excel export is not available yet.", {
-											description: "Use Export CSV for now.",
-										})
-									}
-								>
-									Export Excel
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-9"
-							onClick={() => window.print()}
-						>
-							<Printer className="mr-1.5 size-3.5" />
-							Print
-						</Button>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button size="sm" className="h-9">
-									Actions
-									<ChevronDown className="ml-1 size-3.5 opacity-80" />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end">
-								{useLive ? (
-									<>
-										<DropdownMenuItem
-											onClick={async () => {
-												try {
-													await seedClaimLines.mutateAsync({});
-													toast.success("Claim lines seeded.");
-												} catch (err) {
-													toast.error(
-														err instanceof Error ? err.message : "Seed failed."
-													);
-												}
-											}}
-										>
-											Seed claim lines
-										</DropdownMenuItem>
-										<DropdownMenuItem
-											disabled={!selectedId || deleteClaimLine.isPending}
-											onClick={async () => {
-												if (!selectedId) {
-													toast.message("Select a claim row first.");
-													return;
-												}
-												try {
-													await deleteClaimLine.mutateAsync(selectedId);
-													toast.success("Claim line soft-deleted.");
-													setSelectedId(null);
-												} catch (err) {
-													toast.error(
-														err instanceof Error
-															? err.message
-															: "Delete failed."
-													);
-												}
-											}}
-										>
-											Soft-delete selected
-										</DropdownMenuItem>
-									</>
-								) : (
-									<>
-										<DropdownMenuItem
-											onClick={() => toast.message("Bulk accept is mock-only")}
-										>
-											Bulk accept
-										</DropdownMenuItem>
-										<DropdownMenuItem
-											onClick={() => toast.message("Bulk reject is mock-only")}
-										>
-											Bulk reject
-										</DropdownMenuItem>
-										<DropdownMenuItem
-											onClick={() =>
-												toast.message("Assign reviewer is mock-only")
-											}
-										>
-											Assign reviewer
-										</DropdownMenuItem>
-									</>
-								)}
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				}
-			/>
+		<div className={CMS_EDGE_PAGE_STACK}>
+			{/* Header */}
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<div className="min-w-0 space-y-1">
+					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+						Claims
+					</h1>
+					<p className="text-sm text-muted-foreground">
+						Claim workbench · {program} · {formatCount(stats.total)}{" "}
+						{stats.total === 1 ? "claim" : "claims"}
+					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-1.5">
+					<Button
+						variant="outline"
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
+						onClick={exportCsv}
+					>
+						<Download className="size-3.5" />
+						Export
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
+						onClick={() => void handleRefresh()}
+						disabled={refreshing}
+					>
+						<RefreshCw
+							className={cn("size-3.5", refreshing && "animate-spin")}
+						/>
+						Refresh
+					</Button>
+				</div>
+			</div>
 
-			{useLive && claimLinesQ.error ? (
-				<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-					Could not load claims: {claimLinesQ.error.message}
+			{useLive && liveQuery.error ? (
+				<div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+					Could not load claims: {liveQuery.error.message}
 				</div>
 			) : null}
 
-			{useLive && !claimLinesQ.isLoading && allRows.length === 0 ? (
-				<div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-					No claim lines returned from vendor-core yet. Run{" "}
+			{useLive && !liveQuery.isLoading && allRows.length === 0 ? (
+				<div className="rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+					No claim lines yet. Seed with{" "}
 					<code className="rounded bg-muted px-1 py-0.5 text-xs">
-						pnpm seed:claim-lines
-					</code>{" "}
-					(after vendor-core claim-line seed is deployed), then refresh.
+						npm run seed:claim-lines
+					</code>
+					, then refresh.
 				</div>
 			) : null}
 
-			{/* Quick search + collapsible filters */}
-			<Card className="gap-0 bg-card/70 py-0">
-				<CardContent className="p-3">
-					<div className="flex flex-wrap items-center gap-2">
-						<div className="relative min-w-[220px] flex-1">
-							<Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								value={quickSearch}
-								onChange={(e) => {
-									setQuickSearch(e.target.value);
+			{/* Primary health banner — CMS reporting */}
+			<section className="rounded-sm border border-primary/20 bg-primary px-4 py-4 text-primary-foreground shadow-[0_1px_3px_rgba(15,23,42,0.12),0_4px_12px_rgba(15,23,42,0.06)] sm:px-5">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+					<div className="min-w-0 space-y-1.5">
+						<div className="flex flex-wrap items-center gap-2">
+							<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary-foreground/70">
+								Workbench status
+							</p>
+							<span className="inline-flex items-center gap-1.5 rounded-sm border border-primary-foreground/25 bg-primary-foreground/10 px-2 py-0.5 text-[11px] font-medium">
+								<span
+									className={cn(
+										"size-1.5 rounded-full",
+										stats.health === "On Track"
+											? "bg-emerald-300"
+											: stats.health === "Watch"
+												? "bg-amber-300"
+												: "bg-rose-300"
+									)}
+								/>
+								{stats.health}
+							</span>
+						</div>
+						<p className="text-base font-semibold tracking-tight sm:text-lg">
+							{formatCount(stats.total)} claims · {program}
+						</p>
+						<p className="text-xs text-primary-foreground/75">
+							{formatCount(stats.paid)} paid · {formatCount(stats.pending)}{" "}
+							pending · {formatCount(stats.attention)} need attention
+						</p>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-5 sm:gap-6">
+						<div className="min-w-34">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-foreground/70">
+								Paid ratio
+							</p>
+							<p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+								{stats.payRate}%
+							</p>
+							<div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-primary-foreground/20">
+								<div
+									className="h-full rounded-full bg-primary-foreground transition-all"
+									style={{ width: `${Math.min(stats.payRate, 100)}%` }}
+								/>
+							</div>
+						</div>
+						{stats.attention > 0 ? (
+							<Button
+								size="sm"
+								className="h-9 gap-1.5 rounded-sm border-0 bg-primary-foreground text-primary shadow-none hover:bg-primary-foreground/90"
+								onClick={() => {
+									setClaimStatus("Denied");
 									setPage(1);
 								}}
-								placeholder="Search claims by Claim ID, Member ID, Provider, NPI…"
-								className="h-9 pl-8"
-							/>
-						</div>
-						<Button
-							variant="outline"
-							size="sm"
-							className={cn(
-								"h-9",
-								filtersOpen && "border-primary/40 bg-primary/5"
-							)}
-							onClick={() => setFiltersOpen((o) => !o)}
-							aria-expanded={filtersOpen}
-						>
-							<Filter className="mr-1.5 size-3.5" />
-							Filters
-							{activeFilterCount > 0 ? (
-								<span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-									{activeFilterCount}
-								</span>
-							) : null}
-							<ChevronDown
-								className={cn(
-									"ml-1.5 size-3.5 opacity-60 transition-transform",
-									filtersOpen && "rotate-180"
-								)}
-							/>
-						</Button>
-						{activeFilterCount > 0 ? (
-							<Button
-								variant="ghost"
-								size="sm"
-								className="h-9 text-xs"
-								onClick={clearFilters}
 							>
-								Clear
+								Work attention
+								<ArrowRight className="size-3.5" />
 							</Button>
 						) : null}
-						<Button size="sm" className="h-9" onClick={runSearch}>
-							<Search className="mr-1.5 size-3.5" />
-							Search
-						</Button>
 					</div>
+				</div>
+			</section>
 
-					<Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-						<CollapsibleContent className="mt-3 space-y-3 border-t border-border/50 pt-3">
-							<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-								<Field label="Claim ID">
-									<Input
-										value={claimId}
-										onChange={(e) => setClaimId(e.target.value)}
-										placeholder="CLM-…"
-										className="h-9"
-									/>
-								</Field>
-								<Field label="Member ID">
-									<Input
-										value={memberId}
-										onChange={(e) => setMemberId(e.target.value)}
-										placeholder="MBR-…"
-										className="h-9"
-									/>
-								</Field>
-								<Field label="Member Name">
-									<Input
-										value={memberName}
-										onChange={(e) => setMemberName(e.target.value)}
-										placeholder="Name"
-										className="h-9"
-									/>
-								</Field>
-								<Field label="Provider / NPI">
-									<Input
-										value={providerNpi}
-										onChange={(e) => setProviderNpi(e.target.value)}
-										placeholder="Name or NPI"
-										className="h-9"
-									/>
-								</Field>
-								<Field label="Vendor">
-									<Select value={vendor} onValueChange={setVendor}>
-										<SelectTrigger className="h-9 w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All Vendors</SelectItem>
-											{vendors.map((v) => (
-												<SelectItem key={v} value={v}>
-													{v}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</Field>
-								<Field label="Authorization #">
-									<Input
-										value={authNumber}
-										onChange={(e) => setAuthNumber(e.target.value)}
-										placeholder="AUTH-…"
-										className="h-9"
-									/>
-								</Field>
-								<Field label="Rx Number">
-									<Input
-										value={rxNumber}
-										onChange={(e) => setRxNumber(e.target.value)}
-										placeholder="RX-…"
-										className="h-9"
-									/>
-								</Field>
-								<Field label="Date of Service">
-									<div className="flex items-center gap-1">
-										<Input
-											type="date"
-											value={dosFrom}
-											onChange={(e) => setDosFrom(e.target.value)}
-											className="h-9 px-2"
-										/>
-										<span className="text-[10px] text-muted-foreground">–</span>
-										<Input
-											type="date"
-											value={dosTo}
-											onChange={(e) => setDosTo(e.target.value)}
-											className="h-9 px-2"
-										/>
-									</div>
-								</Field>
+			{/* KPI cards — CMS reporting style */}
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				{kpis.map((kpi) => {
+					const Icon = kpi.icon;
+					const interactive = Boolean(kpi.onClick);
+					const className = cn(
+						CMS_EDGE_KPI_CARD_CLASS,
+						"text-left",
+						kpi.active
+							? cn("border-transparent ring-1", kpi.ring)
+							: "border-border/70"
+					);
+					const body = (
+						<>
+							<span
+								aria-hidden
+								className={cn(
+									"absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b",
+									kpi.accent
+								)}
+							/>
+							<div className="flex items-start justify-between gap-3 pl-1.5">
+								<div className="min-w-0">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+										{kpi.label}
+									</p>
+									<p
+										className={cn(
+											"mt-1.5 text-2xl font-semibold tracking-tight tabular-nums",
+											kpi.valueTone
+										)}
+									>
+										{typeof kpi.value === "number"
+											? kpi.value.toLocaleString()
+											: kpi.value}
+									</p>
+									<p className="mt-1.5 text-xs text-muted-foreground">
+										{kpi.hint}
+									</p>
+								</div>
+								<span
+									className={cn(
+										"flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm",
+										kpi.well
+									)}
+								>
+									<Icon className="size-[18px] text-white" aria-hidden />
+								</span>
 							</div>
+						</>
+					);
+					return interactive ? (
+						<button
+							key={kpi.id}
+							type="button"
+							onClick={kpi.onClick}
+							className={className}
+						>
+							{body}
+						</button>
+					) : (
+						<div key={kpi.id} className={className}>
+							{body}
+						</div>
+					);
+				})}
+			</div>
 
-							<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-								<Field label="Claim Status">
-									<Select value={claimStatus} onValueChange={setClaimStatus}>
-										<SelectTrigger className="h-9 w-full">
+			{/* Lifecycle strip */}
+			<section className={cn(PANEL, "overflow-hidden")}>
+				<div className="flex items-center justify-between border-b border-border/50 px-4 py-2.5">
+					<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+						Claim lifecycle
+					</p>
+					<span className="text-[11px] text-muted-foreground">{program}</span>
+				</div>
+				<ol className="grid gap-0 sm:grid-cols-4">
+					{lifecycle.map((step, index) => {
+						const Icon = step.icon;
+						const isLast = index === lifecycle.length - 1;
+						return (
+							<li
+								key={step.id}
+								className={cn(
+									"relative flex gap-3 px-4 py-4",
+									!isLast && "sm:border-r sm:border-border/50"
+								)}
+							>
+								<span
+									className={cn(
+										"flex size-9 shrink-0 items-center justify-center rounded-full",
+										step.state === "done" && "bg-emerald-600 text-white",
+										step.state === "active" &&
+											"bg-primary text-primary-foreground ring-4 ring-primary/20",
+										step.state === "pending" && "bg-muted text-muted-foreground"
+									)}
+								>
+									<Icon className="size-4" />
+								</span>
+								<div className="min-w-0">
+									<p className="text-[12px] font-semibold text-foreground">
+										{step.label}
+									</p>
+									<p className="mt-0.5 text-[11px] text-muted-foreground">
+										{step.detail}
+									</p>
+								</div>
+							</li>
+						);
+					})}
+				</ol>
+			</section>
+
+			{/* Filters */}
+			<section className={cn(PANEL, "px-3 py-2.5")}>
+				<div className="flex flex-wrap items-center gap-2">
+					<div className="relative min-w-40 flex-1">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							value={search}
+							onChange={(e) => {
+								setSearch(e.target.value);
+								setPage(1);
+							}}
+							placeholder="Search claim, member, provider, NPI…"
+							className={cn(compactFieldClass, "w-full pl-8")}
+						/>
+					</div>
+					<div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+						<Select
+							value={vendor}
+							onValueChange={(v) => {
+								setVendor(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(compactFieldClass, "w-37.5")}>
+								<SelectValue placeholder="Vendor" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All vendors</SelectItem>
+								{VENDOR_NAMES.map((name) => (
+									<SelectItem key={name} value={name}>
+										{name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={claimStatus}
+							onValueChange={(v) => {
+								setClaimStatus(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(compactFieldClass, "w-35")}>
+								<SelectValue placeholder="Status" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All statuses</SelectItem>
+								{(
+									["Paid", "Pending", "Partial", "Denied", "Rejected"] as const
+								).map((status) => (
+									<SelectItem key={status} value={status}>
+										{status}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={claimType}
+							onValueChange={(v) => {
+								setClaimType(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(compactFieldClass, "w-32.5")}>
+								<SelectValue placeholder="Type" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All types</SelectItem>
+								{(["Medical", "Pharmacy", "Dental", "Encounter"] as const).map(
+									(type) => (
+										<SelectItem key={type} value={type}>
+											{type}
+										</SelectItem>
+									)
+								)}
+							</SelectContent>
+						</Select>
+						<Popover>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									className={cn(
+										compactFieldClass,
+										"h-8 gap-1.5 px-2.5 shadow-none",
+										extraFilterCount > 0 && "border-primary/40 bg-primary/5"
+									)}
+								>
+									<SlidersHorizontal className="size-3.5 shrink-0" />
+									More
+									{extraFilterCount > 0 ? (
+										<span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+											{extraFilterCount}
+										</span>
+									) : null}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="end" className="w-72 space-y-3 p-3">
+								<div className="space-y-1">
+									<p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+										Payer
+									</p>
+									<Select
+										value={payer}
+										onValueChange={(v) => {
+											setPayer(v);
+											setPage(1);
+										}}
+									>
+										<SelectTrigger className={cn(compactFieldClass, "w-full")}>
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
-											<SelectItem value="Paid">Paid</SelectItem>
-											<SelectItem value="Denied">Denied</SelectItem>
-											<SelectItem value="Pending">Pending</SelectItem>
-											<SelectItem value="Partial">Partial</SelectItem>
-											<SelectItem value="Rejected">Rejected</SelectItem>
-										</SelectContent>
-									</Select>
-								</Field>
-								<Field label="Claim Type">
-									<Select value={claimType} onValueChange={setClaimType}>
-										<SelectTrigger className="h-9 w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
-											<SelectItem value="Medical">Medical</SelectItem>
-											<SelectItem value="Pharmacy">Pharmacy</SelectItem>
-											<SelectItem value="Dental">Dental</SelectItem>
-											<SelectItem value="Encounter">Encounter</SelectItem>
-										</SelectContent>
-									</Select>
-								</Field>
-								<Field label="Payer">
-									<Select value={payer} onValueChange={setPayer}>
-										<SelectTrigger className="h-9 w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
+											<SelectItem value="all">All payers</SelectItem>
 											{PAYERS.map((p) => (
 												<SelectItem key={p} value={p}>
 													{p}
@@ -872,802 +933,375 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 											))}
 										</SelectContent>
 									</Select>
-								</Field>
-								<Field label="Group">
-									<Select value={group} onValueChange={setGroup}>
-										<SelectTrigger className="h-9 w-full">
+								</div>
+								<div className="space-y-1">
+									<p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+										Response
+									</p>
+									<Select
+										value={responseStatus}
+										onValueChange={(v) => {
+											setResponseStatus(v);
+											setPage(1);
+										}}
+									>
+										<SelectTrigger className={cn(compactFieldClass, "w-full")}>
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
-											{GROUPS.map((g) => (
-												<SelectItem key={g} value={g}>
-													{g}
+											<SelectItem value="all">All responses</SelectItem>
+											{(
+												["Accepted", "Rejected", "Denied", "Pending"] as const
+											).map((status) => (
+												<SelectItem key={status} value={status}>
+													{status}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
-								</Field>
-								<Field label="Plan">
-									<Select value={plan} onValueChange={setPlan}>
-										<SelectTrigger className="h-9 w-full">
+								</div>
+								<div className="space-y-1">
+									<p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+										Priority
+									</p>
+									<Select
+										value={priority}
+										onValueChange={(v) => {
+											setPriority(v);
+											setPage(1);
+										}}
+									>
+										<SelectTrigger className={cn(compactFieldClass, "w-full")}>
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
-											{PLANS.map((p) => (
+											<SelectItem value="all">All priorities</SelectItem>
+											{(["Normal", "High", "Urgent"] as const).map((p) => (
 												<SelectItem key={p} value={p}>
 													{p}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
-								</Field>
-								<Field label="Service Date">
-									<Select
-										value={serviceDatePreset}
-										onValueChange={(v) => {
-											setServiceDatePreset(v);
-											if (v === "90") {
-												setDosFrom("2026-05-01");
-												setDosTo("2026-07-28");
-											} else if (v === "30") {
-												setDosFrom("2026-06-28");
-												setDosTo("2026-07-28");
-											} else if (v === "7") {
-												setDosFrom("2026-07-21");
-												setDosTo("2026-07-28");
-											}
-										}}
-									>
-										<SelectTrigger className="h-9 w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="7">Last 7 Days</SelectItem>
-											<SelectItem value="30">Last 30 Days</SelectItem>
-											<SelectItem value="90">Last 90 Days</SelectItem>
-											<SelectItem value="custom">Custom range</SelectItem>
-										</SelectContent>
-									</Select>
-								</Field>
-								<Field label="Response Status">
-									<Select
-										value={responseStatus}
-										onValueChange={setResponseStatus}
-									>
-										<SelectTrigger className="h-9 w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
-											<SelectItem value="Accepted">Accepted</SelectItem>
-											<SelectItem value="Rejected">Rejected</SelectItem>
-											<SelectItem value="Denied">Denied</SelectItem>
-											<SelectItem value="Pending">Pending</SelectItem>
-										</SelectContent>
-									</Select>
-								</Field>
-								<Field label="Priority">
-									<Select value={priority} onValueChange={setPriority}>
-										<SelectTrigger className="h-9 w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All</SelectItem>
-											<SelectItem value="Normal">Normal</SelectItem>
-											<SelectItem value="High">High</SelectItem>
-											<SelectItem value="Urgent">Urgent</SelectItem>
-										</SelectContent>
-									</Select>
-								</Field>
-								<div className="flex items-end gap-1.5 sm:col-span-2">
-									<Button
-										variant="outline"
-										size="sm"
-										className="h-9"
-										onClick={clearFilters}
-									>
-										Clear Filters
-									</Button>
-									<Button size="sm" className="h-9" onClick={runSearch}>
-										Apply Filters
-									</Button>
 								</div>
-							</div>
-						</CollapsibleContent>
-					</Collapsible>
-				</CardContent>
-			</Card>
-
-			{/* Results */}
-			<Card className="gap-1 bg-card/70 py-2">
-				<CardHeader className="px-3 pb-1 pt-0">
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<p className="text-sm font-medium">
-							{formatCount(filtered.length)} Claims found
-						</p>
-						<div className="flex items-center gap-2 text-xs text-muted-foreground">
-							<span>Rows per page</span>
-							<Select
-								value={String(pageSize)}
-								onValueChange={(v) => {
-									setPageSize(Number(v));
-									setPage(1);
-								}}
-							>
-								<SelectTrigger className="h-8 w-[72px]">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{[10, 25, 50, 100].map((n) => (
-										<SelectItem key={n} value={String(n)}>
-											{n}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<span className="tabular-nums">
-								{filtered.length === 0
-									? "0–0"
-									: `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)}`}{" "}
-								of {formatCount(filtered.length)}
-							</span>
-							<Button
-								variant="outline"
-								size="icon"
-								className="size-8"
-								disabled={safePage <= 1}
-								onClick={() => setPage((p) => Math.max(1, p - 1))}
-							>
-								<ChevronLeft className="size-3.5" />
-							</Button>
-							<Button
-								variant="outline"
-								size="icon"
-								className="size-8"
-								disabled={safePage >= pageCount}
-								onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-							>
-								<ChevronRight className="size-3.5" />
-							</Button>
-						</div>
-					</div>
-				</CardHeader>
-				<CardContent className="px-0 pb-0">
-					<div className="overflow-x-auto border-t border-border/50">
-						<Table>
-							<TableHeader>
-								<TableRow className="hover:bg-transparent">
-									<TableHead className="pl-3">Claim ID</TableHead>
-									<TableHead>Member ID</TableHead>
-									<TableHead>Member Name</TableHead>
-									<TableHead>Provider</TableHead>
-									<TableHead>DOS</TableHead>
-									<TableHead>Claim Type</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead className="text-right">Charge</TableHead>
-									<TableHead className="text-right">Paid</TableHead>
-									<TableHead>Vendor</TableHead>
-									<TableHead>Payer</TableHead>
-									<TableHead>Response Status</TableHead>
-									<TableHead>Received Date</TableHead>
-									<TableHead className="pr-3">Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{pageRows.map((row) => (
-									<TableRow
-										key={row.id}
-										className={cn(
-											"cursor-pointer hover:bg-muted/30",
-											selectedId === row.id && "bg-primary/5"
-										)}
-										onClick={() => openClaimDetail(row)}
-									>
-										<TableCell className="pl-3">
-											<Link
-												href={`/admin/claim-encounter/claims/${encodeURIComponent(row.claimId)}`}
-												className="font-mono text-xs font-medium text-primary hover:underline"
-												onClick={(e) => e.stopPropagation()}
-											>
-												{row.claimId}
-											</Link>
-										</TableCell>
-										<TableCell className="font-mono text-xs">
-											{row.memberId}
-										</TableCell>
-										<TableCell className="text-sm">{row.memberName}</TableCell>
-										<TableCell className="max-w-[140px] truncate text-sm">
-											{row.provider}
-										</TableCell>
-										<TableCell className="text-xs tabular-nums">
-											{row.dateOfService}
-										</TableCell>
-										<TableCell className="text-xs">
-											{row.displayClaimType}
-										</TableCell>
-										<TableCell>
-											<ClaimStatusBadge status={row.claimStatus} />
-										</TableCell>
-										<TableCell className="text-right text-xs tabular-nums">
-											{formatCurrency(row.amountBilled)}
-										</TableCell>
-										<TableCell className="text-right text-xs tabular-nums">
-											{formatCurrency(row.amountPaid)}
-										</TableCell>
-										<TableCell className="text-sm">{row.vendor}</TableCell>
-										<TableCell className="max-w-[120px] truncate text-xs">
-											{row.payer}
-										</TableCell>
-										<TableCell>
-											<ClaimStatusBadge status={row.responseStatus} />
-										</TableCell>
-										<TableCell className="text-xs tabular-nums text-muted-foreground">
-											{row.receivedAt.slice(0, 10)}
-										</TableCell>
-										<TableCell
-											className="pr-3"
-											onClick={(e) => e.stopPropagation()}
-										>
-											<DropdownMenu>
-												<DropdownMenuTrigger asChild>
-													<Button
-														variant="ghost"
-														size="icon"
-														className="size-7"
-													>
-														<MoreHorizontal className="size-3.5" />
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent align="end">
-													<DropdownMenuItem
-														onClick={() => openClaimDetail(row)}
-													>
-														View details
-													</DropdownMenuItem>
-													<DropdownMenuItem
-														onClick={() => {
-															setSelectedId(row.id);
-															setEdiOpen(true);
-														}}
-													>
-														View EDI
-													</DropdownMenuItem>
-													{useLive ? (
-														<DropdownMenuItem
-															onClick={async () => {
-																try {
-																	await deleteClaimLine.mutateAsync(row.id);
-																	toast.success("Claim line soft-deleted.");
-																} catch (err) {
-																	toast.error(
-																		err instanceof Error
-																			? err.message
-																			: "Delete failed."
-																	);
-																}
-															}}
-														>
-															Soft delete
-														</DropdownMenuItem>
-													) : null}
-													<DropdownMenuItem
-														onClick={() =>
-															toast.message("Copy claim ID", {
-																description: row.claimId,
-															})
-														}
-													>
-														Copy claim ID
-													</DropdownMenuItem>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										</TableCell>
-									</TableRow>
-								))}
-								{pageRows.length === 0 && (
-									<TableRow>
-										<TableCell
-											colSpan={14}
-											className="h-24 text-center text-muted-foreground"
-										>
-											{useLive && claimLinesQ.isLoading
-												? "Loading claims from vendor-core…"
-												: "No claims match the current filters."}
-										</TableCell>
-									</TableRow>
-								)}
-							</TableBody>
-						</Table>
-					</div>
-				</CardContent>
-			</Card>
-
-			{selected ? (
-				<Card className="gap-0 overflow-hidden bg-card/70 py-0">
-					<div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/50 px-3 py-2.5">
-						<div className="min-w-0">
-							<div className="flex flex-wrap items-center gap-2">
-								<h2 className="font-mono text-sm font-semibold">
-									{selected.claimId}
-								</h2>
-								<ClaimStatusBadge status={selected.claimStatus} />
-							</div>
-							<p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-								{selected.memberName} · {selected.memberId} · {selected.vendor}{" "}
-								· {selected.payer} · Received {selected.receivedAt.slice(0, 10)}
-							</p>
-						</div>
-						<div className="flex items-center gap-1.5">
-							<Button
-								variant="outline"
-								size="sm"
-								className="h-8 text-xs"
-								onClick={() => setEdiOpen(true)}
-							>
-								<Code2 className="mr-1.5 size-3.5" />
-								View EDI
-							</Button>
+							</PopoverContent>
+						</Popover>
+						{hasFilters ? (
 							<Button
 								variant="ghost"
-								size="icon"
-								className="size-8"
-								onClick={() => setSelectedId(null)}
+								size="sm"
+								className="h-8 px-2 text-xs text-muted-foreground"
+								onClick={clearFilters}
 							>
-								<X className="size-3.5" />
+								Clear
 							</Button>
-						</div>
+						) : null}
 					</div>
+				</div>
+			</section>
 
-					<Tabs
-						value={detailTab}
-						onValueChange={(v) =>
-							setDetailTab(v as (typeof DETAIL_TABS)[number])
-						}
-						className="gap-0"
-					>
-						<div className="overflow-x-auto border-b border-border/50 px-2">
-							<TabsList className="h-auto w-max justify-start gap-0 rounded-none bg-transparent p-0">
-								{DETAIL_TABS.map((tab) => (
-									<TabsTrigger
-										key={tab}
-										value={tab}
-										className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-									>
-										{tab}
-									</TabsTrigger>
-								))}
-							</TabsList>
-						</div>
+			{/* Claim table */}
+			<section className={cn(PANEL, "overflow-hidden")}>
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
+					<p className="text-sm font-semibold text-foreground">
+						{formatCount(filtered.length)}{" "}
+						{filtered.length === 1 ? "claim" : "claims"}
+					</p>
+				</div>
 
-						<TabsContent value="Claim Summary" className="mt-0 space-y-3 p-3">
-							<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-								<SummaryBlock
-									items={[
-										["Claim ID", selected.claimId],
-										["Internal Claim #", selected.id.toUpperCase()],
-										["External Claim #", selected.traceId],
-										["Claim Type", selected.displayClaimType],
-										["Priority", selected.priority],
-									]}
-								/>
-								<SummaryBlock
-									items={[
-										["Batch / File", selected.batchId],
-										["Vendor", selected.vendor],
-										["File Name", selected.fileName],
-										["Received", selected.receivedAt],
-										["Processed", selected.receivedAt],
-									]}
-								/>
-								<SummaryBlock
-									items={[
-										["Payer", selected.payer],
-										["Group / Plan", `${selected.group} / ${selected.plan}`],
-										["Plan Name", selected.plan],
-										["LOB", selected.program],
-										["Status", selected.claimStatus],
-									]}
-								/>
-								<SummaryBlock
-									items={[
-										["Response Status", selected.responseStatus],
-										[
-											"Paid Date",
-											selected.amountPaid > 0
-												? selected.receivedAt.slice(0, 10)
-												: "—",
-										],
-										[
-											"Check / EFT #",
-											selected.amountPaid > 0
-												? `EFT-${selected.claimId.replace(/\D/g, "").slice(-8)}`
-												: "—",
-										],
-										["Payment Method", selected.amountPaid > 0 ? "EFT" : "—"],
-										["Repriced / Adjusted", "No"],
-									]}
-								/>
-							</div>
-
-							<div className="grid gap-3 lg:grid-cols-3">
-								<Card className="gap-2 py-3">
-									<CardHeader className="flex-row items-center justify-between px-3 py-0">
-										<CardTitle className="text-sm">
-											Services ({services.length})
-										</CardTitle>
-										<button
-											type="button"
-											className="text-[11px] text-primary hover:underline"
-											onClick={() => setDetailTab("Services")}
-										>
-											View all services
-										</button>
-									</CardHeader>
-									<CardContent className="px-3 pb-0">
-										<div className="overflow-x-auto">
-											<Table>
-												<TableHeader>
-													<TableRow className="hover:bg-transparent">
-														<TableHead>CPT/HCPCS</TableHead>
-														<TableHead>Mod</TableHead>
-														<TableHead>Dx</TableHead>
-														<TableHead className="text-right">Units</TableHead>
-														<TableHead className="text-right">Charge</TableHead>
-														<TableHead>Status</TableHead>
-													</TableRow>
-												</TableHeader>
-												<TableBody>
-													{services.slice(0, 3).map((s) => (
-														<TableRow key={s.id}>
-															<TableCell className="font-mono text-xs">
-																{s.code}
-															</TableCell>
-															<TableCell className="text-xs">
-																{s.modifier || "—"}
-															</TableCell>
-															<TableCell className="font-mono text-xs">
-																{s.diagnosis}
-															</TableCell>
-															<TableCell className="text-right text-xs tabular-nums">
-																{s.units}
-															</TableCell>
-															<TableCell className="text-right text-xs tabular-nums">
-																{formatCurrency(s.charge)}
-															</TableCell>
-															<TableCell>
-																<ClaimStatusBadge status={s.status} />
-															</TableCell>
-														</TableRow>
-													))}
-												</TableBody>
-											</Table>
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="gap-2 py-3">
-									<CardHeader className="flex-row items-center justify-between px-3 py-0">
-										<CardTitle className="text-sm">Providers</CardTitle>
-										<button
-											type="button"
-											className="text-[11px] text-primary hover:underline"
-											onClick={() => setDetailTab("Providers")}
-										>
-											View all providers
-										</button>
-									</CardHeader>
-									<CardContent className="space-y-2 px-3 pb-0 text-xs">
-										<ProviderRow
-											role="Billing"
-											name={selected.provider}
-											npi={selected.providerNpi}
-										/>
-										<ProviderRow
-											role="Rendering"
-											name={selected.provider}
-											npi={selected.providerNpi}
-										/>
-										<ProviderRow
-											role="Referring"
-											name="Metro Referral Network"
-											npi={String(Number(selected.providerNpi) + 17)}
-										/>
-										<div className="border-t border-border/40 pt-2 text-muted-foreground">
-											<p>Facility · {selected.provider} ASC</p>
-											<p>Place of Service · 11 (Office)</p>
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="gap-2 py-3">
-									<CardHeader className="flex-row items-center justify-between px-3 py-0">
-										<CardTitle className="text-sm">Financial Summary</CardTitle>
-										<button
-											type="button"
-											className="text-[11px] text-primary hover:underline"
-											onClick={() => setDetailTab("Financial")}
-										>
-											View financial details
-										</button>
-									</CardHeader>
-									<CardContent className="px-3 pb-0">
-										<dl className="space-y-1.5 text-xs">
-											{[
-												["Total Charge", formatCurrency(selected.amountBilled)],
-												[
-													"Allowed Amount",
-													formatCurrency(
-														Math.round(selected.amountBilled * 0.85)
-													),
-												],
-												["Paid Amount", formatCurrency(selected.amountPaid)],
-												[
-													"Member Responsibility",
-													formatCurrency(
-														Math.max(
-															0,
-															Math.round(selected.amountBilled * 0.85) -
-																selected.amountPaid
-														)
-													),
-												],
-												["Deductible", formatCurrency(25)],
-												["Copay", formatCurrency(15)],
-												["Coinsurance", formatCurrency(0)],
-											].map(([label, value]) => (
-												<div
-													key={label}
-													className="flex items-center justify-between gap-2"
-												>
-													<dt className="text-muted-foreground">{label}</dt>
-													<dd className="font-medium tabular-nums">{value}</dd>
-												</div>
-											))}
-										</dl>
-									</CardContent>
-								</Card>
-							</div>
-						</TabsContent>
-
-						<TabsContent value="Member" className="mt-0 p-3">
-							<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-								<SummaryBlock
-									items={[
-										["Member ID", selected.memberId],
-										["Name", selected.memberName],
-										["Program", selected.program],
-										["Group", selected.group],
-										["Plan", selected.plan],
-									]}
-								/>
-								<SummaryBlock
-									items={[
-										["Payer", selected.payer],
-										["Vendor source", selected.vendor],
-										["Account", selected.account],
-										["Auth #", selected.authNumber || "—"],
-										["Rx #", selected.rxNumber || "—"],
-									]}
-								/>
-							</div>
-						</TabsContent>
-
-						<TabsContent value="Services" className="mt-0 p-3">
-							<div className="overflow-x-auto rounded-lg border border-border/50">
+				{pageRows.length === 0 ? (
+					<p className="px-4 py-16 text-center text-sm text-muted-foreground">
+						{hasFilters
+							? "No claims match your filters."
+							: useLive
+								? "No claims yet. Run npm run seed:claim-lines."
+								: "No mock claims for this program."}
+					</p>
+				) : (
+					<>
+						<div className={CMS_EDGE_TABLE_CONTAINER}>
+							<CmsEdgeTableScroll>
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
-											<TableHead className="pl-3">CPT/HCPCS</TableHead>
-											<TableHead>Modifier</TableHead>
-											<TableHead>Diagnosis</TableHead>
-											<TableHead className="text-right">Units</TableHead>
-											<TableHead className="text-right">Charge</TableHead>
-											<TableHead className="text-right">Allowed</TableHead>
-											<TableHead className="text-right">Paid</TableHead>
-											<TableHead className="pr-3">Status</TableHead>
+											<TableHead
+												className={cn(th, "w-12 pl-3 text-right tabular-nums")}
+											>
+												#
+											</TableHead>
+											<TableHead className={th}>Claim</TableHead>
+											<TableHead className={th}>Member</TableHead>
+											<TableHead className={th}>Provider</TableHead>
+											<TableHead className={th}>DOS</TableHead>
+											<TableHead className={th}>Status</TableHead>
+											<TableHead className={cn(th, "text-right")}>
+												Charge
+											</TableHead>
+											<TableHead className={th}>Vendor</TableHead>
+											<TableHead className={cn(th, "pr-3")} />
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{services.map((s) => (
-											<TableRow key={s.id}>
-												<TableCell className="pl-3 font-mono text-xs">
-													{s.code}
+										{pageRows.map((row, index) => (
+											<TableRow
+												key={row.id}
+												className="cursor-pointer hover:bg-muted/30"
+												onClick={() => openClaim(row)}
+											>
+												<TableCell
+													className={cn(
+														td,
+														"w-12 pl-3 text-right tabular-nums text-muted-foreground"
+													)}
+												>
+													{(safePage - 1) * pageSize + index + 1}
 												</TableCell>
-												<TableCell className="text-xs">
-													{s.modifier || "—"}
+												<TableCell className={td}>
+													<div className="flex flex-wrap items-center gap-1.5">
+														<Link
+															href={`/admin/claim-encounter/claims/${encodeURIComponent(row.claimId)}`}
+															className="font-mono text-xs font-semibold text-primary hover:underline"
+															onClick={(e) => e.stopPropagation()}
+														>
+															{row.claimId}
+														</Link>
+														<PriorityPill priority={row.priority} />
+													</div>
+													<p className="mt-0.5 text-[10px] text-muted-foreground">
+														{row.displayClaimType}
+													</p>
 												</TableCell>
-												<TableCell className="font-mono text-xs">
-													{s.diagnosis}
+												<TableCell className={td}>
+													<p className="truncate text-xs font-medium">
+														{row.memberName}
+													</p>
+													<p className="font-mono text-[10px] text-muted-foreground">
+														{row.memberId}
+													</p>
 												</TableCell>
-												<TableCell className="text-right text-xs tabular-nums">
-													{s.units}
+												<TableCell className={cn(td, "max-w-35")}>
+													<p className="truncate">{row.provider}</p>
+													<p className="font-mono text-[10px] text-muted-foreground">
+														{row.providerNpi}
+													</p>
 												</TableCell>
-												<TableCell className="text-right text-xs tabular-nums">
-													{formatCurrency(s.charge)}
+												<TableCell
+													className={cn(
+														td,
+														"tabular-nums text-muted-foreground"
+													)}
+												>
+													{row.dateOfService}
 												</TableCell>
-												<TableCell className="text-right text-xs tabular-nums">
-													{formatCurrency(s.allowed)}
+												<TableCell className={td}>
+													<div className="flex flex-col items-start gap-1">
+														<StatusBadge status={row.claimStatus} />
+														<span className="text-[10px] text-muted-foreground">
+															{row.responseStatus}
+														</span>
+													</div>
 												</TableCell>
-												<TableCell className="text-right text-xs tabular-nums">
-													{formatCurrency(s.paid)}
+												<TableCell
+													className={cn(td, "text-right tabular-nums")}
+												>
+													<p className="font-medium">
+														{formatCurrency(row.amountBilled)}
+													</p>
+													<p className="text-[10px] text-muted-foreground">
+														paid {formatCurrency(row.amountPaid)}
+													</p>
 												</TableCell>
-												<TableCell className="pr-3">
-													<ClaimStatusBadge status={s.status} />
+												<TableCell className={cn(td, "max-w-30")}>
+													<p className="truncate">{row.vendor}</p>
+													<p className="truncate text-[10px] text-muted-foreground">
+														{row.payer}
+													</p>
+												</TableCell>
+												<TableCell
+													className={cn(td, "pr-3 text-right")}
+													onClick={(e) => e.stopPropagation()}
+												>
+													<DropdownMenu>
+														<DropdownMenuTrigger asChild>
+															<Button
+																variant="ghost"
+																size="icon"
+																className="size-7"
+															>
+																<MoreHorizontal className="size-3.5" />
+															</Button>
+														</DropdownMenuTrigger>
+														<DropdownMenuContent align="end">
+															<DropdownMenuItem onClick={() => openClaim(row)}>
+																Open claim
+															</DropdownMenuItem>
+															<DropdownMenuItem onClick={() => setEdiRow(row)}>
+																<Code2 className="mr-2 size-3.5" />
+																View EDI
+															</DropdownMenuItem>
+															{useLive ? (
+																<DropdownMenuItem
+																	onClick={() => void softDelete(row)}
+																>
+																	Soft delete
+																</DropdownMenuItem>
+															) : null}
+															<DropdownMenuItem
+																onClick={() =>
+																	toast.message("Claim ID", {
+																		description: row.claimId,
+																	})
+																}
+															>
+																Copy claim ID
+															</DropdownMenuItem>
+														</DropdownMenuContent>
+													</DropdownMenu>
 												</TableCell>
 											</TableRow>
 										))}
 									</TableBody>
 								</Table>
-							</div>
-						</TabsContent>
+							</CmsEdgeTableScroll>
+						</div>
 
-						<TabsContent value="Providers" className="mt-0 p-3">
-							<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-								<ProviderRow
-									role="Billing"
-									name={selected.provider}
-									npi={selected.providerNpi}
-								/>
-								<ProviderRow
-									role="Rendering"
-									name={selected.provider}
-									npi={selected.providerNpi}
-								/>
-								<ProviderRow
-									role="Referring"
-									name="Metro Referral Network"
-									npi={String(Number(selected.providerNpi) + 17)}
-								/>
-							</div>
-						</TabsContent>
-
-						<TabsContent value="Financial" className="mt-0 p-3">
-							<div className="max-w-md rounded-lg border border-border/50 p-3">
-								<dl className="space-y-2 text-sm">
-									{[
-										["Total Charge", formatCurrency(selected.amountBilled)],
-										[
-											"Allowed Amount",
-											formatCurrency(Math.round(selected.amountBilled * 0.85)),
-										],
-										["Paid Amount", formatCurrency(selected.amountPaid)],
-										[
-											"Member Responsibility",
-											formatCurrency(
-												Math.max(
-													0,
-													Math.round(selected.amountBilled * 0.85) -
-														selected.amountPaid
-												)
-											),
-										],
-										["Deductible", formatCurrency(25)],
-										["Copay", formatCurrency(15)],
-										["Coinsurance", formatCurrency(0)],
-										["Interest", formatCurrency(0)],
-										["Withhold", formatCurrency(0)],
-									].map(([label, value]) => (
-										<div
-											key={label}
-											className="flex items-center justify-between gap-3"
-										>
-											<dt className="text-muted-foreground">{label}</dt>
-											<dd className="font-medium tabular-nums">{value}</dd>
-										</div>
-									))}
-								</dl>
-							</div>
-						</TabsContent>
-
-						<TabsContent value="Responses" className="mt-0 p-3">
-							<div className="space-y-2 text-sm">
-								<p>
-									<span className="text-muted-foreground">
-										Response status:{" "}
-									</span>
-									<ClaimStatusBadge status={selected.responseStatus} />
-								</p>
-								<p className="text-muted-foreground">
-									Response file:{" "}
-									<span className="font-mono text-foreground">
-										{selected.responseFileName || "—"}
-									</span>
-								</p>
-								{selected.rejectReasons.length > 0 ? (
-									<ul className="space-y-1">
-										{selected.rejectReasons.map((r) => (
-											<li
-												key={r.code}
-												className="rounded border border-red-200/60 bg-red-50/80 px-2 py-1.5 text-xs dark:border-red-900/40 dark:bg-red-950/30"
-											>
-												<span className="font-mono font-semibold">
-													{r.code}
-												</span>{" "}
-												— {r.description}
-											</li>
+						<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 px-3 py-2.5 text-xs text-muted-foreground">
+							<p>
+								Showing{" "}
+								<span className="font-medium tabular-nums text-foreground">
+									{rangeStart}
+								</span>
+								–
+								<span className="font-medium tabular-nums text-foreground">
+									{rangeEnd}
+								</span>{" "}
+								of{" "}
+								<span className="font-medium tabular-nums text-foreground">
+									{formatCount(filtered.length)}
+								</span>
+							</p>
+							<div className="flex items-center gap-1.5">
+								<span className="mr-1">Rows</span>
+								<Select
+									value={String(pageSize)}
+									onValueChange={(v) => {
+										setPageSize(Number(v));
+										setPage(1);
+									}}
+								>
+									<SelectTrigger className={cn(compactFieldClass, "w-18")}>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{[10, 25, 50, 100].map((size) => (
+											<SelectItem key={size} value={String(size)}>
+												{size}
+											</SelectItem>
 										))}
-									</ul>
-								) : (
-									<p className="text-xs text-muted-foreground">
-										No reject / denial codes on this claim.
-									</p>
-								)}
+									</SelectContent>
+								</Select>
+								<Button
+									variant="outline"
+									size="icon"
+									className="size-8"
+									disabled={safePage <= 1}
+									onClick={() => setPage((p) => Math.max(1, p - 1))}
+								>
+									<ChevronLeft className="size-3.5" />
+								</Button>
+								<span className="min-w-12 text-center tabular-nums">
+									{safePage} / {pageCount}
+								</span>
+								<Button
+									variant="outline"
+									size="icon"
+									className="size-8"
+									disabled={safePage >= pageCount}
+									onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+								>
+									<ChevronRight className="size-3.5" />
+								</Button>
 							</div>
-						</TabsContent>
+						</div>
+					</>
+				)}
+			</section>
 
-						{(["History", "Attachments", "Notes"] as const).map((tab) => (
-							<TabsContent key={tab} value={tab} className="mt-0 p-3">
-								<p className="text-sm text-muted-foreground">
-									{tab} for{" "}
-									<span className="font-mono text-foreground">
-										{selected.claimId}
-									</span>{" "}
-									will connect when the claims API is available.
-								</p>
-							</TabsContent>
+			{/* Needs attention — below table */}
+			<section className={cn(PANEL, "overflow-hidden")}>
+				<div className="flex items-center justify-between border-b border-border/50 px-4 py-2.5">
+					<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+						Needs attention
+					</p>
+					<span className="rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+						{stats.attention}
+					</span>
+				</div>
+				{stats.attentionRows.length === 0 ? (
+					<p className="px-4 py-10 text-center text-sm text-muted-foreground">
+						Nothing needs attention right now.
+					</p>
+				) : (
+					<ul className="grid sm:grid-cols-2">
+						{stats.attentionRows.slice(0, 8).map((row) => (
+							<li
+								key={row.id}
+								className="border-b border-border/50 sm:odd:border-r"
+							>
+								<button
+									type="button"
+									onClick={() => openClaim(row)}
+									className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+								>
+									<span
+										className={cn(
+											"mt-0.5 inline-flex shrink-0 rounded-sm px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white",
+											row.claimStatus === "Denied" ||
+												row.claimStatus === "Rejected"
+												? "bg-red-600"
+												: row.priority === "Urgent"
+													? "bg-orange-500"
+													: "bg-amber-500"
+										)}
+									>
+										{row.claimStatus === "Denied" ||
+										row.claimStatus === "Rejected"
+											? row.claimStatus
+											: row.priority === "Urgent"
+												? "Urgent"
+												: "Partial"}
+									</span>
+									<div className="min-w-0 flex-1">
+										<p className="font-mono text-[12px] font-semibold text-foreground">
+											{row.claimId}
+										</p>
+										<p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+											{row.vendor} · {row.memberName} ·{" "}
+											{formatCurrency(row.amountBilled)}
+										</p>
+									</div>
+									{row.claimStatus === "Denied" ||
+									row.claimStatus === "Rejected" ? (
+										<XCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
+									) : (
+										<AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+									)}
+								</button>
+							</li>
 						))}
-					</Tabs>
-				</Card>
-			) : null}
+					</ul>
+				)}
+			</section>
 
 			<EdiViewerDialog
-				open={ediOpen}
-				onOpenChange={setEdiOpen}
+				open={Boolean(ediRow)}
+				onOpenChange={(open) => {
+					if (!open) setEdiRow(null);
+				}}
 				fixture="837I"
-				fileName={selected?.fileName}
-				title={selected ? `EDI · ${selected.claimId}` : "EDI Viewer"}
+				fileName={ediRow?.fileName}
+				title={ediRow ? `EDI · ${ediRow.claimId}` : "EDI Viewer"}
 			/>
-		</div>
-	);
-}
-
-function SummaryBlock({ items }: { items: Array<[string, ReactNode]> }) {
-	return (
-		<div className="rounded-lg border border-border/50 bg-background/40 p-3">
-			<dl className="space-y-2">
-				{items.map(([label, value]) => (
-					<div key={label}>
-						<dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-							{label}
-						</dt>
-						<dd className="mt-0.5 text-xs font-medium break-all">
-							{typeof value === "string" &&
-							(value === "Paid" ||
-								value === "Denied" ||
-								value === "Pending" ||
-								value === "Accepted" ||
-								value === "Rejected" ||
-								value === "Partial") ? (
-								<ClaimStatusBadge status={value} />
-							) : (
-								value
-							)}
-						</dd>
-					</div>
-				))}
-			</dl>
-		</div>
-	);
-}
-
-function ProviderRow({
-	role,
-	name,
-	npi,
-}: {
-	role: string;
-	name: string;
-	npi: string;
-}) {
-	return (
-		<div className="rounded-md border border-border/40 px-2.5 py-2">
-			<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-				{role}
-			</p>
-			<p className="mt-0.5 text-xs font-medium">{name}</p>
-			<p className="font-mono text-[10px] text-muted-foreground">NPI {npi}</p>
 		</div>
 	);
 }
