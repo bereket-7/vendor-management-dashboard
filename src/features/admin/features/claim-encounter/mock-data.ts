@@ -1,5 +1,5 @@
 import { CLAIM_VENDOR_SEED } from "@/features/admin/features/vendors/vendor-integration-mock";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isClaimVendorFilesMockEnabled } from "@/lib/mock-mode";
 import type { ProgramFileType } from "@/types/UI/system.types";
 
 export type { ProgramFileType };
@@ -209,75 +209,88 @@ function seedFiles(): ClaimVendorFile[] {
 		});
 	}
 
-	// Outbound: accepted (to Gainwell) + denied (Gainwell/payer denials)
-	for (let i = 0; i < 12; i++) {
+	// Outbound: accepted → Gainwell + denied packages notified back to vendor
+	for (let i = 0; i < 18; i++) {
 		const program: ProgramFileType =
 			i % 3 === 0 ? "MDH" : i % 3 === 1 ? "DHCF" : "BHP";
 		const vendorMeta = VENDORS[i % VENDORS.length]!;
-		const records = 35 + ((i * 13) % 90);
-		const isDeniedPackage = i % 4 === 0;
+		const records = 28 + ((i * 19) % 110);
+		const isDeniedPackage = i % 5 === 0;
+		const isPartialDeny = !isDeniedPackage && i % 3 === 0;
 		const deniedCount = isDeniedPackage
 			? records
-			: i % 3 === 0
-				? Math.max(2, Math.floor(records * 0.1))
+			: isPartialDeny
+				? Math.max(3, Math.floor(records * 0.12))
 				: 0;
 		const accepted = records - deniedCount;
-		const day = String(18 + (i % 10)).padStart(2, "0");
-		const hour = String(9 + (i % 8)).padStart(2, "0");
+		const day = String(1 + (i % 28)).padStart(2, "0");
+		const hour = String(8 + (i % 9)).padStart(2, "0");
 		const reasons = isDeniedPackage
 			? [
 					REJECT_REASON_CATALOG[i % REJECT_REASON_CATALOG.length]!,
-					REJECT_REASON_CATALOG[(i + 1) % REJECT_REASON_CATALOG.length]!,
+					REJECT_REASON_CATALOG[(i + 2) % REJECT_REASON_CATALOG.length]!,
 				]
 			: deniedCount > 0
 				? [REJECT_REASON_CATALOG[i % REJECT_REASON_CATALOG.length]!]
 				: [];
-		const sourceId = `CE-IN-2026-07${day}-${String(200 + i).padStart(3, "0")}`;
+		const sourceId = `CE-IN-2026-08${day}-${String(200 + i).padStart(3, "0")}`;
+		const sendStatus: ClaimVendorFile["outboundSendStatus"] = isDeniedPackage
+			? "notified"
+			: i % 3 === 0
+				? "queued"
+				: i % 3 === 1
+					? "sent"
+					: "notified";
+		const tx: ClaimVendorFile["transactionType"] =
+			i % 7 === 0 ? "835" : i % 11 === 0 ? "277CA" : "837";
 		rows.push({
 			id: `cf-out-${i + 1}`,
-			fileId: `CE-OUT-2026-07${day}-${String(300 + i).padStart(3, "0")}`,
+			fileId: `CE-OUT-2026-09${day}-${String(300 + i).padStart(3, "0")}`,
 			vendor: vendorMeta.name,
 			direction: "outbound",
 			program,
 			fileTypeLabel: vendorMeta.fileType,
-			transactionType: "837",
+			transactionType: tx,
 			fileName: isDeniedPackage
-				? `${program}_${vendorMeta.name.toUpperCase()}_DENIED_202607${day}.edi`
-				: `${program}_${vendorMeta.name.toUpperCase()}_837_ACCEPTED_202607${day}.edi`,
-			receivedAt: `2026-07-${day} ${hour}:${String((i * 11) % 60).padStart(2, "0")}`,
+				? `${program}_${vendorMeta.name.replace(/\s+/g, "")}_DENIED_202609${day}.edi`
+				: `${program}_${vendorMeta.name.replace(/\s+/g, "")}_${tx}_OUT_202609${day}.edi`,
+			receivedAt: `2026-09-${day} ${hour}:${String((i * 11) % 60).padStart(2, "0")}`,
 			records,
 			submitted: records,
 			accepted: isDeniedPackage ? 0 : accepted,
 			rejected: 0,
-			partial: 0,
-			paid: isDeniedPackage ? 0 : Math.floor(accepted * 0.85),
+			partial: isPartialDeny ? deniedCount : 0,
+			paid: isDeniedPackage ? 0 : Math.floor(accepted * 0.82),
 			denied: deniedCount,
-			status: isDeniedPackage ? "denied" : "accepted",
+			status: isDeniedPackage
+				? "denied"
+				: isPartialDeny
+					? "partial"
+					: "accepted",
 			responseCode: isDeniedPackage ? `DN-${9100 + i}` : `AC-${9200 + i}`,
 			notes: isDeniedPackage
-				? "Gainwell denied — denial codes returned to vendor"
-				: "MFC accepted — queued/sent to Gainwell",
-			avgResponseMinutes: 22 + (i % 6) * 5,
+				? "Package denied — denial codes notified to vendor for correction"
+				: sendStatus === "queued"
+					? "MFC accepted — queued for Gainwell transmission"
+					: sendStatus === "sent"
+						? "Transmitted to Gainwell · awaiting acknowledgements"
+						: "Vendor notified of claim-level outcomes",
+			avgResponseMinutes: 18 + (i % 8) * 6,
 			reviewStatus: isDeniedPackage ? "denied" : "accepted",
 			rejectReasons: reasons,
-			reviewedAt: `2026-07-${day} ${String(10 + (i % 6)).padStart(2, "0")}:${String((i * 13) % 60).padStart(2, "0")}`,
+			reviewedAt: `2026-09-${day} ${String(10 + (i % 7)).padStart(2, "0")}:${String((i * 13) % 60).padStart(2, "0")}`,
 			reviewedBy: reviewers[i % reviewers.length]!,
 			sourceInboundFileId: sourceId,
-			outboundSendStatus: isDeniedPackage
-				? "notified"
-				: i % 2 === 0
-					? "sent"
-					: "queued",
-			ediFixture: "837I",
+			outboundSendStatus: sendStatus,
+			ediFixture: tx === "835" ? "835" : "837I",
 		});
 	}
 
 	return rows;
 }
 
-export const CLAIM_VENDOR_FILES: ClaimVendorFile[] = isMockEnabled()
-	? seedFiles()
-	: [];
+export const CLAIM_VENDOR_FILES: ClaimVendorFile[] =
+	isClaimVendorFilesMockEnabled() ? seedFiles() : [];
 
 export const CLAIM_RESPONSES: ClaimResponse[] = CLAIM_VENDOR_FILES.filter(
 	(f) => f.direction === "outbound" && f.reviewStatus === "accepted"
@@ -751,7 +764,9 @@ function seedClaimLines(): ClaimLine[] {
 	return lines;
 }
 
-export const CLAIM_LINES: ClaimLine[] = isMockEnabled() ? seedClaimLines() : [];
+export const CLAIM_LINES: ClaimLine[] = isClaimVendorFilesMockEnabled()
+	? seedClaimLines()
+	: [];
 
 export const SUBMISSION_BATCHES: SubmissionBatch[] = CLAIM_RESPONSES.map(
 	(response) => ({
@@ -776,14 +791,14 @@ export const SUBMISSION_BATCHES: SubmissionBatch[] = CLAIM_RESPONSES.map(
 );
 
 export function getClaimResponse(id: string) {
-	if (!isMockEnabled()) return undefined;
+	if (!isClaimVendorFilesMockEnabled()) return undefined;
 	return CLAIM_RESPONSES.find(
 		(r) => r.id === id || r.responseId === id || r.responseFile === id
 	);
 }
 
 export function getSubmissionBatch(batchId: string) {
-	if (!isMockEnabled()) return undefined;
+	if (!isClaimVendorFilesMockEnabled()) return undefined;
 	const decoded = decodeURIComponent(batchId);
 	return SUBMISSION_BATCHES.find(
 		(b) => b.id === decoded || b.batchId === decoded
@@ -791,7 +806,7 @@ export function getSubmissionBatch(batchId: string) {
 }
 
 export function getVendorFile(fileId: string) {
-	if (!isMockEnabled()) return undefined;
+	if (!isClaimVendorFilesMockEnabled()) return undefined;
 	return CLAIM_VENDOR_FILES.find((f) => f.id === fileId || f.fileId === fileId);
 }
 
@@ -1456,7 +1471,7 @@ export const SHOWCASE_CLAIM_DETAIL: ClaimDetail = {
 };
 
 export function getClaimDetail(claimId: string): ClaimDetail | undefined {
-	if (!isMockEnabled()) return undefined;
+	if (!isClaimVendorFilesMockEnabled()) return undefined;
 	const decoded = decodeURIComponent(claimId);
 	if (
 		decoded === SHOWCASE_CLAIM_DETAIL.claimId ||
