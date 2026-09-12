@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { useQueryClient } from "@tanstack/react-query";
 import {
 	AlertTriangle,
 	ArrowUpDown,
 	Clock3,
-	Download,
 	ExternalLink,
 	Eye,
 	FileOutput,
 	FileSearch,
 	Hourglass,
+	Inbox,
 	type LucideIcon,
 	MoreHorizontal,
 	RefreshCw,
-	ScrollText,
 	Search,
 	X,
 	XCircle,
@@ -58,6 +56,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import {
 	CMS_EDGE_PANEL_CLASS,
 	CMS_EDGE_TABLE_CONTAINER,
@@ -72,33 +71,25 @@ import {
 	usePagedRows,
 } from "@/features/admin/features/claim-encounter/components/ClaimQueueChrome";
 import {
+	VendorFileWorkspace,
+	vendorFileToolbarBtn,
+} from "@/features/admin/features/claim-encounter/components/VendorFileWorkspace";
+import {
 	type ClaimVendorFile,
-	type ClaimVendorFileListParams,
+	filesForProgram,
 	formatCount,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
-import {
-	useClaimVendorFilesSummaryQuery,
-	useExportClaimVendorFilesCsvMutation,
-	useInboundVendorQueueQuery,
-	useSeedInboundVendorQueueMutation,
-} from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
-import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
-import { featureQueryKey } from "@/features/admin/shared/feature-contract";
-import { Link, useRouter } from "@/i18n/navigation";
-import { downloadBlob, stampFilename } from "@/lib/export/csv";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { useProgramFilesQuery } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
+import { CLAIM_VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { Link } from "@/i18n/navigation";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
-type SortKey = "receivedAt" | "records" | "vendor" | "wait";
-
-/** Align wait chips / SLA with BE summary age_buckets.over_3d (72h). */
-const SLA_HOURS = 72;
-
 const PANEL = CMS_EDGE_PANEL_CLASS;
+const SLA_HOURS = 48;
 
-const toolbarBtn =
-	"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
+const toolbarBtn = vendorFileToolbarBtn;
 
 const selectField = cn(
 	"h-8 w-auto min-w-[7.5rem] rounded-sm border border-border bg-background text-xs shadow-none transition-colors duration-200",
@@ -114,6 +105,9 @@ const STAT_SHADOW =
 	"shadow-[0_1px_2px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)]";
 const STAT_SHADOW_HOVER =
 	"hover:shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(15,23,42,0.10)]";
+
+type SortKey = "receivedAt" | "records" | "vendor" | "wait";
+type StatusFilter = "all" | "pending" | "rejected";
 
 function ReviewStatusPill({
 	status,
@@ -135,18 +129,18 @@ function ReviewStatusPill({
 			) : (
 				<Clock3 className="size-2.5" />
 			)}
-			{rejected ? "MFC rejected" : "Pending"}
+			{rejected ? "rejected" : "pending"}
 		</span>
 	);
 }
 
-function WaitPill({ wait }: { wait: number }) {
-	const sla = wait >= SLA_HOURS;
-	const aging = wait >= 24 && wait < SLA_HOURS;
+function WaitPill({ hours }: { hours: number }) {
+	const sla = hours >= SLA_HOURS;
+	const aging = hours >= 24 && hours < SLA_HOURS;
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+				"inline-flex items-center rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
 				sla
 					? "border-rose-200/80 bg-rose-50 text-rose-800"
 					: aging
@@ -154,27 +148,43 @@ function WaitPill({ wait }: { wait: number }) {
 						: "border-sky-200/80 bg-sky-50 text-sky-900"
 			)}
 		>
-			{formatWaitLabel(wait)}
+			{formatWaitLabel(hours)}
 		</span>
 	);
 }
 
-function TxBadge({ label }: { label: string }) {
+function TxBadge({ type }: { type: ClaimVendorFile["transactionType"] }) {
 	return (
 		<span className="rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-muted-foreground">
-			{label}
+			{type}
 		</span>
 	);
 }
 
+/** Prefer claim-file fixtures (default on). Live → vendor-core claim-vendor-files. */
 export function InboundVendorFilePage() {
+	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
+	if (!useFixtures) {
+		return (
+			<VendorCoreGate title="Inbound Vendor Files">
+				<InboundVendorFileBody useLive />
+			</VendorCoreGate>
+		);
+	}
+	return <InboundVendorFileBody useLive={false} />;
+}
+
+function InboundVendorFileBody({ useLive }: { useLive: boolean }) {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
-	const queryClient = useQueryClient();
+	const inboundQuery = useProgramFilesQuery(programFilter, "inbound", useLive);
+	const outboundQuery = useProgramFilesQuery(
+		programFilter,
+		"outbound",
+		useLive
+	);
 	const [vendor, setVendor] = useState("all");
 	const [fileType, setFileType] = useState("all");
-	const [statusFilter, setStatusFilter] = useState<
-		"all" | "pending" | "rejected"
-	>("all");
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 	const [waitBucket, setWaitBucket] = useState("all");
 	const [search, setSearch] = useState("");
 	const [sortKey, setSortKey] = useState<SortKey>("wait");
@@ -182,102 +192,16 @@ export function InboundVendorFilePage() {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 	const [refreshing, setRefreshing] = useState(false);
-	/** Persist vendor UUID by display name across filtered fetches. */
-	const [vendorIdByName, setVendorIdByName] = useState<Record<string, string>>(
-		{}
-	);
+	const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
-	const listApiParams = useMemo((): ClaimVendorFileListParams | undefined => {
-		if (isMockEnabled()) return undefined;
-		const params: ClaimVendorFileListParams = {
-			limit: 100,
-			offset: 0,
-			direction: "inbound",
-		};
-		const q = search.trim();
-		if (q) params.search = q;
-		if (statusFilter === "pending") params.review_status = "pending";
-		else if (statusFilter === "rejected") params.review_status = "rejected";
-		const vid = vendor !== "all" ? vendorIdByName[vendor] : undefined;
-		if (vid) params.vendor_id = vid;
-		if (waitBucket === "fresh") params.wait_bucket = "under_24h";
-		else if (waitBucket === "aging") params.wait_bucket = "day_1_to_3";
-		else if (waitBucket === "sla") params.wait_bucket = "over_3d";
-		if (sortKey === "receivedAt" || sortKey === "wait") {
-			// ListOrderingMixin allowlist is created_at/updated_at/deleted_at only
-			// (FilterSet also supports received_at once query serializer is extended).
-			params.order_by = sortDir === "asc" ? "created_at" : "-created_at";
-		}
-		return params;
-	}, [
-		search,
-		statusFilter,
-		vendor,
-		vendorIdByName,
-		waitBucket,
-		sortKey,
-		sortDir,
-	]);
-
-	const summaryApiParams = useMemo(():
-		| ClaimVendorFileListParams
-		| undefined => {
-		if (isMockEnabled()) return undefined;
-		const params: ClaimVendorFileListParams = { direction: "inbound" };
-		const q = search.trim();
-		if (q) params.search = q;
-		if (statusFilter === "pending") params.review_status = "pending";
-		else if (statusFilter === "rejected") params.review_status = "rejected";
-		const vid = vendor !== "all" ? vendorIdByName[vendor] : undefined;
-		if (vid) params.vendor_id = vid;
-		if (waitBucket === "fresh") params.wait_bucket = "under_24h";
-		else if (waitBucket === "aging") params.wait_bucket = "day_1_to_3";
-		else if (waitBucket === "sla") params.wait_bucket = "over_3d";
-		return params;
-	}, [search, statusFilter, vendor, vendorIdByName, waitBucket]);
-
-	const queueQuery = useInboundVendorQueueQuery(programFilter, listApiParams);
-	const summaryQuery = useClaimVendorFilesSummaryQuery(
-		!isMockEnabled(),
-		summaryApiParams
-	);
-	const seedMutation = useSeedInboundVendorQueueMutation();
-	const exportMutation = useExportClaimVendorFilesCsvMutation();
-
-	/** Inbound = pending review + MFC-rejected (held for vendor correction). */
-	const inboundQueue = useMemo(
-		() => queueQuery.data?.inbound ?? ([] as ClaimVendorFile[]),
-		[queueQuery.data?.inbound]
-	);
-
-	useEffect(() => {
-		const next: Record<string, string> = {};
-		for (const f of inboundQueue) {
-			if (f.vendor && f.vendor !== "—" && f.vendorId) {
-				next[f.vendor] = f.vendorId;
-			}
-		}
-		if (Object.keys(next).length === 0) return;
-		setVendorIdByName((prev) => {
-			let changed = false;
-			const merged = { ...prev };
-			for (const [name, id] of Object.entries(next)) {
-				if (merged[name] !== id) {
-					merged[name] = id;
-					changed = true;
-				}
-			}
-			return changed ? merged : prev;
-		});
-	}, [inboundQueue]);
-	const allOutbound = useMemo(
-		() => queueQuery.data?.outbound ?? ([] as ClaimVendorFile[]),
-		[queueQuery.data?.outbound]
-	);
-	const outboundAvailable =
-		queueQuery.data?.outboundAvailable ?? isMockEnabled();
-	const openExceptionCount = queueQuery.data?.openExceptionCount ?? 0;
-
+	const inboundQueue = useMemo(() => {
+		if (useLive) return inboundQuery.data ?? [];
+		return filesForProgram(programFilter, "inbound");
+	}, [useLive, inboundQuery.data, programFilter]);
+	const allOutbound = useMemo(() => {
+		if (useLive) return outboundQuery.data ?? [];
+		return filesForProgram(programFilter, "outbound");
+	}, [useLive, outboundQuery.data, programFilter]);
 	const pending = useMemo(
 		() => inboundQueue.filter((f) => f.reviewStatus === "pending"),
 		[inboundQueue]
@@ -287,60 +211,7 @@ export function InboundVendorFilePage() {
 		[inboundQueue]
 	);
 
-	const statusCounts = useMemo(() => {
-		const byReview = summaryQuery.data?.by_review_status;
-		if (byReview && Object.keys(byReview).length > 0) {
-			return {
-				all:
-					summaryQuery.data?.total_files ??
-					Object.values(byReview).reduce((s, n) => s + Number(n), 0),
-				pending: Number(
-					byReview.pending ??
-						summaryQuery.data?.awaiting_review ??
-						pending.length
-				),
-				rejected: Number(
-					byReview.rejected ?? summaryQuery.data?.rejected ?? rejectedIn.length
-				),
-			};
-		}
-		const byStatus = summaryQuery.data?.by_status;
-		if (byStatus && Object.keys(byStatus).length > 0) {
-			const pendingFromStatus =
-				Number(byStatus.received ?? 0) +
-				Number(byStatus.processing ?? 0) +
-				Number(byStatus.pending ?? 0);
-			return {
-				all:
-					summaryQuery.data?.total_files ??
-					Object.values(byStatus).reduce((s, n) => s + Number(n), 0),
-				pending: pendingFromStatus || pending.length,
-				rejected: Number(
-					byStatus.rejected ?? summaryQuery.data?.rejected ?? rejectedIn.length
-				),
-			};
-		}
-		return {
-			all: inboundQueue.length,
-			pending: pending.length,
-			rejected: rejectedIn.length,
-		};
-	}, [
-		summaryQuery.data,
-		inboundQueue.length,
-		pending.length,
-		rejectedIn.length,
-	]);
-
-	const vendors = useMemo(() => {
-		if (isMockEnabled()) return [...VENDOR_NAMES];
-		const fromRows = Array.from(
-			new Set(inboundQueue.map((f) => f.vendor).filter((v) => v && v !== "—"))
-		).sort();
-		const known = Object.keys(vendorIdByName).sort();
-		const merged = Array.from(new Set([...fromRows, ...known]));
-		return merged.length > 0 ? merged : [];
-	}, [inboundQueue, vendorIdByName]);
+	const vendors = CLAIM_VENDOR_NAMES;
 	const fileTypes = useMemo(
 		() => Array.from(new Set(inboundQueue.map((f) => f.fileTypeLabel))).sort(),
 		[inboundQueue]
@@ -359,7 +230,13 @@ export function InboundVendorFilePage() {
 			if (waitBucket === "sla" && wait < SLA_HOURS) return false;
 			const q = search.trim().toLowerCase();
 			if (!q) return true;
-			return [f.fileId, f.fileName, f.vendor, f.fileTypeLabel]
+			return [
+				f.fileId,
+				f.fileName,
+				f.vendor,
+				f.fileTypeLabel,
+				f.transactionType,
+			]
 				.join(" ")
 				.toLowerCase()
 				.includes(q);
@@ -393,24 +270,19 @@ export function InboundVendorFilePage() {
 		setPage
 	);
 
+	const selectedFile = useMemo(
+		() =>
+			selectedFileId
+				? (inboundQueue.find((f) => f.id === selectedFileId) ?? null)
+				: null,
+		[inboundQueue, selectedFileId]
+	);
+
 	const analytics = useMemo(() => {
 		const awaiting = pending;
 		const waits = awaiting.map((f) => hoursSince(f.receivedAt));
 		const claimsPending = awaiting.reduce((s, f) => s + f.records, 0);
 		const claimsRejected = rejectedIn.reduce((s, f) => s + f.rejected, 0);
-		const buckets = summaryQuery.data?.age_buckets;
-		const under24 =
-			buckets?.under_24h ??
-			awaiting.filter((f) => hoursSince(f.receivedAt) < 24).length;
-		const day1to3 =
-			buckets?.day_1_to_3 ??
-			awaiting.filter((f) => {
-				const h = hoursSince(f.receivedAt);
-				return h >= 24 && h < SLA_HOURS;
-			}).length;
-		const over3d =
-			buckets?.over_3d ??
-			awaiting.filter((f) => hoursSince(f.receivedAt) >= SLA_HOURS).length;
 		const slaRisk = awaiting.filter(
 			(f) => hoursSince(f.receivedAt) >= SLA_HOURS
 		);
@@ -426,50 +298,57 @@ export function InboundVendorFilePage() {
 		)[0];
 		const largest = [...awaiting].sort((a, b) => b.records - a.records)[0];
 
-		const nameByVendorId = new Map<string, string>();
-		for (const f of inboundQueue) {
-			if (f.vendorId && f.vendor && f.vendor !== "—") {
-				nameByVendorId.set(f.vendorId, f.vendor);
-			}
-		}
-		for (const [name, id] of Object.entries(vendorIdByName)) {
-			if (!nameByVendorId.has(id)) nameByVendorId.set(id, name);
-		}
-
-		const summaryByVendor = summaryQuery.data?.by_vendor;
-		const byVendor =
-			summaryByVendor && Object.keys(summaryByVendor).length > 0
-				? Object.entries(summaryByVendor)
-						.map(([id, files]) => ({
-							name: nameByVendorId.get(id) ?? id.slice(0, 8),
-							files: Number(files),
-							claims: Number(files),
-						}))
-						.sort((a, b) => b.files - a.files)
-				: Object.entries(
-						inboundQueue.reduce<
-							Record<string, { files: number; claims: number }>
-						>((acc, f) => {
-							const cur = acc[f.vendor] ?? { files: 0, claims: 0 };
-							cur.files += 1;
-							cur.claims += f.records;
-							acc[f.vendor] = cur;
-							return acc;
-						}, {})
-					)
-						.map(([name, v]) => ({ name, ...v }))
-						.sort((a, b) => b.claims - a.claims);
+		const byVendor = Object.entries(
+			inboundQueue.reduce<Record<string, { files: number; claims: number }>>(
+				(acc, f) => {
+					const cur = acc[f.vendor] ?? { files: 0, claims: 0 };
+					cur.files += 1;
+					cur.claims += f.records;
+					acc[f.vendor] = cur;
+					return acc;
+				},
+				{}
+			)
+		)
+			.map(([name, v]) => ({
+				name,
+				short: name.length > 14 ? `${name.slice(0, 12)}…` : name,
+				...v,
+			}))
+			.sort((a, b) => b.claims - a.claims);
 
 		const ageBuckets = [
-			{ name: "< 24h", files: under24, fill: "#0ea5e9" },
-			{ name: "1–3 days", files: day1to3, fill: "#f59e0b" },
-			{ name: "≥ 3 days", files: over3d, fill: "#ef4444" },
+			{
+				name: "< 24h",
+				id: "fresh" as const,
+				files: awaiting.filter((f) => hoursSince(f.receivedAt) < 24).length,
+				fill: "#0ea5e9",
+			},
+			{
+				name: "24–48h",
+				id: "aging" as const,
+				files: aging.length,
+				fill: "#f59e0b",
+			},
+			{
+				name: `≥ ${SLA_HOURS}h SLA`,
+				id: "sla" as const,
+				files: slaRisk.length,
+				fill: "#ef4444",
+			},
 		];
+
+		const statusPie = [
+			{ name: "Pending", value: pending.length, fill: "#d97706" },
+			{ name: "Rejected", value: rejectedIn.length, fill: "#e11d48" },
+		].filter((d) => d.value > 0);
 
 		const acceptedOut = allOutbound.filter(
 			(f) => f.reviewStatus === "accepted"
 		);
-		const deniedOut = allOutbound.filter((f) => f.reviewStatus === "denied");
+		const deniedOut = allOutbound.filter(
+			(f) => f.reviewStatus === "denied" || f.reviewStatus === "rejected"
+		);
 		const throughputClaims = allOutbound.reduce((s, f) => s + f.records, 0);
 		const acceptRate = pct(
 			acceptedOut.reduce((s, f) => s + f.accepted, 0),
@@ -486,23 +365,14 @@ export function InboundVendorFilePage() {
 			largest,
 			byVendor,
 			ageBuckets,
+			statusPie,
+			statusTotal: pending.length + rejectedIn.length,
 			acceptedOut,
 			deniedOut,
 			acceptRate,
-			maxVendorClaims: Math.max(1, ...byVendor.map((v) => v.claims || v.files)),
-			under24,
-			day1to3,
-			over3d,
-			totalFiles: summaryQuery.data?.total_files ?? inboundQueue.length,
+			maxVendorClaims: Math.max(1, ...byVendor.map((v) => v.claims), 1),
 		};
-	}, [
-		pending,
-		rejectedIn,
-		inboundQueue,
-		allOutbound,
-		summaryQuery.data,
-		vendorIdByName,
-	]);
+	}, [pending, rejectedIn, inboundQueue, allOutbound]);
 
 	const hasActiveFilters =
 		statusFilter !== "all" ||
@@ -535,60 +405,16 @@ export function InboundVendorFilePage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		try {
-			await queryClient.invalidateQueries({
-				queryKey: featureQueryKey("claim-encounter", "inbound-vendor-queue"),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: featureQueryKey("claim-encounter", "vendor-files"),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: featureQueryKey("claim-encounter", "vendor-files-summary"),
-			});
-			toast.success("Inbound queue refreshed");
-		} catch {
-			toast.error("Refresh failed");
-		} finally {
-			setRefreshing(false);
+		if (useLive) {
+			await Promise.all([inboundQuery.refetch(), outboundQuery.refetch()]);
+		} else {
+			await new Promise((r) => setTimeout(r, 400));
 		}
+		setRefreshing(false);
+		toast.success("Inbound refreshed");
 	}
 
-	async function handleSeedDemo() {
-		try {
-			const result = await seedMutation.mutateAsync({ force: true });
-			await queryClient.invalidateQueries({
-				queryKey: featureQueryKey("claim-encounter", "inbound-vendor-queue"),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: featureQueryKey("claim-encounter", "vendor-files"),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: featureQueryKey("claim-encounter", "vendor-files-summary"),
-			});
-			const created =
-				typeof result.result.created === "number"
-					? result.result.created
-					: undefined;
-			toast.success(
-				created != null
-					? `Seeded ${created} via ${result.source}`
-					: `Seeded via ${result.source}`
-			);
-		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Seed demo failed");
-		}
-	}
-
-	const pendingCount =
-		summaryQuery.data?.by_review_status?.pending ??
-		summaryQuery.data?.awaiting_review ??
-		pending.length;
-	const rejectedCount =
-		summaryQuery.data?.by_review_status?.rejected ??
-		summaryQuery.data?.rejected ??
-		rejectedIn.length;
-	const packageTotal = Math.max(statusCounts.all, 1);
-
+	const queueTotal = Math.max(inboundQueue.length, 1);
 	const inboundKpis: {
 		id: string;
 		label: string;
@@ -605,8 +431,8 @@ export function InboundVendorFilePage() {
 		{
 			id: "pending",
 			label: "Awaiting review",
-			value: pendingCount,
-			hint: `${formatCount(analytics.claimsPending)} claims · ${pct(Number(pendingCount), packageTotal)}%`,
+			value: pending.length,
+			hint: `${formatCount(analytics.claimsPending)} claims`,
 			icon: Clock3,
 			accent: "from-amber-500/80 to-amber-400/40",
 			valueTone: "text-amber-700 dark:text-amber-300",
@@ -615,13 +441,14 @@ export function InboundVendorFilePage() {
 			active: statusFilter === "pending",
 			onClick: () => {
 				setStatusFilter((s) => (s === "pending" ? "all" : "pending"));
+				setWaitBucket("all");
 				setPage(1);
 			},
 		},
 		{
 			id: "rejected",
 			label: "MFC rejected",
-			value: rejectedCount,
+			value: rejectedIn.length,
 			hint: `${formatCount(analytics.claimsRejected)} claims · vendor rework`,
 			icon: XCircle,
 			accent: "from-rose-500/80 to-rose-400/40",
@@ -631,31 +458,33 @@ export function InboundVendorFilePage() {
 			active: statusFilter === "rejected",
 			onClick: () => {
 				setStatusFilter((s) => (s === "rejected" ? "all" : "rejected"));
+				setWaitBucket("all");
 				setPage(1);
 			},
 		},
 		{
 			id: "sla",
-			label: "Age risk (≥3d)",
-			value: analytics.over3d,
-			hint: `${pct(analytics.over3d, packageTotal)}% past SLA`,
+			label: "SLA risk",
+			value: analytics.slaRisk.length,
+			hint: `Pending waiting ≥ ${SLA_HOURS}h`,
 			icon: AlertTriangle,
-			accent: "from-rose-500/80 to-rose-400/40",
-			valueTone: "text-rose-700 dark:text-rose-300",
-			iconTone: "text-rose-700 bg-rose-500/10 dark:text-rose-300",
-			ring: "ring-rose-500/20",
+			accent: "from-orange-500/80 to-orange-400/40",
+			valueTone: "text-orange-700 dark:text-orange-300",
+			iconTone: "text-orange-700 bg-orange-500/10 dark:text-orange-200",
+			ring: "ring-orange-500/20",
 			active: waitBucket === "sla",
 			onClick: () => {
-				setWaitBucket((b) => (b === "sla" ? "all" : "sla"));
+				setWaitBucket((w) => (w === "sla" ? "all" : "sla"));
+				setStatusFilter("pending");
 				setPage(1);
 			},
 		},
 		{
-			id: "avg-wait",
-			label: "Avg wait",
-			value: formatWaitLabel(analytics.avgWait),
-			hint: "Across pending files",
-			icon: Hourglass,
+			id: "total",
+			label: "Total inbound",
+			value: inboundQueue.length,
+			hint: `${pct(pending.length, queueTotal)}% still pending · avg wait ${formatWaitLabel(analytics.avgWait)}`,
+			icon: Inbox,
 			accent: "from-sky-500/80 to-sky-400/40",
 			valueTone: "text-sky-700 dark:text-sky-300",
 			iconTone: "text-sky-700 bg-sky-500/10 dark:text-sky-300",
@@ -672,102 +501,26 @@ export function InboundVendorFilePage() {
 		},
 	];
 
-	async function handleExportCsv() {
-		if (isMockEnabled()) {
-			toast.message("Export CSV is live-mode only.");
-			return;
-		}
-		try {
-			const result = await exportMutation.mutateAsync(summaryApiParams);
-			downloadBlob(
-				result.filename ?? stampFilename("claim-vendor-files"),
-				result.blob
-			);
-			toast.success("Vendor files CSV downloaded");
-		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Export failed");
-		}
-	}
-
-	if (queueQuery.isLoading) {
+	if (selectedFile) {
 		return (
-			<div className="space-y-4">
-				<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
-					<div className="min-w-0 space-y-1">
-						<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-							Inbound
-						</h1>
-						<p className="text-sm text-muted-foreground">
-							Loading queue · {programFilter}
-						</p>
-					</div>
-				</div>
-				<p className="text-sm text-muted-foreground">Loading inbound files…</p>
-			</div>
+			<InboundFileWorkspace
+				file={selectedFile}
+				useLive={useLive}
+				onBack={() => setSelectedFileId(null)}
+			/>
 		);
 	}
-
-	if (queueQuery.isError) {
-		return (
-			<div className="space-y-4">
-				<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
-					<div className="min-w-0 space-y-1">
-						<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-							Inbound
-						</h1>
-						<p className="text-sm text-muted-foreground">
-							Pending review · {programFilter}
-						</p>
-					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						className={cn(
-							toolbarBtn,
-							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-						)}
-						onClick={handleRefresh}
-					>
-						<RefreshCw className="size-3.5" />
-						Retry
-					</Button>
-				</div>
-				<p className="text-sm text-destructive">
-					Could not load inbound vendor files.
-					{queueQuery.error instanceof Error
-						? ` ${queueQuery.error.message}`
-						: ""}
-				</p>
-			</div>
-		);
-	}
-
-	const ageTotal = Math.max(
-		analytics.under24 + analytics.day1to3 + analytics.over3d,
-		1
-	);
 
 	return (
 		<div className="space-y-4">
-			{/* Header — match outbound CMS EDGE Reporting rhythm */}
+			{/* Header — CMS EDGE Reporting rhythm */}
 			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
 				<div className="min-w-0 space-y-1">
 					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
 						Inbound
 					</h1>
 					<p className="text-sm text-muted-foreground">
-						Pending review + MFC-rejected · {programFilter}
-						{openExceptionCount > 0 && !isMockEnabled() ? (
-							<>
-								{" · "}
-								<Link
-									href="/admin/claim-encounter/exceptions"
-									className="font-medium text-amber-800 underline-offset-2 hover:underline"
-								>
-									{formatCount(openExceptionCount)} open exceptions
-								</Link>
-							</>
-						) : null}
+						Pending review + MFC-rejected packages
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
@@ -784,35 +537,6 @@ export function InboundVendorFilePage() {
 							Outbound
 						</Link>
 					</Button>
-					{!isMockEnabled() ? (
-						<Button
-							variant="outline"
-							size="sm"
-							className={cn(
-								toolbarBtn,
-								"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-							)}
-							disabled={exportMutation.isPending}
-							onClick={() => void handleExportCsv()}
-						>
-							<Download className="size-3.5" />
-							{exportMutation.isPending ? "Exporting…" : "Export CSV"}
-						</Button>
-					) : null}
-					{!isMockEnabled() ? (
-						<Button
-							variant="outline"
-							size="sm"
-							className={cn(
-								toolbarBtn,
-								"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-							)}
-							onClick={handleSeedDemo}
-							disabled={seedMutation.isPending}
-						>
-							{seedMutation.isPending ? "Seeding…" : "Seed demo"}
-						</Button>
-					) : null}
 					<Button
 						variant="outline"
 						size="sm"
@@ -821,20 +545,34 @@ export function InboundVendorFilePage() {
 							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
 						)}
 						onClick={handleRefresh}
-						disabled={refreshing || queueQuery.isFetching}
+						disabled={refreshing}
 					>
 						<RefreshCw
-							className={cn(
-								"size-3.5",
-								(refreshing || queueQuery.isFetching) && "animate-spin"
-							)}
+							className={cn("size-3.5", refreshing && "animate-spin")}
 						/>
 						Refresh
 					</Button>
 				</div>
 			</div>
 
-			{/* KPI grid — outbound reporting pattern */}
+			{useLive && inboundQuery.error ? (
+				<p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+					Could not load inbound files: {inboundQuery.error.message}
+				</p>
+			) : null}
+			{useLive && inboundQuery.isLoading ? (
+				<p className="text-sm text-muted-foreground">Loading inbound queue…</p>
+			) : null}
+			{useLive &&
+			!inboundQuery.isLoading &&
+			!inboundQuery.error &&
+			inboundQueue.length === 0 ? (
+				<p className="text-sm text-muted-foreground">
+					No inbound vendor files for this program yet.
+				</p>
+			) : null}
+
+			{/* KPI grid — reporting submissions pattern */}
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				{inboundKpis.map((kpi) => {
 					const Icon = kpi.icon;
@@ -893,7 +631,7 @@ export function InboundVendorFilePage() {
 				})}
 			</div>
 
-			{/* Filters — outbound reporting-style panel */}
+			{/* Filters — reporting-style panel */}
 			<section className={cn(PANEL, "px-3 py-2.5 sm:px-3")}>
 				<div className="flex flex-col gap-2.5">
 					<div className="relative">
@@ -904,7 +642,7 @@ export function InboundVendorFilePage() {
 								setSearch(e.target.value);
 								setPage(1);
 							}}
-							placeholder="Search file ID, name, vendor, claim type…"
+							placeholder="Search file ID, vendor, claim type…"
 							className="h-8 rounded-sm border-border bg-background pl-8 text-xs shadow-none focus-visible:ring-primary/15"
 						/>
 						{search ? (
@@ -925,7 +663,7 @@ export function InboundVendorFilePage() {
 						<Select
 							value={statusFilter}
 							onValueChange={(v) => {
-								setStatusFilter(v as "all" | "pending" | "rejected");
+								setStatusFilter(v as StatusFilter);
 								setPage(1);
 							}}
 						>
@@ -933,38 +671,9 @@ export function InboundVendorFilePage() {
 								<SelectValue placeholder="Status" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="all">
-									All status ({statusCounts.all})
-								</SelectItem>
-								<SelectItem value="pending">
-									Pending ({statusCounts.pending})
-								</SelectItem>
-								<SelectItem value="rejected">
-									Rejected ({statusCounts.rejected})
-								</SelectItem>
-							</SelectContent>
-						</Select>
-						<Select
-							value={waitBucket}
-							onValueChange={(v) => {
-								setWaitBucket(v);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className={cn(selectField, "min-w-[8rem]")}>
-								<SelectValue placeholder="Age" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">Any age</SelectItem>
-								<SelectItem value="fresh">
-									&lt; 24h ({analytics.under24})
-								</SelectItem>
-								<SelectItem value="aging">
-									1–3 days ({analytics.day1to3})
-								</SelectItem>
-								<SelectItem value="sla">
-									≥ 3 days ({analytics.over3d})
-								</SelectItem>
+								<SelectItem value="all">All status</SelectItem>
+								<SelectItem value="pending">Pending</SelectItem>
+								<SelectItem value="rejected">Rejected</SelectItem>
 							</SelectContent>
 						</Select>
 						<Select
@@ -1003,6 +712,23 @@ export function InboundVendorFilePage() {
 										{t}
 									</SelectItem>
 								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={waitBucket}
+							onValueChange={(v) => {
+								setWaitBucket(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={selectField}>
+								<SelectValue placeholder="Wait" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Any age</SelectItem>
+								<SelectItem value="fresh">&lt; 24h</SelectItem>
+								<SelectItem value="aging">24–48h</SelectItem>
+								<SelectItem value="sla">SLA risk</SelectItem>
 							</SelectContent>
 						</Select>
 						<Select
@@ -1097,7 +823,6 @@ export function InboundVendorFilePage() {
 										<ArrowUpDown className="size-3 opacity-60" />
 									</button>
 								</TableHead>
-								<TableHead className={th}>Received</TableHead>
 								<TableHead className={th}>
 									<button
 										type="button"
@@ -1109,6 +834,7 @@ export function InboundVendorFilePage() {
 									</button>
 								</TableHead>
 								<TableHead className={th}>Status</TableHead>
+								<TableHead className={th}>Received</TableHead>
 								<TableHead className={cn(th, "pr-4 text-right")}>
 									Action
 								</TableHead>
@@ -1121,34 +847,117 @@ export function InboundVendorFilePage() {
 										colSpan={9}
 										className="px-4 py-12 text-center text-sm text-muted-foreground"
 									>
-										{inboundQueue.length === 0 && !isMockEnabled() ? (
-											<span>
-												No claim vendor files in core yet. Click{" "}
-												<button
-													type="button"
-													className="font-medium text-primary underline-offset-2 hover:underline"
-													onClick={handleSeedDemo}
-													disabled={seedMutation.isPending}
-												>
-													Seed demo
-												</button>{" "}
-												to load the review queue.
-											</span>
-										) : hasActiveFilters ? (
-											"No inbound files match your filters."
-										) : (
-											"No inbound files for this program."
-										)}
+										{hasActiveFilters
+											? "No inbound files match your filters."
+											: "No inbound files for this program."}
 									</TableCell>
 								</TableRow>
 							) : (
-								pageRows.map((row, index) => (
-									<InboundRow
-										key={row.id}
-										row={row}
-										index={(safePage - 1) * pageSize + index + 1}
-									/>
-								))
+								pageRows.map((row, index) => {
+									const wait = hoursSince(row.receivedAt);
+									return (
+										<TableRow
+											key={row.id}
+											className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/25"
+											onClick={() => setSelectedFileId(row.id)}
+										>
+											<TableCell
+												className={cn(
+													td,
+													"w-12 pl-4 text-center tabular-nums text-muted-foreground"
+												)}
+											>
+												{(safePage - 1) * pageSize + index + 1}
+											</TableCell>
+											<TableCell className={td}>
+												<div className="min-w-0 space-y-0.5">
+													<div className="flex flex-wrap items-center gap-1.5">
+														<span className="font-mono text-[11px] font-medium text-primary">
+															{row.fileId}
+														</span>
+														<TxBadge type={row.transactionType} />
+														<span className="text-[10px] text-muted-foreground">
+															{row.program}
+														</span>
+													</div>
+													<p className="max-w-[260px] truncate text-[11px] text-muted-foreground">
+														{row.fileName}
+													</p>
+												</div>
+											</TableCell>
+											<TableCell className={cn(td, "font-medium")}>
+												{row.vendor}
+											</TableCell>
+											<TableCell className={td}>
+												<span className="text-[11px] text-muted-foreground">
+													{row.fileTypeLabel}
+												</span>
+											</TableCell>
+											<TableCell
+												className={cn(
+													td,
+													"text-right font-medium tabular-nums"
+												)}
+											>
+												{formatCount(row.records)}
+											</TableCell>
+											<TableCell className={td}>
+												<WaitPill hours={wait} />
+											</TableCell>
+											<TableCell className={td}>
+												<ReviewStatusPill status={row.reviewStatus} />
+											</TableCell>
+											<TableCell
+												className={cn(td, "tabular-nums text-muted-foreground")}
+											>
+												{row.receivedAt}
+											</TableCell>
+											<TableCell
+												className={cn(td, "pr-4 text-right")}
+												onClick={(e) => e.stopPropagation()}
+											>
+												<DropdownMenu>
+													<DropdownMenuTrigger asChild>
+														<Button
+															variant="ghost"
+															size="icon"
+															className="size-7 text-muted-foreground hover:text-foreground"
+															aria-label={`Actions for ${row.fileId}`}
+														>
+															<MoreHorizontal className="size-3.5" />
+														</Button>
+													</DropdownMenuTrigger>
+													<DropdownMenuContent align="end" className="w-48">
+														<DropdownMenuItem
+															onClick={() => setSelectedFileId(row.id)}
+														>
+															<Eye className="mr-2 size-3.5" />
+															Open claims
+														</DropdownMenuItem>
+														{row.reviewStatus === "pending" ? (
+															<DropdownMenuItem asChild>
+																<Link
+																	href={`/admin/claim-encounter/files/${encodeURIComponent(row.id)}/review`}
+																>
+																	<FileSearch className="mr-2 size-3.5" />
+																	Review
+																</Link>
+															</DropdownMenuItem>
+														) : null}
+														<DropdownMenuItem asChild>
+															<Link
+																href={`/admin/claim-encounter/files/${encodeURIComponent(row.id)}`}
+															>
+																<ExternalLink className="mr-2 size-3.5" />
+																Full page
+															</Link>
+														</DropdownMenuItem>
+													</DropdownMenuContent>
+												</DropdownMenu>
+											</TableCell>
+										</TableRow>
+									);
+								})
 							)}
 						</TableBody>
 					</Table>
@@ -1170,17 +979,17 @@ export function InboundVendorFilePage() {
 				</div>
 			</section>
 
-			{/* Analytics — outbound CmsEdgeSectionPanel pattern */}
+			{/* Analytics — CmsEdgeSectionPanel standard */}
 			<div className="grid gap-3 lg:grid-cols-3 lg:items-stretch">
 				<CmsEdgeSectionPanel
 					title="Queue age mix"
-					subtitle="Pending files vs 72h SLA"
+					subtitle="Pending files vs 48h SLA"
 					className="flex h-full flex-col"
 					bodyClassName="flex flex-1 flex-col p-4"
 				>
 					{analytics.ageBuckets.every((b) => b.files === 0) ? (
 						<div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-							No pending files in scope
+							No pending files in queue
 						</div>
 					) : (
 						<div className="flex flex-1 flex-col justify-center gap-4">
@@ -1207,7 +1016,7 @@ export function InboundVendorFilePage() {
 									</ResponsiveContainer>
 									<div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-center">
 										<p className="text-lg font-bold tabular-nums leading-none text-foreground">
-											{analytics.under24 + analytics.day1to3 + analytics.over3d}
+											{pending.length}
 										</p>
 										<p className="mt-0.5 text-[9px] leading-tight text-muted-foreground">
 											Pending
@@ -1216,18 +1025,14 @@ export function InboundVendorFilePage() {
 								</div>
 								<div className="min-w-0 flex-1 space-y-1.5">
 									{analytics.ageBuckets.map((b) => {
-										const next = b.name.startsWith("<")
-											? "fresh"
-											: b.name.includes("1–3")
-												? "aging"
-												: "sla";
-										const active = waitBucket === next;
+										const active = waitBucket === b.id;
 										return (
 											<button
 												key={b.name}
 												type="button"
 												onClick={() => {
-													setWaitBucket((cur) => (cur === next ? "all" : next));
+													setWaitBucket((cur) => (cur === b.id ? "all" : b.id));
+													setStatusFilter("pending");
 													setPage(1);
 												}}
 												className={cn(
@@ -1246,8 +1051,96 @@ export function InboundVendorFilePage() {
 												</span>
 												<span className="shrink-0 tabular-nums text-muted-foreground">
 													{b.files}
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+						</div>
+					)}
+				</CmsEdgeSectionPanel>
+
+				<CmsEdgeSectionPanel
+					title="Status mix"
+					subtitle="Pending vs MFC-rejected packages"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
+				>
+					{analytics.statusPie.length === 0 ? (
+						<div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+							No packages in scope
+						</div>
+					) : (
+						<div className="flex flex-1 flex-col justify-center gap-4">
+							<div className="flex items-center gap-3">
+								<div className="relative h-[112px] w-[112px] shrink-0">
+									<ResponsiveContainer width="100%" height="100%">
+										<PieChart>
+											<Pie
+												data={analytics.statusPie}
+												dataKey="value"
+												nameKey="name"
+												innerRadius="58%"
+												outerRadius="88%"
+												paddingAngle={2}
+												stroke="none"
+												isAnimationActive={false}
+											>
+												{analytics.statusPie.map((d) => (
+													<Cell key={d.name} fill={d.fill} />
+												))}
+											</Pie>
+											<Tooltip content={<InboundChartTooltip />} />
+										</PieChart>
+									</ResponsiveContainer>
+									<div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-center">
+										<p className="text-lg font-bold tabular-nums leading-none text-foreground">
+											{analytics.statusTotal}
+										</p>
+										<p className="mt-0.5 text-[9px] leading-tight text-muted-foreground">
+											Packages
+										</p>
+									</div>
+								</div>
+								<div className="min-w-0 flex-1 space-y-1.5">
+									{analytics.statusPie.map((d) => {
+										const isPending = d.name === "Pending";
+										const active = isPending
+											? statusFilter === "pending"
+											: statusFilter === "rejected";
+										return (
+											<button
+												key={d.name}
+												type="button"
+												onClick={() => {
+													const next = isPending ? "pending" : "rejected";
+													setStatusFilter((cur) =>
+														cur === next ? "all" : next
+													);
+													setPage(1);
+												}}
+												className={cn(
+													"flex w-full items-center justify-between gap-2 rounded-sm border px-2 py-1.5 text-left text-xs transition",
+													active
+														? isPending
+															? "border-amber-300/80 bg-amber-50 dark:bg-amber-950/30"
+															: "border-rose-300/80 bg-rose-50 dark:bg-rose-950/30"
+														: "border-border/60 hover:bg-muted/40"
+												)}
+											>
+												<span className="flex min-w-0 items-center gap-1.5 font-medium">
+													<span
+														className="size-2 shrink-0 rounded-full"
+														style={{ backgroundColor: d.fill }}
+													/>
+													<span className="truncate">{d.name}</span>
+												</span>
+												<span className="shrink-0 tabular-nums text-muted-foreground">
+													{d.value}
 													<span className="ml-1 text-[10px]">
-														({pct(b.files, ageTotal)}%)
+														({pct(d.value, Math.max(1, analytics.statusTotal))}
+														%)
 													</span>
 												</span>
 											</button>
@@ -1261,72 +1154,17 @@ export function InboundVendorFilePage() {
 										Outbound accept rate
 									</span>
 									<span className="font-semibold tabular-nums text-foreground">
-										{outboundAvailable ? `${analytics.acceptRate}%` : "—"}
+										{analytics.acceptRate}%
 									</span>
 								</div>
 								<div className="h-1.5 overflow-hidden rounded-full bg-muted">
 									<div
 										className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all"
-										style={{
-											width: `${outboundAvailable ? analytics.acceptRate : 0}%`,
-										}}
+										style={{ width: `${analytics.acceptRate}%` }}
 									/>
 								</div>
 							</div>
 						</div>
-					)}
-				</CmsEdgeSectionPanel>
-
-				<CmsEdgeSectionPanel
-					title="Vendor backlog"
-					subtitle="Files waiting by vendor"
-					className="flex h-full flex-col"
-					bodyClassName="flex flex-1 flex-col p-4"
-				>
-					{analytics.byVendor.length === 0 ? (
-						<p className="flex flex-1 items-center justify-center text-center text-xs text-muted-foreground">
-							Queue is empty.
-						</p>
-					) : (
-						<ul className="flex flex-1 flex-col justify-evenly gap-1.5">
-							{analytics.byVendor.slice(0, 5).map((v) => {
-								const share = pct(v.files, analytics.maxVendorClaims);
-								const active = vendor === v.name;
-								return (
-									<li key={v.name} className="min-h-0">
-										<button
-											type="button"
-											onClick={() => {
-												setVendor((cur) => (cur === v.name ? "all" : v.name));
-												setPage(1);
-											}}
-											className={cn(
-												"flex h-full w-full flex-col justify-center rounded-sm border px-2 py-2 text-left transition",
-												active
-													? "border-primary/30 bg-primary/5"
-													: "border-transparent hover:bg-muted/40"
-											)}
-										>
-											<div className="mb-1 flex items-center justify-between gap-2 text-xs">
-												<span className="truncate font-medium">{v.name}</span>
-												<span className="shrink-0 tabular-nums text-muted-foreground">
-													{v.files}{" "}
-													<span className="text-[10px]">({share}%)</span>
-												</span>
-											</div>
-											<div className="h-1.5 overflow-hidden rounded-full bg-muted">
-												<div
-													className="h-full rounded-full bg-sky-500 transition-all"
-													style={{
-														width: `${Math.max(v.files > 0 ? 4 : 0, share)}%`,
-													}}
-												/>
-											</div>
-										</button>
-									</li>
-								);
-							})}
-						</ul>
 					)}
 				</CmsEdgeSectionPanel>
 
@@ -1336,130 +1174,61 @@ export function InboundVendorFilePage() {
 					className="flex h-full flex-col"
 					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<ul className="flex flex-1 flex-col justify-evenly gap-1.5">
+					<div className="flex flex-1 flex-col justify-evenly gap-2">
 						{analytics.oldest ? (
-							<li className="min-h-0">
-								<AttentionRow
-									icon={Hourglass}
-									tone="text-amber-700 bg-amber-500/10"
-									title="Oldest waiting"
-									meta={`${analytics.oldest.vendor} · ${formatWaitLabel(hoursSince(analytics.oldest.receivedAt))}`}
-									detail={analytics.oldest.fileId}
-									href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.oldest.fileId)}/review`}
-								/>
-							</li>
+							<AttentionRow
+								icon={Hourglass}
+								tone="text-amber-700 bg-amber-500/10"
+								title="Oldest waiting"
+								meta={`${analytics.oldest.vendor} · ${formatWaitLabel(hoursSince(analytics.oldest.receivedAt))}`}
+								detail={analytics.oldest.fileId}
+								onOpen={() => setSelectedFileId(analytics.oldest!.id)}
+							/>
 						) : null}
 						{analytics.largest ? (
-							<li className="min-h-0">
-								<AttentionRow
-									icon={ScrollText}
-									tone="text-sky-700 bg-sky-500/10"
-									title="Largest file"
-									meta={`${formatCount(analytics.largest.records)} claims · ${analytics.largest.vendor}`}
-									detail={analytics.largest.fileId}
-									href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.largest.fileId)}/review`}
-								/>
-							</li>
+							<AttentionRow
+								icon={FileSearch}
+								tone="text-sky-700 bg-sky-500/10"
+								title="Largest file"
+								meta={`${formatCount(analytics.largest.records)} claims · ${analytics.largest.vendor}`}
+								detail={analytics.largest.fileId}
+								onOpen={() => setSelectedFileId(analytics.largest!.id)}
+							/>
 						) : null}
 						{analytics.slaRisk[0] ? (
-							<li className="min-h-0">
-								<AttentionRow
-									icon={AlertTriangle}
-									tone="text-rose-700 bg-rose-500/10"
-									title="SLA breach"
-									meta={`${analytics.slaRisk.length} file(s) past ${SLA_HOURS}h`}
-									detail={analytics.slaRisk[0].fileId}
-									href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.slaRisk[0].fileId)}/review`}
-								/>
-							</li>
+							<AttentionRow
+								icon={AlertTriangle}
+								tone="text-red-700 bg-red-500/10"
+								title="SLA breach"
+								meta={`${analytics.slaRisk.length} file(s) past ${SLA_HOURS}h`}
+								detail={analytics.slaRisk[0].fileId}
+								onOpen={() => setSelectedFileId(analytics.slaRisk[0]!.id)}
+							/>
 						) : (
-							<li className="rounded-sm border border-emerald-200/80 bg-emerald-50 px-2 py-2 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+							<div className="rounded-sm border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-primary">
 								No files past the {SLA_HOURS}h review SLA.
-							</li>
+							</div>
 						)}
-					</ul>
+					</div>
 				</CmsEdgeSectionPanel>
 			</div>
 
 			<div className="grid gap-3 lg:grid-cols-2">
 				<CmsEdgeSectionPanel
-					title="Program snapshot"
-					subtitle={`${programFilter} inbound volume`}
-					bodyClassName="p-4"
-				>
-					<div className="grid grid-cols-2 gap-2">
-						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
-							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-								Inbound files
-							</p>
-							<p className="mt-1 text-lg font-semibold tabular-nums">
-								{formatCount(analytics.totalFiles)}
-							</p>
-						</div>
-						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
-							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-								Pending claims
-							</p>
-							<p className="mt-1 text-lg font-semibold tabular-nums">
-								{formatCount(analytics.claimsPending)}
-							</p>
-						</div>
-						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
-							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-								Avg claims / file
-							</p>
-							<p className="mt-1 text-lg font-semibold tabular-nums">
-								{pending.length
-									? formatCount(
-											Math.round(analytics.claimsPending / pending.length)
-										)
-									: "0"}
-							</p>
-						</div>
-						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
-							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-								File types
-							</p>
-							<p className="mt-1 text-lg font-semibold tabular-nums">
-								{formatCount(fileTypes.length)}
-							</p>
-						</div>
-					</div>
-					<Button
-						asChild
-						variant="outline"
-						size="sm"
-						className={cn(
-							toolbarBtn,
-							"mt-3 w-full border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-						)}
-					>
-						<Link href="/admin/claim-encounter/acceptance-analytics">
-							<FileSearch className="size-3.5" />
-							Open acceptance analytics
-						</Link>
-					</Button>
-				</CmsEdgeSectionPanel>
-
-				<CmsEdgeSectionPanel
-					title="Vendor claim volume"
-					subtitle="Files in queue by vendor"
+					title="Vendor backlog"
+					subtitle="Claims waiting by vendor — click a bar to filter"
 					bodyClassName="px-2 pb-3 pt-2"
 				>
 					{analytics.byVendor.length === 0 ? (
 						<p className="py-8 text-center text-xs text-muted-foreground">
-							No vendor volume in scope.
+							Queue is empty.
 						</p>
 					) : (
 						<div className="h-[220px]">
 							<ResponsiveContainer width="100%" height="100%">
 								<BarChart
 									layout="vertical"
-									data={analytics.byVendor.slice(0, 6).map((v) => ({
-										...v,
-										short:
-											v.name.length > 14 ? `${v.name.slice(0, 12)}…` : v.name,
-									}))}
+									data={analytics.byVendor.slice(0, 6)}
 									margin={{ left: 4, right: 16, top: 4, bottom: 4 }}
 									barCategoryGap={10}
 								>
@@ -1495,12 +1264,12 @@ export function InboundVendorFilePage() {
 										content={<InboundChartTooltip />}
 									/>
 									<Bar
-										dataKey="files"
-										name="Files"
-										fill="#0284c7"
-										radius={[0, 4, 4, 0]}
+										dataKey="claims"
+										name="Claims"
+										fill="#13446c"
 										barSize={14}
 										cursor="pointer"
+										radius={[0, 4, 4, 0]}
 										onClick={(data) => {
 											const name = (data as { name?: string })?.name;
 											if (!name) return;
@@ -1511,7 +1280,7 @@ export function InboundVendorFilePage() {
 										{analytics.byVendor.slice(0, 6).map((v) => (
 											<Cell
 												key={v.name}
-												fill={vendor === v.name ? "#0369a1" : "#0284c7"}
+												fill={vendor === v.name ? "#13446c" : "#13446c99"}
 											/>
 										))}
 									</Bar>
@@ -1519,6 +1288,82 @@ export function InboundVendorFilePage() {
 							</ResponsiveContainer>
 						</div>
 					)}
+				</CmsEdgeSectionPanel>
+
+				<CmsEdgeSectionPanel
+					title="Program snapshot"
+					subtitle={`${programFilter} inbound volume`}
+					bodyClassName="p-4"
+				>
+					<div className="grid grid-cols-2 gap-2">
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+								Inbound files
+							</p>
+							<p className="mt-1 text-lg font-semibold tabular-nums">
+								{formatCount(inboundQueue.length)}
+							</p>
+						</div>
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+								Pending claims
+							</p>
+							<p className="mt-1 text-lg font-semibold tabular-nums">
+								{formatCount(analytics.claimsPending)}
+							</p>
+						</div>
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+								Avg claims / file
+							</p>
+							<p className="mt-1 text-lg font-semibold tabular-nums">
+								{pending.length
+									? formatCount(
+											Math.round(analytics.claimsPending / pending.length)
+										)
+									: "0"}
+							</p>
+						</div>
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+								Accepted out
+							</p>
+							<p className="mt-1 text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+								{formatCount(analytics.acceptedOut.length)}
+							</p>
+						</div>
+					</div>
+					<ol className="mt-4 space-y-2 border-t border-border/40 pt-3 text-xs text-muted-foreground">
+						<li className="flex gap-2">
+							<span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-[10px] font-semibold text-primary">
+								1
+							</span>
+							Open a file, inspect 837 claim loops in the EDI reader
+						</li>
+						<li className="flex gap-2">
+							<span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-[10px] font-semibold text-primary">
+								2
+							</span>
+							Accept clean claims or reject with catalog reason codes
+						</li>
+						<li className="flex gap-2">
+							<span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-[10px] font-semibold text-primary">
+								3
+							</span>
+							Accepted packages go outbound; full MFC rejects stay inbound
+						</li>
+					</ol>
+					<Button
+						asChild
+						variant="outline"
+						size="sm"
+						className={cn(toolbarBtn, "mt-3 w-full border-border/80")}
+					>
+						<Link href="/admin/claim-encounter/acceptance-analytics">
+							<FileSearch className="size-3.5" />
+							Open acceptance analytics
+						</Link>
+					</Button>
 				</CmsEdgeSectionPanel>
 			</div>
 		</div>
@@ -1535,22 +1380,17 @@ function InboundChartTooltip({
 		name?: string;
 		value?: number | string;
 		color?: string;
-		payload?: { name?: string };
+		dataKey?: string;
 	}>;
-	label?: string | number;
+	label?: string;
 }) {
 	if (!active || !payload?.length) return null;
-	const title =
-		typeof label === "string" || typeof label === "number"
-			? String(label)
-			: (payload[0]?.payload?.name ?? "");
-
 	return (
-		<div className="rounded-sm border border-border/70 bg-card px-2.5 py-1.5 text-xs shadow-md">
-			{title ? (
-				<p className="mb-1 font-medium text-foreground">{title}</p>
+		<div className="rounded-sm border border-border/70 bg-card px-2.5 py-2 text-xs shadow-md">
+			{label ? (
+				<p className="mb-1.5 font-medium text-foreground">{label}</p>
 			) : null}
-			<ul className="space-y-0.5">
+			<ul className="space-y-1">
 				{payload.map((entry) => (
 					<li
 						key={`${entry.name}-${entry.value}`}
@@ -1581,129 +1421,87 @@ function AttentionRow({
 	title,
 	meta,
 	detail,
-	href,
+	onOpen,
 }: {
 	icon: LucideIcon;
 	tone: string;
 	title: string;
 	meta: string;
 	detail: string;
-	href: string;
+	onOpen: () => void;
 }) {
 	return (
-		<Link
-			href={href}
-			className="flex h-full w-full items-start gap-2 rounded-sm border border-border/60 px-2 py-2 transition hover:bg-muted/40"
+		<button
+			type="button"
+			onClick={onOpen}
+			className="flex w-full items-start gap-2 rounded-sm border border-border/50 bg-background/40 px-2.5 py-2 text-left transition-colors hover:bg-muted/40"
 		>
 			<span
 				className={cn(
-					"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm ring-1 ring-inset ring-black/5 dark:ring-white/10",
+					"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm",
 					tone
 				)}
 			>
 				<Icon className="size-3.5" />
 			</span>
 			<span className="min-w-0 flex-1">
-				<span className="block text-xs font-medium text-foreground">
-					{title}
-				</span>
+				<span className="block text-xs font-medium">{title}</span>
 				<span className="block text-[11px] text-muted-foreground">{meta}</span>
 				<span className="mt-0.5 block truncate font-mono text-[10px] text-foreground/80">
 					{detail}
 				</span>
 			</span>
-		</Link>
+		</button>
 	);
 }
 
-function InboundRow({ row, index }: { row: ClaimVendorFile; index: number }) {
-	const router = useRouter();
-	const wait = hoursSince(row.receivedAt);
-	const reviewHref = `/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}/review`;
-	const detailHref = `/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}`;
-
+function InboundFileWorkspace({
+	file,
+	useLive,
+	onBack,
+}: {
+	file: ClaimVendorFile;
+	useLive: boolean;
+	onBack: () => void;
+}) {
 	return (
-		<TableRow
-			className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/25"
-			onClick={() => {
-				router.push(row.reviewStatus === "pending" ? reviewHref : detailHref);
-			}}
-		>
-			<TableCell
-				className={cn(
-					td,
-					"w-12 pl-4 text-center tabular-nums text-muted-foreground"
-				)}
-			>
-				{index}
-			</TableCell>
-			<TableCell className={td}>
-				<div className="min-w-0 space-y-0.5">
-					<div className="flex flex-wrap items-center gap-1.5">
-						<span className="font-mono text-[11px] font-medium text-primary">
-							{row.fileId}
-						</span>
-						<TxBadge label="837" />
-						<span className="text-[10px] text-muted-foreground">
-							{row.program}
-						</span>
-					</div>
-					<p className="max-w-[260px] truncate text-[11px] text-muted-foreground">
-						{row.fileName}
-					</p>
-				</div>
-			</TableCell>
-			<TableCell className={cn(td, "font-medium")}>{row.vendor}</TableCell>
-			<TableCell className={td}>
-				<span className="text-[11px] text-muted-foreground">
-					{row.fileTypeLabel}
-				</span>
-			</TableCell>
-			<TableCell className={cn(td, "text-right font-medium tabular-nums")}>
-				{formatCount(row.records)}
-			</TableCell>
-			<TableCell className={cn(td, "tabular-nums text-muted-foreground")}>
-				{row.receivedAt}
-			</TableCell>
-			<TableCell className={td}>
-				<WaitPill wait={wait} />
-			</TableCell>
-			<TableCell className={td}>
-				<ReviewStatusPill status={row.reviewStatus} />
-			</TableCell>
-			<TableCell
-				className={cn(td, "pr-4 text-right")}
-				onClick={(e) => e.stopPropagation()}
-			>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="size-7 text-muted-foreground hover:text-foreground"
-							aria-label={`Actions for ${row.fileId}`}
+		<VendorFileWorkspace
+			file={file}
+			useLive={useLive}
+			backLabel="Inbound"
+			onBack={onBack}
+			negativeLabel="rejected"
+			statusPills={
+				<>
+					<ReviewStatusPill status={file.reviewStatus} />
+					<WaitPill hours={hoursSince(file.receivedAt)} />
+				</>
+			}
+			metaExtra={
+				<>
+					<span className="text-border">·</span>
+					<span>Received {file.receivedAt}</span>
+				</>
+			}
+			actions={
+				file.reviewStatus === "pending" ? (
+					<Button
+						asChild
+						size="sm"
+						className={cn(
+							vendorFileToolbarBtn,
+							"bg-primary text-primary-foreground shadow-none hover:bg-primary/90"
+						)}
+					>
+						<Link
+							href={`/admin/claim-encounter/files/${encodeURIComponent(file.id)}/review`}
 						>
-							<MoreHorizontal className="size-3.5" />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-44">
-						{row.reviewStatus === "pending" ? (
-							<DropdownMenuItem asChild>
-								<Link href={reviewHref}>
-									<Eye className="mr-2 size-3.5" />
-									Review
-								</Link>
-							</DropdownMenuItem>
-						) : null}
-						<DropdownMenuItem asChild>
-							<Link href={detailHref}>
-								<ExternalLink className="mr-2 size-3.5" />
-								{row.reviewStatus === "rejected" ? "View" : "Open EDI"}
-							</Link>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</TableCell>
-		</TableRow>
+							<FileSearch className="size-3.5" />
+							Review
+						</Link>
+					</Button>
+				) : null
+			}
+		/>
 	);
 }

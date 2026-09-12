@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
-	ArrowLeft,
 	ArrowUpDown,
 	CheckCircle2,
+	Download,
 	ExternalLink,
 	Eye,
 	FileOutput,
@@ -42,12 +42,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
-	ResizableHandle,
-	ResizablePanel,
-	ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -62,6 +56,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import {
 	CMS_EDGE_PANEL_CLASS,
 	CMS_EDGE_TABLE_CONTAINER,
@@ -73,26 +68,26 @@ import {
 	pct,
 	usePagedRows,
 } from "@/features/admin/features/claim-encounter/components/ClaimQueueChrome";
+import { VendorFileWorkspace } from "@/features/admin/features/claim-encounter/components/VendorFileWorkspace";
 import {
-	EdiViewerLoader,
-	loadEdiFixture,
-} from "@/features/admin/features/claim-encounter/edi";
-import {
-	type ClaimLine,
 	type ClaimVendorFile,
 	REJECT_REASON_CATALOG,
-	claimsForFile,
+	downloadClaimVendorFile,
 	filesForProgram,
 	formatCount,
-	formatCurrency,
 	getVendorFile,
+	saveVendorCoreBlob,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
+import {
+	useProgramFilesQuery,
+	useSendClaimVendorFileMutation,
+} from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { CLAIM_VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
-const WORKSPACE_H = "h-[calc(100svh-5rem)]";
 const PANEL = CMS_EDGE_PANEL_CLASS;
 
 const toolbarBtn =
@@ -174,7 +169,24 @@ function TxBadge({ type }: { type: ClaimVendorFile["transactionType"] }) {
 }
 
 export function OutboundVendorFilePage() {
+	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
+	if (!useFixtures) {
+		return (
+			<VendorCoreGate title="Outbound Vendor Files">
+				<OutboundVendorFileBody useLive />
+			</VendorCoreGate>
+		);
+	}
+	return <OutboundVendorFileBody useLive={false} />;
+}
+
+function OutboundVendorFileBody({ useLive }: { useLive: boolean }) {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const outboundQuery = useProgramFilesQuery(
+		programFilter,
+		"outbound",
+		useLive
+	);
 	const [vendor, setVendor] = useState("all");
 	const [decision, setDecision] = useState("all");
 	const [sendStatus, setSendStatus] = useState("all");
@@ -187,10 +199,10 @@ export function OutboundVendorFilePage() {
 	const [refreshing, setRefreshing] = useState(false);
 	const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
-	const base = useMemo(
-		() => filesForProgram(programFilter, "outbound"),
-		[programFilter]
-	);
+	const base = useMemo(() => {
+		if (useLive) return outboundQuery.data ?? [];
+		return filesForProgram(programFilter, "outbound");
+	}, [useLive, outboundQuery.data, programFilter]);
 
 	const vendors = CLAIM_VENDOR_NAMES;
 
@@ -199,7 +211,12 @@ export function OutboundVendorFilePage() {
 			if (vendor !== "all" && f.vendor !== vendor) return false;
 			if (decision === "accepted" && f.reviewStatus !== "accepted")
 				return false;
-			if (decision === "denied" && f.reviewStatus !== "denied") return false;
+			if (
+				decision === "denied" &&
+				f.reviewStatus !== "denied" &&
+				f.reviewStatus !== "rejected"
+			)
+				return false;
 			if (sendStatus !== "all" && f.outboundSendStatus !== sendStatus)
 				return false;
 			if (
@@ -254,14 +271,56 @@ export function OutboundVendorFilePage() {
 		setPage
 	);
 
-	const selectedFile = useMemo(
-		() => (selectedFileId ? getVendorFile(selectedFileId) : null),
-		[selectedFileId]
-	);
+	const sendMutation = useSendClaimVendorFileMutation();
+
+	const selectedFile = useMemo(() => {
+		if (!selectedFileId) return null;
+		return (
+			base.find((f) => f.id === selectedFileId) ??
+			getVendorFile(selectedFileId) ??
+			null
+		);
+	}, [selectedFileId, base]);
+
+	async function handleSend(row: ClaimVendorFile) {
+		if (!useLive) {
+			toast.message("Send requires live vendor-core");
+			return;
+		}
+		const canSend =
+			row.reviewStatus === "accepted" || row.outboundSendStatus === "queued";
+		if (!canSend) {
+			toast.message("Send only available for accepted or queued packages");
+			return;
+		}
+		try {
+			await sendMutation.mutateAsync({ id: row.id });
+			toast.success("Send requested");
+			await outboundQuery.refetch();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Send failed");
+		}
+	}
+
+	async function handleDownloadEdi(row: ClaimVendorFile) {
+		if (!useLive) {
+			toast.message("EDI download requires live vendor-core");
+			return;
+		}
+		try {
+			const result = await downloadClaimVendorFile(row.id);
+			saveVendorCoreBlob(result, row.fileName || `${row.fileId}.edi`);
+			toast.success("EDI download started");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "EDI download failed");
+		}
+	}
 
 	const analytics = useMemo(() => {
 		const accepted = base.filter((f) => f.reviewStatus === "accepted");
-		const denied = base.filter((f) => f.reviewStatus === "denied");
+		const denied = base.filter(
+			(f) => f.reviewStatus === "denied" || f.reviewStatus === "rejected"
+		);
 		const sent = base.filter((f) => f.outboundSendStatus === "sent");
 		const queued = base.filter((f) => f.outboundSendStatus === "queued");
 		const notified = base.filter((f) => f.outboundSendStatus === "notified");
@@ -330,7 +389,8 @@ export function OutboundVendorFilePage() {
 				const cur = acc[name] ?? { files: 0, accepted: 0, denied: 0 };
 				cur.files += 1;
 				if (f.reviewStatus === "accepted") cur.accepted += 1;
-				else if (f.reviewStatus === "denied") cur.denied += 1;
+				else if (f.reviewStatus === "denied" || f.reviewStatus === "rejected")
+					cur.denied += 1;
 				acc[name] = cur;
 				return acc;
 			}, {})
@@ -412,7 +472,11 @@ export function OutboundVendorFilePage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		await new Promise((r) => setTimeout(r, 400));
+		if (useLive) {
+			await outboundQuery.refetch();
+		} else {
+			await new Promise((r) => setTimeout(r, 400));
+		}
 		setRefreshing(false);
 		toast.success("Outbound refreshed");
 	}
@@ -511,6 +575,7 @@ export function OutboundVendorFilePage() {
 		return (
 			<OutboundFileWorkspace
 				file={selectedFile}
+				useLive={useLive}
 				onBack={() => setSelectedFileId(null)}
 			/>
 		);
@@ -559,6 +624,25 @@ export function OutboundVendorFilePage() {
 					</Button>
 				</div>
 			</div>
+
+			{useLive && outboundQuery.error ? (
+				<p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+					Could not load outbound files: {outboundQuery.error.message}
+				</p>
+			) : null}
+			{useLive && outboundQuery.isLoading ? (
+				<p className="text-sm text-muted-foreground">
+					Loading outbound packages…
+				</p>
+			) : null}
+			{useLive &&
+			!outboundQuery.isLoading &&
+			!outboundQuery.error &&
+			base.length === 0 ? (
+				<p className="text-sm text-muted-foreground">
+					No outbound vendor files for this program yet.
+				</p>
+			) : null}
 
 			{/* KPI grid — reporting submissions pattern */}
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -842,7 +926,7 @@ export function OutboundVendorFilePage() {
 									<TableRow
 										key={row.id}
 										className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/25"
-										onClick={() => setSelectedFileId(row.fileId)}
+										onClick={() => setSelectedFileId(row.id)}
 									>
 										<TableCell
 											className={cn(
@@ -933,21 +1017,40 @@ export function OutboundVendorFilePage() {
 														<MoreHorizontal className="size-3.5" />
 													</Button>
 												</DropdownMenuTrigger>
-												<DropdownMenuContent align="end" className="w-44">
+												<DropdownMenuContent align="end" className="w-48">
 													<DropdownMenuItem
-														onClick={() => setSelectedFileId(row.fileId)}
+														onClick={() => setSelectedFileId(row.id)}
 													>
 														<Eye className="mr-2 size-3.5" />
 														Open claims
 													</DropdownMenuItem>
 													<DropdownMenuItem asChild>
 														<Link
-															href={`/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}`}
+															href={`/admin/claim-encounter/files/${encodeURIComponent(row.id)}`}
 														>
 															<ExternalLink className="mr-2 size-3.5" />
 															Full page
 														</Link>
 													</DropdownMenuItem>
+													{useLive &&
+													(row.reviewStatus === "accepted" ||
+														row.outboundSendStatus === "queued") ? (
+														<DropdownMenuItem
+															onClick={() => void handleSend(row)}
+															disabled={sendMutation.isPending}
+														>
+															<Send className="mr-2 size-3.5" />
+															Send
+														</DropdownMenuItem>
+													) : null}
+													{useLive ? (
+														<DropdownMenuItem
+															onClick={() => void handleDownloadEdi(row)}
+														>
+															<Download className="mr-2 size-3.5" />
+															Download EDI
+														</DropdownMenuItem>
+													) : null}
 												</DropdownMenuContent>
 											</DropdownMenu>
 										</TableCell>
@@ -1477,242 +1580,36 @@ function OutboundChartTooltip({
 
 function OutboundFileWorkspace({
 	file,
+	useLive,
 	onBack,
 }: {
 	file: ClaimVendorFile;
+	useLive: boolean;
 	onBack: () => void;
 }) {
-	const claims = useMemo(() => claimsForFile(file.fileId), [file.fileId]);
-	const [focusedClaimId, setFocusedClaimId] = useState<string | null>(
-		() => claims[0]?.claimId ?? null
-	);
-
-	const focusClaimIndex = useMemo(() => {
-		if (!focusedClaimId) return 0;
-		const idx = claims.findIndex((c) => c.claimId === focusedClaimId);
-		return idx >= 0 ? idx : 0;
-	}, [claims, focusedClaimId]);
-
-	const focused = claims[focusClaimIndex] ?? null;
-	const acceptedCount = claims.filter(
-		(c) => c.mfcReviewStatus === "accepted"
-	).length;
-	const deniedCount = claims.filter(
-		(c) => c.mfcReviewStatus === "denied"
-	).length;
-
-	const load = useCallback(
-		() => loadEdiFixture(file.ediFixture ?? "837I"),
-		[file]
-	);
-
 	return (
-		<div className={cn(WORKSPACE_H, "flex min-h-0 flex-col gap-3")}>
-			<header className="shrink-0 border-b border-border/60 pb-3">
-				<div className="flex flex-wrap items-start justify-between gap-3">
-					<div className="min-w-0 space-y-2">
-						<button
-							type="button"
-							onClick={onBack}
-							className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition hover:text-foreground"
-						>
-							<ArrowLeft className="size-3" />
-							Outbound
-						</button>
-						<div className="flex flex-wrap items-center gap-2">
-							<h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
-								{file.fileName}
-							</h1>
-							<DecisionPill status={file.reviewStatus} />
-							<SendStatusPill status={file.outboundSendStatus} />
-							<TxBadge type={file.transactionType} />
-						</div>
-						<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-							<span className="truncate">{file.vendor}</span>
-							<span className="text-border">·</span>
-							<span>{file.program}</span>
-							<span className="text-border">·</span>
-							<span className="font-mono tabular-nums">{file.fileId}</span>
-							{file.sourceInboundFileId ? (
-								<>
-									<span className="text-border">·</span>
-									<span className="font-mono tabular-nums">
-										← {file.sourceInboundFileId}
-									</span>
-								</>
-							) : null}
-						</div>
-						<div className="flex flex-wrap items-center gap-1.5">
-							<span className="inline-flex items-center gap-1 rounded-sm border border-emerald-200/70 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-								<CheckCircle2 className="size-2.5" />
-								{acceptedCount} ok
-							</span>
-							<span className="inline-flex items-center gap-1 rounded-sm border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
-								<XCircle className="size-2.5" />
-								{deniedCount} denied
-							</span>
-							{focused ? (
-								<span className="inline-flex items-center gap-1 rounded-sm border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
-									{focused.claimId}
-								</span>
-							) : null}
-						</div>
-					</div>
-					<Button
-						asChild
-						variant="outline"
-						size="sm"
-						className={cn(toolbarBtn, "border-border/80")}
-					>
-						<Link
-							href={`/admin/claim-encounter/files/${encodeURIComponent(file.fileId)}`}
-						>
-							<ExternalLink className="size-3.5" />
-							Open
-						</Link>
-					</Button>
-				</div>
-			</header>
-
-			<div className="min-h-0 flex-1">
-				<ResizablePanelGroup
-					direction="horizontal"
-					className={cn(PANEL, "h-full overflow-hidden")}
-				>
-					<ResizablePanel
-						defaultSize={28}
-						minSize={16}
-						maxSize={40}
-						className="bg-muted/10"
-					>
-						<div className="flex h-full min-h-0 flex-col">
-							<div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
-								<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-									Claims
-								</p>
-								<span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
-									{claims.length}
-								</span>
-							</div>
-							<ScrollArea className="min-h-0 flex-1" scrollbarClassName="w-1.5">
-								<div className="space-y-0.5 p-1.5">
-									{claims.map((c, index) => (
-										<ClaimDecisionCard
-											key={c.id}
-											claim={c}
-											index={index}
-											active={
-												(focusedClaimId ?? claims[0]?.claimId) === c.claimId
-											}
-											onSelect={() => setFocusedClaimId(c.claimId)}
-										/>
-									))}
-									{claims.length === 0 ? (
-										<p className="px-2 py-8 text-center text-xs text-muted-foreground">
-											No claims on this package
-										</p>
-									) : null}
-								</div>
-							</ScrollArea>
-						</div>
-					</ResizablePanel>
-
-					<ResizableHandle withHandle />
-
-					<ResizablePanel defaultSize={72} minSize={48} className="min-w-0">
-						<EdiViewerLoader
-							load={load}
-							fileName={file.fileName}
-							focusClaimIndex={focusClaimIndex}
-							className="h-full min-h-0 rounded-none border-0"
-						/>
-					</ResizablePanel>
-				</ResizablePanelGroup>
-			</div>
-		</div>
-	);
-}
-
-function ClaimDecisionCard({
-	claim,
-	index,
-	active,
-	onSelect,
-}: {
-	claim: ClaimLine;
-	index: number;
-	active: boolean;
-	onSelect: () => void;
-}) {
-	const isDenied = claim.mfcReviewStatus === "denied";
-	const isRejected = claim.mfcReviewStatus === "rejected";
-	const isAccepted = claim.mfcReviewStatus === "accepted";
-	const isNegative = isDenied || isRejected;
-	const reasonCodes = isNegative
-		? claim.rejectReasons.map((r) => r.code).slice(0, 3)
-		: [];
-
-	return (
-		<button
-			type="button"
-			onClick={onSelect}
-			className={cn(
-				"w-full rounded-sm border border-transparent px-2.5 py-2 text-left transition",
-				"hover:border-border/50 hover:bg-card",
-				active &&
-					"border-primary/20 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-primary/15"
-			)}
-		>
-			<div className="flex items-start justify-between gap-2">
-				<div className="min-w-0">
-					<p className="truncate font-mono text-[11px] font-semibold tracking-tight">
-						{claim.claimId}
-					</p>
-					<p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
-						#{index + 1} · {claim.memberId}
-					</p>
-				</div>
-				<div className="flex shrink-0 flex-col items-end gap-1">
-					<span
-						className={cn(
-							"inline-flex items-center gap-0.5 rounded-sm border px-1.5 py-0.5 text-[9px] font-semibold capitalize",
-							isAccepted &&
-								"border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300",
-							isNegative &&
-								"border-rose-200/80 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300",
-							!isAccepted &&
-								!isNegative &&
-								"border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
-						)}
-					>
-						{isAccepted ? (
-							<CheckCircle2 className="size-2.5" />
-						) : isNegative ? (
-							<XCircle className="size-2.5" />
-						) : null}
-						{claim.mfcReviewStatus}
-					</span>
-					<span className="text-[10px] tabular-nums text-muted-foreground">
-						{formatCurrency(claim.amountBilled)}
-					</span>
-				</div>
-			</div>
-
-			{reasonCodes.length > 0 ? (
-				<div className="mt-1.5 flex flex-wrap gap-1">
-					{reasonCodes.map((code) => (
-						<span
-							key={code}
-							className="rounded-sm border border-rose-200/60 bg-rose-50/90 px-1 py-0.5 font-mono text-[9px] font-medium text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300"
-							title={
-								claim.rejectReasons.find((r) => r.code === code)?.description
-							}
-						>
-							{code}
+		<VendorFileWorkspace
+			file={file}
+			useLive={useLive}
+			backLabel="Outbound"
+			onBack={onBack}
+			negativeLabel="denied"
+			statusPills={
+				<>
+					<DecisionPill status={file.reviewStatus} />
+					<SendStatusPill status={file.outboundSendStatus} />
+				</>
+			}
+			metaExtra={
+				file.sourceInboundFileId ? (
+					<>
+						<span className="text-border">·</span>
+						<span className="font-mono tabular-nums">
+							← {file.sourceInboundFileId}
 						</span>
-					))}
-				</div>
-			) : null}
-		</button>
+					</>
+				) : null
+			}
+		/>
 	);
 }
