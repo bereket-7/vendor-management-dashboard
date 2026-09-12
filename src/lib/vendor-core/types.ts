@@ -1942,6 +1942,10 @@ export type ClaimLineDto = {
 	paid_amount?: number | string | null;
 	status?: string;
 	denial_reason_code?: string | null;
+	billing_provider_npi?: string | null;
+	rendering_provider_npi?: string | null;
+	line_kind?: string | null;
+	metadata?: Record<string, unknown> | null;
 	created_at?: string;
 	updated_at?: string;
 };
@@ -2715,6 +2719,13 @@ export function normalizeClaimLine(raw: Record<string, unknown>): ClaimLineDto {
 		paid_amount: pickAmount(raw, "paid_amount") || null,
 		status: pickString(raw, "status") || undefined,
 		denial_reason_code: pickString(raw, "denial_reason_code") || null,
+		billing_provider_npi: pickString(raw, "billing_provider_npi") || null,
+		rendering_provider_npi: pickString(raw, "rendering_provider_npi") || null,
+		line_kind: pickString(raw, "line_kind") || null,
+		metadata:
+			raw.metadata && typeof raw.metadata === "object"
+				? (raw.metadata as Record<string, unknown>)
+				: null,
 		created_at: pickString(raw, "created_at") || undefined,
 		updated_at: pickString(raw, "updated_at") || undefined,
 	};

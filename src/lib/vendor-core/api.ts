@@ -551,8 +551,18 @@ export const vendorCoreEndpoints = {
 		`/api/v1/claim-exceptions/${id}/resolve/`,
 	submissionBatchesList: "/api/v1/submission-batches/list/",
 	submissionBatch: (id: string) => `/api/v1/submission-batches/${id}/`,
+	submissionBatchGenerateOutbound: (id: string) =>
+		`/api/v1/submission-batches/${id}/generate-outbound/`,
 	claimDiagnosesList: "/api/v1/claim-diagnoses/list/",
 	claimDiagnosis: (id: string) => `/api/v1/claim-diagnoses/${id}/`,
+	remittanceFilesList: "/api/v1/remittance-files/list/",
+	remittanceFilesSummary: "/api/v1/remittance-files/summary/",
+	remittanceFile: (id: string) => `/api/v1/remittance-files/${id}/`,
+	remittanceFileExport: (id: string) =>
+		`/api/v1/remittance-files/${id}/export/`,
+	remittanceClaimsList: "/api/v1/remittance-claims/list/",
+	remittanceClaim: (id: string) => `/api/v1/remittance-claims/${id}/`,
+	remittanceServiceLinesList: "/api/v1/remittance-service-lines/list/",
 	eligibilityFilesList: "/api/v1/eligibility-files/list/",
 	eligibilityFilesCreate: "/api/v1/eligibility-files/create/",
 	inboundFiles: "/api/v1/inbound-files/",
@@ -3705,6 +3715,15 @@ export const vendorCoreApi = {
 			vendorCoreEndpoints.submissionBatch(id)
 		),
 
+	generateSubmissionBatchOutbound: (
+		id: string,
+		body?: Record<string, unknown>
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.submissionBatchGenerateOutbound(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
 	listClaimDiagnoses: (params?: { limit?: number; offset?: number }) =>
 		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
 			vendorCoreEndpoints.claimDiagnosesList,
@@ -3714,6 +3733,38 @@ export const vendorCoreApi = {
 	getClaimDiagnosis: (id: string) =>
 		vendorCoreFetch<Record<string, unknown>>(
 			vendorCoreEndpoints.claimDiagnosis(id)
+		),
+
+	listRemittanceFiles: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.remittanceFilesList,
+			{ params: pageParams(params) }
+		),
+
+	getRemittanceFile: (id: string) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.remittanceFile(id)
+		),
+
+	getRemittanceFilesSummary: (
+		params?: Record<string, string | number | undefined | null>
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.remittanceFilesSummary,
+			{ params: pageParams(params) }
+		),
+
+	exportRemittanceFile: (id: string) =>
+		vendorCoreFetchBlob(vendorCoreEndpoints.remittanceFileExport(id)),
+
+	listRemittanceClaims: (params?: {
+		limit?: number;
+		offset?: number;
+		remittance_file_id?: string;
+	}) =>
+		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
+			vendorCoreEndpoints.remittanceClaimsList,
+			{ params: pageParams(params) }
 		),
 
 	listClaimHeaders: (params?: ClaimHeaderListQuery) =>
