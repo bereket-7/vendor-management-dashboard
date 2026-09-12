@@ -23,7 +23,21 @@ function mapGainwellStatus(
 	return "pending";
 }
 
-function mapMfcStatus(status?: string | null): ClaimLine["mfcReviewStatus"] {
+function mapMfcStatus(
+	status?: string | null,
+	metadata?: Record<string, unknown> | null
+): ClaimLine["mfcReviewStatus"] {
+	const review = metadata?.review;
+	if (review && typeof review === "object") {
+		const decision = String(
+			(review as { decision?: string }).decision ?? ""
+		).toLowerCase();
+		if (decision === "accepted") return "accepted";
+		if (decision === "rejected") return "rejected";
+		if (decision === "denied") return "denied";
+		if (decision === "partial") return "partial";
+		if (decision === "pending") return "pending";
+	}
 	const gainwell = mapGainwellStatus(status);
 	if (gainwell === "denied") return "denied";
 	if (gainwell === "rejected") return "rejected";
@@ -32,11 +46,12 @@ function mapMfcStatus(status?: string | null): ClaimLine["mfcReviewStatus"] {
 }
 
 function mapSubmissionStatus(
-	status?: string | null
+	status?: string | null,
+	metadata?: Record<string, unknown> | null
 ): ClaimLine["submissionStatus"] {
-	const mfc = mapMfcStatus(status);
+	const mfc = mapMfcStatus(status, metadata);
 	if (mfc === "rejected" || mfc === "denied") return "rejected";
-	if (mfc === "pending") return "pending";
+	if (mfc === "pending" || mfc === "partial") return "pending";
 	return "accepted";
 }
 
@@ -51,7 +66,7 @@ export function claimLineDtosToClaimLines(
 				String(row.claim_reference_id ?? row.claim_id).replace(/\D/g, "")
 			) || index + 1;
 		const gainwellStatus = mapGainwellStatus(row.status);
-		const mfcReviewStatus = mapMfcStatus(row.status);
+		const mfcReviewStatus = mapMfcStatus(row.status, row.metadata);
 		const billed = Number(row.billed_amount ?? 0);
 		const paid = Number(row.paid_amount ?? 0);
 		const fileId =
@@ -62,6 +77,7 @@ export function claimLineDtosToClaimLines(
 		return {
 			id: row.id,
 			claimId: row.claim_reference_id || row.claim_id || row.id,
+			lineNumber: row.line_number != null ? Number(row.line_number) : undefined,
 			memberId: `MBR-${440000 + seq}`,
 			provider: PROVIDERS[seq % PROVIDERS.length]!,
 			vendor: row.vendor ?? "—",
@@ -70,11 +86,13 @@ export function claimLineDtosToClaimLines(
 				? "Pharmacy Claim"
 				: row.procedure_code?.startsWith("D")
 					? "Dental Claim"
-					: "Professional Claim",
+					: row.line_kind === "institutional"
+						? "Institutional Claim"
+						: "Professional Claim",
 			dateOfService: row.service_date ?? "2026-07-15",
 			amountBilled: billed,
 			amountPaid: paid,
-			submissionStatus: mapSubmissionStatus(row.status),
+			submissionStatus: mapSubmissionStatus(row.status, row.metadata),
 			gainwellStatus,
 			mfcReviewStatus,
 			rejectReason: row.denial_reason_code ?? null,
@@ -92,7 +110,7 @@ export function claimLineDtosToClaimLines(
 			fileId,
 			responseId: gainwellStatus === "paid" ? `resp-${row.id.slice(0, 8)}` : "",
 			program,
-			direction: index % 3 === 0 ? "outbound" : "inbound",
+			direction: index % 3 === 0 ? ("outbound" as const) : ("inbound" as const),
 		};
 	});
 }

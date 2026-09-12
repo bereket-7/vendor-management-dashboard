@@ -634,6 +634,8 @@ export function vendorPerformanceForProgram(
 export type ClaimLine = {
 	id: string;
 	claimId: string;
+	/** Service line number within the claim (1-based). */
+	lineNumber?: number;
 	memberId: string;
 	provider: string;
 	vendor: string;
