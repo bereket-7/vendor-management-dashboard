@@ -10,6 +10,7 @@ import {
 import { isMockEnabled } from "@/lib/mock-mode";
 import type { ProgramFileType } from "@/types/UI/system.types";
 
+import type { ClaimHeaderDto } from "../../live-claim-headers";
 import {
 	type ClaimVendorFileListParams,
 	acceptClaimVendorFileLive,
@@ -26,6 +27,7 @@ import {
 	getProgramVendorPerformance,
 	hardDeleteClaimLine,
 	listClaimExceptions,
+	listClaimHeadersLive,
 	listClaimLines,
 	listClaimLinesLive,
 	listClaimResponses,
@@ -35,6 +37,7 @@ import {
 	rejectClaimVendorFileLive,
 	reprocessLinkedInboundFile,
 	resolveClaimExceptionLive,
+	resolveClaimVendorFile,
 	restoreClaimLine,
 	seedClaimLines,
 	seedInboundVendorQueueDemo,
@@ -53,18 +56,20 @@ export function useClaimVendorFilesQuery() {
 	});
 }
 
-export function useClaimResponsesQuery() {
+export function useClaimResponsesQuery(enabled = true) {
 	return useQuery({
 		queryKey: featureQueryKey(domain, "responses"),
 		queryFn: listClaimResponses,
+		enabled,
 		staleTime: isMockEnabled() ? Infinity : liveStaleMs,
 	});
 }
 
-export function useClaimExceptionsQuery() {
+export function useClaimExceptionsQuery(enabled = true) {
 	return useQuery({
 		queryKey: featureQueryKey(domain, "exceptions"),
 		queryFn: listClaimExceptions,
+		enabled,
 		staleTime: isMockEnabled() ? Infinity : liveStaleMs,
 	});
 }
@@ -96,11 +101,49 @@ export function useClaimLinesLiveQuery(enabled = true) {
 
 export function useProgramFilesQuery(
 	program: ProgramFileType,
-	direction: "inbound" | "outbound"
+	direction: "inbound" | "outbound",
+	enabled = true
 ) {
 	return useQuery({
 		queryKey: featureQueryKey(domain, "program-files", program, direction),
 		queryFn: () => getProgramFiles(program, direction),
+		enabled,
+		staleTime: isMockEnabled() ? Infinity : liveStaleMs,
+	});
+}
+
+export function useClaimHeadersLiveQuery(
+	enabled = true,
+	params?: {
+		search?: string;
+		vendor_file_id?: string;
+		status?: string;
+		limit?: number;
+	}
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"claim-headers-live",
+		() => listClaimHeadersLive(params) as Promise<ClaimHeaderDto[]>,
+		enabled,
+		[
+			params?.search ?? "",
+			params?.vendor_file_id ?? "",
+			params?.status ?? "",
+			params?.limit ?? 100,
+		]
+	);
+}
+
+/** Stash-compatible alias of useClaimVendorFileDetailQuery. */
+export function useResolveClaimVendorFileQuery(
+	idOrRef: string,
+	enabled = true
+) {
+	return useQuery({
+		queryKey: featureQueryKey(domain, "vendor-file", idOrRef),
+		queryFn: () => resolveClaimVendorFile(idOrRef),
+		enabled: Boolean(idOrRef) && enabled,
 		staleTime: isMockEnabled() ? Infinity : liveStaleMs,
 	});
 }
@@ -130,9 +173,26 @@ export function useClaimVendorFileDetailQuery(fileId: string, enabled = true) {
 	});
 }
 
-export function useClaimsForVendorFileQuery(fileId: string, enabled = true) {
+/**
+ * Claim lines for a vendor file.
+ * Compatible with both main `(fileId, enabled)` and stash `(fileId, program, enabled)`.
+ */
+export function useClaimsForVendorFileQuery(
+	fileId: string,
+	programOrEnabled: ProgramFileType | boolean = true,
+	enabledArg = true
+) {
+	const program =
+		typeof programOrEnabled === "string" ? programOrEnabled : undefined;
+	const enabled =
+		typeof programOrEnabled === "boolean" ? programOrEnabled : enabledArg;
 	return useQuery({
-		queryKey: featureQueryKey(domain, "vendor-file-claims", fileId),
+		queryKey: featureQueryKey(
+			domain,
+			"vendor-file-claims",
+			fileId,
+			program ?? "default"
+		),
 		queryFn: () => getClaimsForVendorFileLive(fileId),
 		enabled: Boolean(fileId) && enabled,
 		staleTime: isMockEnabled() ? Infinity : liveStaleMs,

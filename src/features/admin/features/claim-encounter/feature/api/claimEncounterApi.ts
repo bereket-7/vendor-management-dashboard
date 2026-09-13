@@ -1,4 +1,4 @@
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
 import type { ClaimLineDto } from "@/lib/vendor-core/types";
 import type { ProgramFileType } from "@/types/UI/system.types";
@@ -63,6 +63,7 @@ export {
 };
 export type {
 	ClaimDetail,
+	ClaimDetailNote,
 	ClaimException,
 	ClaimFileStatus,
 	ClaimLine,
@@ -73,6 +74,10 @@ export type {
 	SubmissionBatch,
 	VendorPerformanceRow,
 } from "../../mock-data";
+
+function claimFixturesEnabled() {
+	return isMockEnabled() || isClaimVendorFilesMockEnabled();
+}
 
 function mapPipelineStatus(raw: unknown): ClaimFileStatus {
 	const s = String(raw ?? "").toLowerCase();
@@ -624,6 +629,82 @@ export async function updateClaimLine(
 	return vendorCoreApi.updateClaimLine(id, body);
 }
 
+export type ClaimOperationalNote = {
+	id: string;
+	text: string;
+	addedBy: string;
+	date: string;
+};
+
+/** Read operational notes stored on claim-line metadata (no dedicated notes API). */
+export function parseClaimOperationalNotes(
+	metadata?: Record<string, unknown> | null
+): ClaimOperationalNote[] {
+	const raw = metadata?.operational_notes;
+	if (!Array.isArray(raw)) return [];
+	return raw
+		.map((item, index) => {
+			if (!item || typeof item !== "object") return null;
+			const row = item as Record<string, unknown>;
+			const text = String(row.text ?? row.body ?? "").trim();
+			if (!text) return null;
+			const addedAt = String(row.added_at ?? row.date ?? row.created_at ?? "");
+			return {
+				id: String(row.id ?? `note-${index}`),
+				text,
+				addedBy: String(row.added_by ?? row.addedBy ?? row.author ?? "User"),
+				date: addedAt ? addedAt.slice(0, 19).replace("T", " ") : "—",
+			};
+		})
+		.filter((n): n is ClaimOperationalNote => n !== null);
+}
+
+/**
+ * Persist a claim note via claim-line update (`metadata.operational_notes`).
+ * Fetches current line first so we do not wipe review / other metadata keys.
+ */
+export async function addClaimLineOperationalNote({
+	claimLineId,
+	text,
+	addedBy = "Dashboard user",
+}: {
+	claimLineId: string;
+	text: string;
+	addedBy?: string;
+}): Promise<ClaimOperationalNote> {
+	const trimmed = text.trim();
+	if (!trimmed) {
+		throw new Error("Note text is required");
+	}
+	const current = await vendorCoreApi.getClaimLine(claimLineId);
+	const meta: Record<string, unknown> = {
+		...(current.metadata && typeof current.metadata === "object"
+			? current.metadata
+			: {}),
+	};
+	const existing = Array.isArray(meta.operational_notes)
+		? [...(meta.operational_notes as unknown[])]
+		: [];
+	const note = {
+		id:
+			typeof crypto !== "undefined" && "randomUUID" in crypto
+				? crypto.randomUUID()
+				: `note-${Date.now()}`,
+		text: trimmed,
+		added_by: addedBy,
+		added_at: new Date().toISOString(),
+	};
+	existing.push(note);
+	meta.operational_notes = existing;
+	await vendorCoreApi.updateClaimLine(claimLineId, { metadata: meta });
+	return {
+		id: note.id,
+		text: note.text,
+		addedBy: note.added_by,
+		date: note.added_at.slice(0, 19).replace("T", " "),
+	};
+}
+
 export async function deleteClaimLine(id: string) {
 	return vendorCoreApi.deleteClaimLine(id);
 }
@@ -800,12 +881,55 @@ export async function getClaimsForVendorFileLive(
 	const file = await getClaimVendorFileLive(decoded);
 	if (!file) return [];
 
-	const page = await vendorCoreApi.listClaimLinesPage({
+	let page = await vendorCoreApi.listClaimLinesPage({
 		limit: 200,
 		offset: 0,
 		vendor_file_id: file.id,
 	});
-	return (page.results ?? []).map((dto) => mapClaimLineDtoToUi(dto, file));
+	let results = page.results ?? [];
+
+	// Outbound CVFs often have no own lines (send leaves lines on inbound).
+	// Fall back to sibling inbound CVF from metadata.
+	if (results.length === 0) {
+		try {
+			const row = await vendorCoreApi.getClaimVendorFile(file.id);
+			const meta =
+				row.metadata && typeof row.metadata === "object"
+					? (row.metadata as Record<string, unknown>)
+					: null;
+			const sourceId = meta?.source_inbound_vendor_file_id
+				? String(meta.source_inbound_vendor_file_id)
+				: null;
+			if (sourceId && sourceId !== file.id) {
+				page = await vendorCoreApi.listClaimLinesPage({
+					limit: 200,
+					offset: 0,
+					vendor_file_id: sourceId,
+				});
+				results = page.results ?? [];
+			}
+		} catch {
+			/* keep empty */
+		}
+	}
+
+	return results.map((dto) => mapClaimLineDtoToUi(dto, file));
+}
+
+/** Stash-compatible alias of getClaimsForVendorFileLive. */
+export async function listClaimsForVendorFile(
+	vendorFileId: string,
+	_program: ProgramFileType = "DHCF"
+) {
+	void _program;
+	return getClaimsForVendorFileLive(vendorFileId);
+}
+
+/** Stash-compatible alias of getClaimVendorFileLive (null instead of undefined). */
+export async function resolveClaimVendorFile(
+	idOrRef: string
+): Promise<ClaimVendorFile | null> {
+	return (await getClaimVendorFileLive(idOrRef)) ?? null;
 }
 
 export type InboundQueueSnapshot = {
@@ -944,6 +1068,20 @@ export async function assignClaimExceptionLive(
 	return vendorCoreApi.assignClaimException(id, body);
 }
 
+/** Stash-compatible aliases used by ExceptionDetailPage. */
+export async function assignClaimException(
+	id: string,
+	body?: { assigned_to_id?: string | null }
+) {
+	if (claimFixturesEnabled()) return { mock: true };
+	return assignClaimExceptionLive(id, body);
+}
+
+export async function resolveClaimException(id: string, notes?: string) {
+	if (claimFixturesEnabled()) return { mock: true };
+	return resolveClaimExceptionLive(id, { notes });
+}
+
 /**
  * Live EDI: prefer inbound-file download, then CVF download.
  * If neither has stored bytes (typical seed CVF on remote), build a
@@ -1032,4 +1170,91 @@ export async function loadVendorFileEdiBody(file: {
 			? errors.join(" ")
 			: "EDI download unavailable for this vendor file."
 	);
+}
+
+/** Browser download from vendor-core CVF (returns blob for saveVendorCoreBlob). */
+export async function downloadClaimVendorFile(id: string) {
+	if (claimFixturesEnabled()) {
+		throw new Error("EDI download requires live vendor-core");
+	}
+	const result = await vendorCoreApi.downloadClaimVendorFile(id);
+	return {
+		blob: new Blob([result.text], {
+			type: result.contentType || "application/edi-x12",
+		}),
+		filename: result.filename,
+	};
+}
+
+/** Trigger browser download from a blob result. */
+export function saveVendorCoreBlob(
+	result: { blob: Blob; filename?: string },
+	fallbackName: string
+) {
+	const url = URL.createObjectURL(result.blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = result.filename || fallbackName;
+	a.click();
+	URL.revokeObjectURL(url);
+}
+
+export async function listClaimHeadersLive(params?: {
+	search?: string;
+	vendor_file_id?: string;
+	status?: string;
+	limit?: number;
+}) {
+	const page = await vendorCoreApi.listClaimHeaders({
+		limit: params?.limit ?? 100,
+		search: params?.search,
+		vendor_file_id: params?.vendor_file_id,
+		status: params?.status,
+	});
+	return page.results ?? [];
+}
+
+export async function getClaimHeaderLive(id: string) {
+	return vendorCoreApi.getClaimHeader(id);
+}
+
+export async function voidClaimHeader(
+	id: string,
+	body?: Record<string, unknown>
+) {
+	return vendorCoreApi.voidClaimHeader(
+		id,
+		body as { related_claim_reference_id?: string } | undefined
+	);
+}
+
+export async function replaceClaimHeader(
+	id: string,
+	body?: Record<string, unknown>
+) {
+	return vendorCoreApi.replaceClaimHeader(
+		id,
+		body as { related_claim_reference_id?: string } | undefined
+	);
+}
+
+/** Stash-compatible alias of reprocessLinkedInboundFile. */
+export async function reprocessInboundFile(id: string) {
+	return reprocessLinkedInboundFile(id);
+}
+
+export async function downloadInboundFile(id: string) {
+	return vendorCoreApi.downloadInboundFile(id);
+}
+
+export async function listRemittanceFilesLive(params?: {
+	limit?: number;
+	offset?: number;
+}) {
+	const page = await vendorCoreApi.listRemittanceFiles(params);
+	return page.results ?? [];
+}
+
+export async function generateSubmissionBatchOutbound(id: string) {
+	return vendorCoreApi.generateSubmissionBatchOutbound(id);
 }
