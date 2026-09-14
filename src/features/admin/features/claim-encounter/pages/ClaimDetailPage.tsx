@@ -16,18 +16,36 @@ import {
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	Copy,
+	Download,
 	ExternalLink,
+	FileDown,
+	FileSpreadsheet,
 	FileText,
+	List,
 	Printer,
+	RefreshCw,
+	StickyNote,
 	WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -38,6 +56,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import {
 	CMS_EDGE_PAGE_STACK,
@@ -50,19 +69,37 @@ import {
 } from "@/features/admin/features/claim-encounter/edi";
 import {
 	type ClaimDetail,
+	type ClaimDetailNote,
+	addClaimLineOperationalNote,
 	buildClaimDetailFromLine,
+	downloadClaimVendorFile,
 	exportRowsAsCsv,
 	formatCurrency,
 	getClaimDetail,
+	getClaimHeaderLive,
+	parseClaimOperationalNotes,
+	reprocessInboundFile,
+	resolveClaimVendorFile,
+	saveVendorCoreBlob,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
-import { useVendorCoreClaimLines } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
+import {
+	useClaimHeadersLiveQuery,
+	useVendorCoreClaimLines,
+} from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
+import { claimHeaderDtosToClaimLines } from "@/features/admin/features/claim-encounter/live-claim-headers";
 import { findClaimLineByClaimId } from "@/features/admin/features/claim-encounter/live-claims";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import { Link } from "@/i18n/navigation";
-import { isClaimVendorFilesMockEnabled } from "@/lib/mock-mode";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const PANEL = CMS_EDGE_PANEL_CLASS;
+
+const toolbarBtn =
+	"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
+
+const actionItemClass =
+	"cursor-pointer gap-2 rounded-sm px-2.5 py-2 text-xs font-medium";
 
 const MAIN_TABS = [
 	"Claim Summary",
@@ -666,38 +703,57 @@ function DocumentsTab({ claim }: { claim: ClaimDetail }) {
 	);
 }
 
-function NotesTab({ claim }: { claim: ClaimDetail }) {
+function NotesTab({
+	claim,
+	notes,
+	onAddNote,
+}: {
+	claim: ClaimDetail;
+	notes: ClaimDetailNote[];
+	onAddNote: () => void;
+}) {
 	return (
 		<div className="space-y-3">
-			<div>
-				<h2 className="text-sm font-semibold text-foreground">Notes</h2>
-				<p className="mt-1 text-xs text-muted-foreground">
-					Operational notes and claim communication history.
-				</p>
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<h2 className="text-sm font-semibold text-foreground">Notes</h2>
+					<p className="mt-1 text-xs text-muted-foreground">
+						Operational notes and claim communication history.
+					</p>
+				</div>
+				<Button
+					variant="outline"
+					size="sm"
+					className={cn(toolbarBtn, "border-border/80")}
+					onClick={onAddNote}
+				>
+					<StickyNote className="size-3.5" />
+					Add note
+				</Button>
 			</div>
-			<Panel title={`Claim Notes (${claim.notes.length})`}>
+			<Panel title={`Claim Notes (${notes.length})`}>
 				<div className="space-y-3">
-					{claim.notes.map((note) => (
-						<div
-							key={note.id}
-							className="rounded-sm border border-primary/15 bg-primary/5 px-3 py-2.5"
-						>
-							<div className="flex justify-between gap-3 text-xs">
-								<p className="font-medium text-foreground">{note.addedBy}</p>
-								<p className="text-muted-foreground">{note.date}</p>
+					{notes.length === 0 ? (
+						<p className="py-6 text-center text-xs text-muted-foreground">
+							No notes on this claim yet.
+						</p>
+					) : (
+						notes.map((note) => (
+							<div
+								key={note.id}
+								className="rounded-sm border border-primary/15 bg-primary/5 px-3 py-2.5"
+							>
+								<div className="flex justify-between gap-3 text-xs">
+									<p className="font-medium text-foreground">{note.addedBy}</p>
+									<p className="text-muted-foreground">{note.date}</p>
+								</div>
+								<p className="mt-2 text-sm text-foreground">{note.text}</p>
 							</div>
-							<p className="mt-2 text-sm text-foreground">{note.text}</p>
-						</div>
-					))}
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => toast.success("Note composer opened")}
-					>
-						Add Note
-					</Button>
+						))
+					)}
 				</div>
 			</Panel>
+			<p className="text-[11px] text-muted-foreground">Claim {claim.claimId}</p>
 		</div>
 	);
 }
@@ -1028,7 +1084,15 @@ function ContractFinancialsTab({ claim }: { claim: ClaimDetail }) {
 	);
 }
 
-function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
+function OperationsAuditTab({
+	claim,
+	notes,
+	onAddNote,
+}: {
+	claim: ClaimDetail;
+	notes: ClaimDetailNote[];
+	onAddNote: () => void;
+}) {
 	const [ediTab, setEdiTab] = useState<"837I" | "835">("837I");
 	const [relatedFilter, setRelatedFilter] =
 		useState<(typeof RELATED_FILTERS)[number]>("All");
@@ -1479,7 +1543,7 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 						label: "View all notes & attachments",
 						onClick: () =>
 							toast.message("Notes & attachments", {
-								description: `${claim.notes.length} notes · ${claim.attachments.length} attachments`,
+								description: `${notes.length} notes · ${claim.attachments.length} attachments`,
 							}),
 					}}
 				>
@@ -1494,7 +1558,7 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 									: "border-transparent text-muted-foreground"
 							)}
 						>
-							Notes ({claim.notes.length})
+							Notes ({notes.length})
 						</button>
 						<button
 							type="button"
@@ -1508,6 +1572,17 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 						>
 							Attachments ({claim.attachments.length})
 						</button>
+						{notesTab === "notes" ? (
+							<Button
+								variant="ghost"
+								size="sm"
+								className="ml-auto h-7 gap-1.5 px-2 text-xs"
+								onClick={onAddNote}
+							>
+								<StickyNote className="size-3.5" />
+								Add note
+							</Button>
+						) : null}
 					</div>
 
 					{notesTab === "notes" ? (
@@ -1521,19 +1596,30 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{claim.notes.map((note) => (
-										<TableRow key={note.id} className="hover:bg-muted/20">
-											<TableCell className="py-2.5 pl-0 text-xs">
-												{note.text}
-											</TableCell>
-											<TableCell className="py-2.5 text-xs">
-												{note.addedBy}
-											</TableCell>
-											<TableCell className="py-2.5 pr-0 text-xs tabular-nums text-muted-foreground">
-												{note.date}
+									{notes.length === 0 ? (
+										<TableRow className="hover:bg-transparent">
+											<TableCell
+												colSpan={3}
+												className="py-8 text-center text-xs text-muted-foreground"
+											>
+												No notes yet.
 											</TableCell>
 										</TableRow>
-									))}
+									) : (
+										notes.map((note) => (
+											<TableRow key={note.id} className="hover:bg-muted/20">
+												<TableCell className="py-2.5 pl-0 text-xs">
+													{note.text}
+												</TableCell>
+												<TableCell className="py-2.5 text-xs">
+													{note.addedBy}
+												</TableCell>
+												<TableCell className="py-2.5 pr-0 text-xs tabular-nums text-muted-foreground">
+													{note.date}
+												</TableCell>
+											</TableRow>
+										))
+									)}
 								</TableBody>
 							</Table>
 						</div>
@@ -1615,7 +1701,7 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 }
 
 export function ClaimDetailPage() {
-	const useFixtures = isClaimVendorFilesMockEnabled();
+	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
 	if (!useFixtures) {
 		return (
 			<VendorCoreGate title="Claim Overview">
@@ -1628,20 +1714,234 @@ export function ClaimDetailPage() {
 
 function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 	const params = useParams<{ claimId: string }>();
+	const claimIdParam = decodeURIComponent(params.claimId);
 	const claimLinesQ = useVendorCoreClaimLines(useLive);
+	const headersQ = useClaimHeadersLiveQuery(useLive);
+
+	const matchedLineDto = useMemo(() => {
+		if (!useLive) return null;
+		return (
+			(claimLinesQ.data ?? []).find(
+				(row) =>
+					row.id === claimIdParam ||
+					row.claim_reference_id === claimIdParam ||
+					row.claim_id === claimIdParam
+			) ?? null
+		);
+	}, [useLive, claimLinesQ.data, claimIdParam]);
+
+	const matchedHeaderDto = useMemo(() => {
+		if (!useLive) return null;
+		return (
+			(headersQ.data ?? []).find((row) => {
+				const id = String(row.id ?? "");
+				const ref = String(row.claim_reference_id ?? row.reference_id ?? "");
+				return id === claimIdParam || ref === claimIdParam;
+			}) ?? null
+		);
+	}, [useLive, headersQ.data, claimIdParam]);
+
 	const claim = useMemo(() => {
 		if (useLive) {
-			const line = findClaimLineByClaimId(
-				claimLinesQ.data ?? [],
-				params.claimId
-			);
+			if (matchedHeaderDto) {
+				const mapped = claimHeaderDtosToClaimLines([matchedHeaderDto])[0];
+				if (mapped) return buildClaimDetailFromLine(mapped);
+			}
+			const line = findClaimLineByClaimId(claimLinesQ.data ?? [], claimIdParam);
 			return line ? buildClaimDetailFromLine(line) : undefined;
 		}
-		return getClaimDetail(params.claimId);
-	}, [useLive, claimLinesQ.data, params.claimId]);
-	const [tab, setTab] = useState<MainTab>("Claim Summary");
+		return getClaimDetail(claimIdParam);
+	}, [useLive, matchedHeaderDto, claimLinesQ.data, claimIdParam]);
 
-	if (useLive && claimLinesQ.isLoading && !claim) {
+	/** Prefer exact line match; else first line sharing claim reference (header view). */
+	const noteTargetLineDto = useMemo(() => {
+		if (!useLive) return null;
+		if (matchedLineDto) return matchedLineDto;
+		const ref =
+			String(
+				matchedHeaderDto?.claim_reference_id ??
+					matchedHeaderDto?.reference_id ??
+					claim?.claimId ??
+					claimIdParam
+			) || "";
+		if (!ref) return null;
+		return (
+			(claimLinesQ.data ?? []).find(
+				(row) =>
+					row.claim_reference_id === ref ||
+					row.claim_id === ref ||
+					row.id === ref
+			) ?? null
+		);
+	}, [
+		useLive,
+		matchedLineDto,
+		matchedHeaderDto,
+		claim?.claimId,
+		claimIdParam,
+		claimLinesQ.data,
+	]);
+
+	const [tab, setTab] = useState<MainTab>("Claim Summary");
+	const [actionBusy, setActionBusy] = useState(false);
+	const [noteOpen, setNoteOpen] = useState(false);
+	const [noteText, setNoteText] = useState("");
+	const [noteSaving, setNoteSaving] = useState(false);
+	const [localNotes, setLocalNotes] = useState<ClaimDetailNote[]>([]);
+
+	useEffect(() => {
+		setLocalNotes([]);
+	}, [claimIdParam]);
+
+	const displayNotes = useMemo((): ClaimDetailNote[] => {
+		if (!claim) return localNotes;
+		if (!useLive) {
+			const byId = new Map(claim.notes.map((n) => [n.id, n]));
+			for (const n of localNotes) byId.set(n.id, n);
+			return Array.from(byId.values());
+		}
+		const fromMeta = parseClaimOperationalNotes(noteTargetLineDto?.metadata);
+		const byId = new Map(fromMeta.map((n) => [n.id, n]));
+		for (const n of localNotes) byId.set(n.id, n);
+		return Array.from(byId.values());
+	}, [claim, useLive, noteTargetLineDto?.metadata, localNotes]);
+
+	async function handleSaveNote() {
+		const trimmed = noteText.trim();
+		if (!trimmed) {
+			toast.message("Enter a note before saving");
+			return;
+		}
+		setNoteSaving(true);
+		try {
+			if (useLive) {
+				const lineId = noteTargetLineDto?.id;
+				if (!lineId) {
+					toast.error(
+						"No claim line linked — notes persist on claim-line metadata"
+					);
+					return;
+				}
+				const saved = await addClaimLineOperationalNote({
+					claimLineId: lineId,
+					text: trimmed,
+				});
+				setLocalNotes((prev) => [...prev, saved]);
+				await claimLinesQ.refetch();
+				toast.success("Note saved");
+			} else {
+				const note: ClaimDetailNote = {
+					id: `local-note-${Date.now()}`,
+					text: trimmed,
+					addedBy: "You",
+					date: new Date().toISOString().slice(0, 19).replace("T", " "),
+				};
+				setLocalNotes((prev) => [...prev, note]);
+				toast.success("Note added (fixture session)");
+			}
+			setNoteText("");
+			setNoteOpen(false);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Failed to save note");
+		} finally {
+			setNoteSaving(false);
+		}
+	}
+
+	async function resolveInboundFileId(): Promise<string | null> {
+		if (matchedHeaderDto?.source_inbound_file_id) {
+			return String(matchedHeaderDto.source_inbound_file_id);
+		}
+		const headerVendorFile = matchedHeaderDto?.vendor_file as
+			| { id?: string }
+			| null
+			| undefined;
+		const vendorFileId =
+			headerVendorFile?.id ?? matchedLineDto?.vendor_file_id ?? null;
+		if (vendorFileId) {
+			const vf = await resolveClaimVendorFile(String(vendorFileId));
+			if (vf?.sourceInboundFileId) return vf.sourceInboundFileId;
+		}
+		if (claim?.fileId) {
+			const vf = await resolveClaimVendorFile(claim.fileId);
+			if (vf?.sourceInboundFileId) return vf.sourceInboundFileId;
+		}
+		try {
+			const header = await getClaimHeaderLive(claim?.id ?? claimIdParam);
+			if (header && typeof header === "object") {
+				const inbound = (header as { source_inbound_file_id?: string | null })
+					.source_inbound_file_id;
+				if (inbound) return String(inbound);
+			}
+		} catch {
+			/* ignore */
+		}
+		return null;
+	}
+
+	function resolveVendorFileId(): string | null {
+		const headerVendorFile = matchedHeaderDto?.vendor_file as
+			| { id?: string }
+			| null
+			| undefined;
+		if (headerVendorFile?.id) {
+			return String(headerVendorFile.id);
+		}
+		if (matchedLineDto?.vendor_file_id) {
+			return String(matchedLineDto.vendor_file_id);
+		}
+		return null;
+	}
+
+	async function handleReprocess() {
+		if (!useLive) {
+			toast.message("Reprocess requires live vendor-core");
+			return;
+		}
+		setActionBusy(true);
+		try {
+			const inboundId = await resolveInboundFileId();
+			if (!inboundId) {
+				toast.error(
+					"No source inbound file linked to this claim — cannot reprocess"
+				);
+				return;
+			}
+			await reprocessInboundFile(inboundId);
+			toast.success("Reprocess queued");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Reprocess failed");
+		} finally {
+			setActionBusy(false);
+		}
+	}
+
+	async function handleDownloadEdi() {
+		if (!useLive) {
+			toast.message("EDI download requires live vendor-core");
+			return;
+		}
+		const vendorFileId = resolveVendorFileId();
+		if (!vendorFileId) {
+			toast.error("No vendor file linked to this claim — cannot download EDI");
+			return;
+		}
+		setActionBusy(true);
+		try {
+			const result = await downloadClaimVendorFile(vendorFileId);
+			saveVendorCoreBlob(
+				result,
+				claim?.edi837FileName || claim?.fileName || "claim.edi"
+			);
+			toast.success("EDI download started");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "EDI download failed");
+		} finally {
+			setActionBusy(false);
+		}
+	}
+
+	if (useLive && (claimLinesQ.isLoading || headersQ.isLoading) && !claim) {
 		return (
 			<div className="space-y-4">
 				<p className="text-sm text-muted-foreground">
@@ -1651,7 +1951,7 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 		);
 	}
 
-	if (useLive && claimLinesQ.error && !claim) {
+	if (useLive && claimLinesQ.error && headersQ.error && !claim) {
 		return (
 			<div className="space-y-4">
 				<p className="text-sm text-destructive">
@@ -1761,79 +2061,205 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 				<div className="flex flex-wrap items-center gap-2">
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="outline" size="sm" className="h-9">
+							<Button
+								variant="outline"
+								size="sm"
+								className={cn(
+									toolbarBtn,
+									"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+								)}
+							>
+								<FileDown className="size-3.5" />
 								Export
-								<ChevronDown className="ml-1.5 size-3.5" />
+								<ChevronDown className="size-3.5 opacity-70" />
 							</Button>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem onClick={handleExport}>
-								Export CSV
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() =>
-									toast.message("PDF export", {
-										description: "Queued for generation",
-									})
-								}
-							>
-								Export PDF
-							</DropdownMenuItem>
+						<DropdownMenuContent align="end" className="w-56 p-1.5">
+							<DropdownMenuLabel className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+								Download
+							</DropdownMenuLabel>
+							<DropdownMenuGroup>
+								<DropdownMenuItem
+									className={actionItemClass}
+									onClick={handleExport}
+								>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+										<FileSpreadsheet className="size-3.5" />
+									</span>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span>Export CSV</span>
+										<span className="text-[10px] font-normal text-muted-foreground">
+											Claim overview spreadsheet
+										</span>
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className={actionItemClass}
+									onClick={() =>
+										toast.message("PDF export", {
+											description: "Queued for generation",
+										})
+									}
+								>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-rose-500/10 text-rose-700 dark:text-rose-300">
+										<FileText className="size-3.5" />
+									</span>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span>Export PDF</span>
+										<span className="text-[10px] font-normal text-muted-foreground">
+											Printable claim packet
+										</span>
+									</span>
+								</DropdownMenuItem>
+							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
 					<Button
 						variant="outline"
 						size="sm"
-						className="h-9"
+						className={cn(
+							toolbarBtn,
+							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
 						onClick={handlePrint}
 					>
-						<Printer className="mr-1.5 size-3.5" />
+						<Printer className="size-3.5" />
 						Print
 					</Button>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button size="sm" className="h-9">
+							<Button
+								size="sm"
+								className={cn(
+									toolbarBtn,
+									"bg-primary text-primary-foreground shadow-none hover:bg-primary/90"
+								)}
+							>
 								Actions
-								<ChevronDown className="ml-1.5 size-3.5" />
+								<ChevronDown className="size-3.5 opacity-80" />
 							</Button>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem
-								onClick={() =>
-									toast.message("Reprocess claim", {
-										description: claim.claimId,
-									})
-								}
-							>
-								Reprocess claim
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() =>
-									toast.message("Add note", { description: claim.claimId })
-								}
-							>
-								Add note
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => {
-									void navigator.clipboard.writeText(claim.claimId);
-									toast.success("Claim ID copied");
-								}}
-							>
-								Copy claim ID
-							</DropdownMenuItem>
-							<DropdownMenuItem asChild>
-								<Link
-									href="/admin/claim-encounter/claims"
-									className="cursor-pointer"
+						<DropdownMenuContent align="end" className="w-64 p-1.5">
+							<DropdownMenuLabel className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+								Claim operations
+							</DropdownMenuLabel>
+							<DropdownMenuGroup>
+								<DropdownMenuItem
+									className={actionItemClass}
+									disabled={actionBusy}
+									onClick={() => void handleReprocess()}
 								>
-									Back to claims list
-								</Link>
-							</DropdownMenuItem>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-amber-500/10 text-amber-800 dark:text-amber-200">
+										<RefreshCw className="size-3.5" />
+									</span>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span>Reprocess claim</span>
+										<span className="text-[10px] font-normal text-muted-foreground">
+											Queue source inbound file again
+										</span>
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className={actionItemClass}
+									disabled={actionBusy}
+									onClick={() => void handleDownloadEdi()}
+								>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-sky-500/10 text-sky-800 dark:text-sky-200">
+										<Download className="size-3.5" />
+									</span>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span>Download EDI</span>
+										<span className="text-[10px] font-normal text-muted-foreground">
+											837 / package bytes from vendor-core
+										</span>
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className={actionItemClass}
+									onClick={() => setNoteOpen(true)}
+								>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-violet-500/10 text-violet-800 dark:text-violet-200">
+										<StickyNote className="size-3.5" />
+									</span>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span>Add note</span>
+										<span className="text-[10px] font-normal text-muted-foreground">
+											{useLive
+												? "Saved on claim-line metadata"
+												: "Fixture session only"}
+										</span>
+									</span>
+								</DropdownMenuItem>
+							</DropdownMenuGroup>
+							<DropdownMenuSeparator className="my-1.5" />
+							<DropdownMenuLabel className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+								Quick links
+							</DropdownMenuLabel>
+							<DropdownMenuGroup>
+								<DropdownMenuItem
+									className={actionItemClass}
+									onClick={() => {
+										void navigator.clipboard.writeText(claim.claimId);
+										toast.success("Claim ID copied");
+									}}
+								>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-muted text-muted-foreground">
+										<Copy className="size-3.5" />
+									</span>
+									<span>Copy claim ID</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem asChild className={actionItemClass}>
+									<Link href="/admin/claim-encounter/claims">
+										<span className="flex size-7 items-center justify-center rounded-sm bg-muted text-muted-foreground">
+											<List className="size-3.5" />
+										</span>
+										<span>Back to claims list</span>
+									</Link>
+								</DropdownMenuItem>
+							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
 			</div>
+
+			<Dialog open={noteOpen} onOpenChange={setNoteOpen}>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Add note</DialogTitle>
+						<DialogDescription>
+							{useLive
+								? "Saved to the linked claim line via metadata.operational_notes."
+								: "Fixture mode — note stays in this browser session only."}
+						</DialogDescription>
+					</DialogHeader>
+					<Textarea
+						value={noteText}
+						onChange={(e) => setNoteText(e.target.value)}
+						placeholder="Write an operational note…"
+						rows={5}
+						className="resize-none text-sm"
+					/>
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button
+							variant="outline"
+							size="sm"
+							className={toolbarBtn}
+							onClick={() => setNoteOpen(false)}
+							disabled={noteSaving}
+						>
+							Cancel
+						</Button>
+						<Button
+							size="sm"
+							className={cn(toolbarBtn, "bg-primary text-primary-foreground")}
+							disabled={noteSaving || !noteText.trim()}
+							onClick={() => void handleSaveNote()}
+						>
+							{noteSaving ? "Saving…" : "Save note"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
 			{/* Metadata strip */}
 			<section className={cn(PANEL, "overflow-hidden")}>
@@ -1883,9 +2309,21 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 				{tab === "Contract & Financials" ? (
 					<ContractFinancialsTab claim={claim} />
 				) : null}
-				{tab === "History" ? <OperationsAuditTab claim={claim} /> : null}
+				{tab === "History" ? (
+					<OperationsAuditTab
+						claim={claim}
+						notes={displayNotes}
+						onAddNote={() => setNoteOpen(true)}
+					/>
+				) : null}
 				{tab === "Documents (2)" ? <DocumentsTab claim={claim} /> : null}
-				{tab === "Notes" ? <NotesTab claim={claim} /> : null}
+				{tab === "Notes" ? (
+					<NotesTab
+						claim={claim}
+						notes={displayNotes}
+						onAddNote={() => setNoteOpen(true)}
+					/>
+				) : null}
 			</div>
 		</div>
 	);
