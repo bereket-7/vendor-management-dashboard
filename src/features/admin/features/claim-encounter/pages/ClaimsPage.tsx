@@ -68,9 +68,11 @@ import {
 	getVendorFile,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
 import {
+	useClaimHeadersLiveQuery,
 	useDeleteClaimLine,
 	useVendorCoreClaimLines,
 } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
+import { claimHeaderDtosToClaimLines } from "@/features/admin/features/claim-encounter/live-claim-headers";
 import { claimLineDtosToClaimLines } from "@/features/admin/features/claim-encounter/live-claims";
 import { CLAIM_LINES } from "@/features/admin/features/claim-encounter/mock-data";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
@@ -256,7 +258,8 @@ export function ClaimsPage() {
 function ClaimsBody({ useLive }: { useLive: boolean }) {
 	const router = useRouter();
 	const program = useAdminModuleStore((s) => s.fileType);
-	const liveQuery = useVendorCoreClaimLines(useLive);
+	const liveLinesQ = useVendorCoreClaimLines(useLive);
+	const liveHeadersQ = useClaimHeadersLiveQuery(useLive);
 	const deleteClaimLine = useDeleteClaimLine();
 
 	const [search, setSearch] = useState("");
@@ -273,7 +276,12 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 
 	const allRows = useMemo(() => {
 		if (useLive) {
-			return claimLineDtosToClaimLines(liveQuery.data ?? [], program).map(
+			const headers = liveHeadersQ.data ?? [];
+			const fromHeaders = claimHeaderDtosToClaimLines(headers, program);
+			if (fromHeaders.length > 0) {
+				return fromHeaders.map(enrichClaim);
+			}
+			return claimLineDtosToClaimLines(liveLinesQ.data ?? [], program).map(
 				enrichClaim
 			);
 		}
@@ -285,7 +293,7 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 			return [showcaseRow(), ...rows];
 		}
 		return rows;
-	}, [useLive, liveQuery.data, program]);
+	}, [useLive, liveHeadersQ.data, liveLinesQ.data, program]);
 
 	const filtered = useMemo(() => {
 		const q = search.trim().toLowerCase();
@@ -383,7 +391,20 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 		(responseStatus !== "all" ? 1 : 0) +
 		(priority !== "all" ? 1 : 0);
 
-	const loading = useLive && liveQuery.isLoading;
+	const loading =
+		useLive &&
+		(liveHeadersQ.isLoading ||
+			((liveHeadersQ.data?.length ?? 0) === 0 && liveLinesQ.isLoading));
+
+	const liveError =
+		useLive && liveHeadersQ.error && liveLinesQ.error
+			? liveLinesQ.error
+			: useLive &&
+				  (liveHeadersQ.data?.length ?? 0) === 0 &&
+				  liveLinesQ.error &&
+				  !liveHeadersQ.isLoading
+				? liveLinesQ.error
+				: null;
 
 	const kpis = [
 		{
@@ -506,7 +527,9 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 	async function handleRefresh() {
 		setRefreshing(true);
 		try {
-			if (useLive) await liveQuery.refetch();
+			if (useLive) {
+				await Promise.all([liveHeadersQ.refetch(), liveLinesQ.refetch()]);
+			}
 			toast.success("Claims refreshed");
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Refresh failed");
@@ -620,13 +643,13 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 				</div>
 			</div>
 
-			{useLive && liveQuery.error ? (
+			{liveError ? (
 				<div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-					Could not load claims: {liveQuery.error.message}
+					Could not load claims: {liveError.message}
 				</div>
 			) : null}
 
-			{useLive && !liveQuery.isLoading && allRows.length === 0 ? (
+			{useLive && !loading && allRows.length === 0 ? (
 				<div className="rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
 					No claim lines yet. Seed with{" "}
 					<code className="rounded bg-muted px-1 py-0.5 text-xs">

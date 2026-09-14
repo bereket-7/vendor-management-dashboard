@@ -44,6 +44,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import {
 	CMS_EDGE_PANEL_CLASS,
 	CMS_EDGE_TABLE_CONTAINER,
@@ -62,8 +63,10 @@ import {
 	formatCount,
 	responsesForProgram,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
+import { useClaimResponsesQuery } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { CLAIM_VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link, useRouter } from "@/i18n/navigation";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -188,8 +191,21 @@ function AcceptBar({ rate }: { rate: number }) {
 }
 
 export function ResponsesPage() {
+	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
+	if (!useFixtures) {
+		return (
+			<VendorCoreGate title="Responses">
+				<ResponsesBody useLive />
+			</VendorCoreGate>
+		);
+	}
+	return <ResponsesBody useLive={false} />;
+}
+
+function ResponsesBody({ useLive }: { useLive: boolean }) {
 	const router = useRouter();
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const liveQuery = useClaimResponsesQuery(useLive);
 	const [search, setSearch] = useState("");
 	const [vendor, setVendor] = useState("all");
 	const [responseType, setResponseType] = useState("all");
@@ -202,10 +218,15 @@ export function ResponsesPage() {
 	const [pageSize, setPageSize] = useState(10);
 	const [refreshing, setRefreshing] = useState(false);
 
-	const base = useMemo(
-		() => responsesForProgram(programFilter),
-		[programFilter]
-	);
+	const base = useMemo(() => {
+		if (useLive) {
+			const rows = liveQuery.data ?? [];
+			return rows.filter(
+				(r) => !r.program || r.program === programFilter
+			) as ClaimResponse[];
+		}
+		return responsesForProgram(programFilter);
+	}, [useLive, liveQuery.data, programFilter]);
 	const vendors = CLAIM_VENDOR_NAMES;
 
 	const filtered = useMemo(() => {

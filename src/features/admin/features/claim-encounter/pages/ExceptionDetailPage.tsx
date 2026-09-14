@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 
 import { ArrowLeft, Download, Eye, FileText, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -15,8 +16,13 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import {
+	assignClaimException,
+	resolveClaimException,
+} from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
 import { useClaimExceptionsQuery } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { Link } from "@/i18n/navigation";
+import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 function DetailRows({
@@ -61,6 +67,8 @@ export function ExceptionDetailPage() {
 	const exception = (exceptionsQ.data ?? []).find(
 		(row) => row.id === decodeURIComponent(exceptionId)
 	);
+	const [busy, setBusy] = useState(false);
+	const useLive = !(isMockEnabled() || isClaimVendorFilesMockEnabled());
 
 	if (!exception) {
 		return (
@@ -76,6 +84,42 @@ export function ExceptionDetailPage() {
 	}
 
 	const isError = exception.severity === "error";
+	const exceptionKey = exception.id;
+	const resolutionNotes = exception.resolutionNotes || undefined;
+
+	async function handleAssign() {
+		if (!useLive) {
+			toast.message("Assignment opened");
+			return;
+		}
+		setBusy(true);
+		try {
+			await assignClaimException(exceptionKey, { assigned_to_id: null });
+			toast.success("Exception assignment updated");
+			await exceptionsQ.refetch();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Assign failed");
+		} finally {
+			setBusy(false);
+		}
+	}
+
+	async function handleResolve() {
+		if (!useLive) {
+			toast.success("Exception marked resolved");
+			return;
+		}
+		setBusy(true);
+		try {
+			await resolveClaimException(exceptionKey, resolutionNotes);
+			toast.success("Exception marked resolved");
+			await exceptionsQ.refetch();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Resolve failed");
+		} finally {
+			setBusy(false);
+		}
+	}
 
 	return (
 		<div className="space-y-4">
@@ -134,7 +178,8 @@ export function ExceptionDetailPage() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => toast.message("Assignment opened")}
+						disabled={busy}
+						onClick={() => void handleAssign()}
 					>
 						<UserRound className="mr-1.5 size-3.5" /> Assign
 					</Button>
@@ -367,7 +412,7 @@ export function ExceptionDetailPage() {
 							["Resolved Date", "—"],
 						]}
 					/>
-					<Button onClick={() => toast.success("Exception marked resolved")}>
+					<Button disabled={busy} onClick={() => void handleResolve()}>
 						Mark Resolved
 					</Button>
 				</div>
