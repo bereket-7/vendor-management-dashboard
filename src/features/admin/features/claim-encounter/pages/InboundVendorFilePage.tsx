@@ -1,17 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	AlertTriangle,
 	ArrowUpDown,
 	CheckCircle2,
 	ClipboardList,
 	Clock3,
+	Download,
 	FileSearch,
 	Hourglass,
 	RefreshCw,
 	ScrollText,
+	Send,
 	XCircle,
 } from "lucide-react";
 import {
@@ -63,20 +66,31 @@ import {
 } from "@/features/admin/features/claim-encounter/components/ClaimQueueChrome";
 import {
 	type ClaimVendorFile,
-	filesForProgram,
+	type ClaimVendorFileListParams,
 	formatCount,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
+import {
+	useClaimVendorFilesSummaryQuery,
+	useExportClaimVendorFilesCsvMutation,
+	useInboundVendorQueueQuery,
+	useSeedInboundVendorQueueMutation,
+} from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 import { Link } from "@/i18n/navigation";
+import { downloadBlob, stampFilename } from "@/lib/export/csv";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 type SortKey = "receivedAt" | "records" | "vendor" | "wait";
 
-const SLA_HOURS = 48;
+/** Align wait chips / SLA with BE summary age_buckets.over_3d (72h). */
+const SLA_HOURS = 72;
 
 export function InboundVendorFilePage() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const queryClient = useQueryClient();
 	const [vendor, setVendor] = useState("all");
 	const [fileType, setFileType] = useState("all");
 	const [statusFilter, setStatusFilter] = useState<
@@ -89,16 +103,104 @@ export function InboundVendorFilePage() {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 	const [refreshing, setRefreshing] = useState(false);
+	/** Persist vendor UUID by display name across filtered fetches. */
+	const [vendorIdByName, setVendorIdByName] = useState<Record<string, string>>(
+		{}
+	);
+
+	const listApiParams = useMemo((): ClaimVendorFileListParams | undefined => {
+		if (isMockEnabled()) return undefined;
+		const params: ClaimVendorFileListParams = {
+			limit: 100,
+			offset: 0,
+			direction: "inbound",
+		};
+		const q = search.trim();
+		if (q) params.search = q;
+		if (statusFilter === "pending") params.review_status = "pending";
+		else if (statusFilter === "rejected") params.review_status = "rejected";
+		const vid = vendor !== "all" ? vendorIdByName[vendor] : undefined;
+		if (vid) params.vendor_id = vid;
+		if (waitBucket === "fresh") params.wait_bucket = "under_24h";
+		else if (waitBucket === "aging") params.wait_bucket = "day_1_to_3";
+		else if (waitBucket === "sla") params.wait_bucket = "over_3d";
+		if (sortKey === "receivedAt" || sortKey === "wait") {
+			// ListOrderingMixin allowlist is created_at/updated_at/deleted_at only
+			// (FilterSet also supports received_at once query serializer is extended).
+			params.order_by = sortDir === "asc" ? "created_at" : "-created_at";
+		}
+		return params;
+	}, [
+		search,
+		statusFilter,
+		vendor,
+		vendorIdByName,
+		waitBucket,
+		sortKey,
+		sortDir,
+	]);
+
+	const summaryApiParams = useMemo(():
+		| ClaimVendorFileListParams
+		| undefined => {
+		if (isMockEnabled()) return undefined;
+		const params: ClaimVendorFileListParams = { direction: "inbound" };
+		const q = search.trim();
+		if (q) params.search = q;
+		if (statusFilter === "pending") params.review_status = "pending";
+		else if (statusFilter === "rejected") params.review_status = "rejected";
+		const vid = vendor !== "all" ? vendorIdByName[vendor] : undefined;
+		if (vid) params.vendor_id = vid;
+		if (waitBucket === "fresh") params.wait_bucket = "under_24h";
+		else if (waitBucket === "aging") params.wait_bucket = "day_1_to_3";
+		else if (waitBucket === "sla") params.wait_bucket = "over_3d";
+		return params;
+	}, [search, statusFilter, vendor, vendorIdByName, waitBucket]);
+
+	const queueQuery = useInboundVendorQueueQuery(programFilter, listApiParams);
+	const summaryQuery = useClaimVendorFilesSummaryQuery(
+		!isMockEnabled(),
+		summaryApiParams
+	);
+	const seedMutation = useSeedInboundVendorQueueMutation();
+	const exportMutation = useExportClaimVendorFilesCsvMutation();
 
 	/** Inbound = pending review + MFC-rejected (held for vendor correction). */
 	const inboundQueue = useMemo(
-		() => filesForProgram(programFilter, "inbound"),
-		[programFilter]
+		() => queueQuery.data?.inbound ?? ([] as ClaimVendorFile[]),
+		[queueQuery.data?.inbound]
 	);
+
+	useEffect(() => {
+		const next: Record<string, string> = {};
+		for (const f of inboundQueue) {
+			if (f.vendor && f.vendor !== "—" && f.vendorId) {
+				next[f.vendor] = f.vendorId;
+			}
+		}
+		if (Object.keys(next).length === 0) return;
+		setVendorIdByName((prev) => {
+			let changed = false;
+			const merged = { ...prev };
+			for (const [name, id] of Object.entries(next)) {
+				if (merged[name] !== id) {
+					merged[name] = id;
+					changed = true;
+				}
+			}
+			return changed ? merged : prev;
+		});
+	}, [inboundQueue]);
 	const allOutbound = useMemo(
-		() => filesForProgram(programFilter, "outbound"),
-		[programFilter]
+		() => queueQuery.data?.outbound ?? ([] as ClaimVendorFile[]),
+		[queueQuery.data?.outbound]
 	);
+	const outboundAvailable =
+		queueQuery.data?.outboundAvailable ?? isMockEnabled();
+	const openExceptionCount = queueQuery.data?.openExceptionCount ?? 0;
+	const monitoring = queueQuery.data?.monitoring ?? null;
+	const ediCompletion = queueQuery.data?.ediCompletion ?? null;
+
 	const pending = useMemo(
 		() => inboundQueue.filter((f) => f.reviewStatus === "pending"),
 		[inboundQueue]
@@ -108,7 +210,60 @@ export function InboundVendorFilePage() {
 		[inboundQueue]
 	);
 
-	const vendors = VENDOR_NAMES;
+	const statusCounts = useMemo(() => {
+		const byReview = summaryQuery.data?.by_review_status;
+		if (byReview && Object.keys(byReview).length > 0) {
+			return {
+				all:
+					summaryQuery.data?.total_files ??
+					Object.values(byReview).reduce((s, n) => s + Number(n), 0),
+				pending: Number(
+					byReview.pending ??
+						summaryQuery.data?.awaiting_review ??
+						pending.length
+				),
+				rejected: Number(
+					byReview.rejected ?? summaryQuery.data?.rejected ?? rejectedIn.length
+				),
+			};
+		}
+		const byStatus = summaryQuery.data?.by_status;
+		if (byStatus && Object.keys(byStatus).length > 0) {
+			const pendingFromStatus =
+				Number(byStatus.received ?? 0) +
+				Number(byStatus.processing ?? 0) +
+				Number(byStatus.pending ?? 0);
+			return {
+				all:
+					summaryQuery.data?.total_files ??
+					Object.values(byStatus).reduce((s, n) => s + Number(n), 0),
+				pending: pendingFromStatus || pending.length,
+				rejected: Number(
+					byStatus.rejected ?? summaryQuery.data?.rejected ?? rejectedIn.length
+				),
+			};
+		}
+		return {
+			all: inboundQueue.length,
+			pending: pending.length,
+			rejected: rejectedIn.length,
+		};
+	}, [
+		summaryQuery.data,
+		inboundQueue.length,
+		pending.length,
+		rejectedIn.length,
+	]);
+
+	const vendors = useMemo(() => {
+		if (isMockEnabled()) return [...VENDOR_NAMES];
+		const fromRows = Array.from(
+			new Set(inboundQueue.map((f) => f.vendor).filter((v) => v && v !== "—"))
+		).sort();
+		const known = Object.keys(vendorIdByName).sort();
+		const merged = Array.from(new Set([...fromRows, ...known]));
+		return merged.length > 0 ? merged : [];
+	}, [inboundQueue, vendorIdByName]);
 	const fileTypes = useMemo(
 		() => Array.from(new Set(inboundQueue.map((f) => f.fileTypeLabel))).sort(),
 		[inboundQueue]
@@ -166,6 +321,19 @@ export function InboundVendorFilePage() {
 		const waits = awaiting.map((f) => hoursSince(f.receivedAt));
 		const claimsPending = awaiting.reduce((s, f) => s + f.records, 0);
 		const claimsRejected = rejectedIn.reduce((s, f) => s + f.rejected, 0);
+		const buckets = summaryQuery.data?.age_buckets;
+		const under24 =
+			buckets?.under_24h ??
+			awaiting.filter((f) => hoursSince(f.receivedAt) < 24).length;
+		const day1to3 =
+			buckets?.day_1_to_3 ??
+			awaiting.filter((f) => {
+				const h = hoursSince(f.receivedAt);
+				return h >= 24 && h < SLA_HOURS;
+			}).length;
+		const over3d =
+			buckets?.over_3d ??
+			awaiting.filter((f) => hoursSince(f.receivedAt) >= SLA_HOURS).length;
 		const slaRisk = awaiting.filter(
 			(f) => hoursSince(f.receivedAt) >= SLA_HOURS
 		);
@@ -181,37 +349,44 @@ export function InboundVendorFilePage() {
 		)[0];
 		const largest = [...awaiting].sort((a, b) => b.records - a.records)[0];
 
-		const byVendor = Object.entries(
-			inboundQueue.reduce<Record<string, { files: number; claims: number }>>(
-				(acc, f) => {
-					const cur = acc[f.vendor] ?? { files: 0, claims: 0 };
-					cur.files += 1;
-					cur.claims += f.records;
-					acc[f.vendor] = cur;
-					return acc;
-				},
-				{}
-			)
-		)
-			.map(([name, v]) => ({ name, ...v }))
-			.sort((a, b) => b.claims - a.claims);
+		const nameByVendorId = new Map<string, string>();
+		for (const f of inboundQueue) {
+			if (f.vendorId && f.vendor && f.vendor !== "—") {
+				nameByVendorId.set(f.vendorId, f.vendor);
+			}
+		}
+		for (const [name, id] of Object.entries(vendorIdByName)) {
+			if (!nameByVendorId.has(id)) nameByVendorId.set(id, name);
+		}
+
+		const summaryByVendor = summaryQuery.data?.by_vendor;
+		const byVendor =
+			summaryByVendor && Object.keys(summaryByVendor).length > 0
+				? Object.entries(summaryByVendor)
+						.map(([id, files]) => ({
+							name: nameByVendorId.get(id) ?? id.slice(0, 8),
+							files: Number(files),
+							claims: Number(files),
+						}))
+						.sort((a, b) => b.files - a.files)
+				: Object.entries(
+						inboundQueue.reduce<
+							Record<string, { files: number; claims: number }>
+						>((acc, f) => {
+							const cur = acc[f.vendor] ?? { files: 0, claims: 0 };
+							cur.files += 1;
+							cur.claims += f.records;
+							acc[f.vendor] = cur;
+							return acc;
+						}, {})
+					)
+						.map(([name, v]) => ({ name, ...v }))
+						.sort((a, b) => b.claims - a.claims);
 
 		const ageBuckets = [
-			{
-				name: "< 24h",
-				files: awaiting.filter((f) => hoursSince(f.receivedAt) < 24).length,
-				fill: "#0ea5e9",
-			},
-			{
-				name: "24–48h",
-				files: aging.length,
-				fill: "#f59e0b",
-			},
-			{
-				name: `≥ ${SLA_HOURS}h SLA`,
-				files: slaRisk.length,
-				fill: "#ef4444",
-			},
+			{ name: "< 24h", files: under24, fill: "#0ea5e9" },
+			{ name: "1–3 days", files: day1to3, fill: "#f59e0b" },
+			{ name: "≥ 3 days", files: over3d, fill: "#ef4444" },
 		];
 
 		const acceptedOut = allOutbound.filter(
@@ -237,9 +412,20 @@ export function InboundVendorFilePage() {
 			acceptedOut,
 			deniedOut,
 			acceptRate,
-			maxVendorClaims: Math.max(1, ...byVendor.map((v) => v.claims)),
+			maxVendorClaims: Math.max(1, ...byVendor.map((v) => v.claims || v.files)),
+			under24,
+			day1to3,
+			over3d,
+			totalFiles: summaryQuery.data?.total_files ?? inboundQueue.length,
 		};
-	}, [pending, rejectedIn, inboundQueue, allOutbound]);
+	}, [
+		pending,
+		rejectedIn,
+		inboundQueue,
+		allOutbound,
+		summaryQuery.data,
+		vendorIdByName,
+	]);
 
 	const hasActiveFilters =
 		statusFilter !== "all" ||
@@ -272,30 +458,77 @@ export function InboundVendorFilePage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		await new Promise((r) => setTimeout(r, 400));
-		setRefreshing(false);
-		toast.success("Inbound queue refreshed");
+		try {
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey("claim-encounter", "inbound-vendor-queue"),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey("claim-encounter", "vendor-files"),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey("claim-encounter", "vendor-files-summary"),
+			});
+			toast.success("Inbound queue refreshed");
+		} catch {
+			toast.error("Refresh failed");
+		} finally {
+			setRefreshing(false);
+		}
+	}
+
+	async function handleSeedDemo() {
+		try {
+			const result = await seedMutation.mutateAsync({ force: true });
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey("claim-encounter", "inbound-vendor-queue"),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey("claim-encounter", "vendor-files"),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: featureQueryKey("claim-encounter", "vendor-files-summary"),
+			});
+			const created =
+				typeof result.result.created === "number"
+					? result.result.created
+					: undefined;
+			toast.success(
+				created != null
+					? `Seeded ${created} via ${result.source}`
+					: `Seeded via ${result.source}`
+			);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Seed demo failed");
+		}
 	}
 
 	const kpis = [
 		{
 			label: "Awaiting review",
-			value: formatCount(pending.length),
+			value: formatCount(
+				summaryQuery.data?.by_review_status?.pending ??
+					summaryQuery.data?.awaiting_review ??
+					pending.length
+			),
 			hint: `${formatCount(analytics.claimsPending)} claims`,
 			icon: Clock3,
 			tone: "text-amber-700 bg-amber-500/10",
 		},
 		{
 			label: "MFC rejected",
-			value: formatCount(rejectedIn.length),
+			value: formatCount(
+				summaryQuery.data?.by_review_status?.rejected ??
+					summaryQuery.data?.rejected ??
+					rejectedIn.length
+			),
 			hint: `${formatCount(analytics.claimsRejected)} claims · vendor rework`,
 			icon: XCircle,
 			tone: "text-red-700 bg-red-500/10",
 		},
 		{
-			label: "SLA risk",
-			value: formatCount(analytics.slaRisk.length),
-			hint: `Pending waiting ≥ ${SLA_HOURS}h`,
+			label: "Age risk (≥3d)",
+			value: formatCount(analytics.over3d),
+			hint: "Summary age_buckets.over_3d",
 			icon: AlertTriangle,
 			tone: "text-red-700 bg-red-500/10",
 		},
@@ -307,40 +540,149 @@ export function InboundVendorFilePage() {
 			tone: "text-orange-700 bg-orange-500/10",
 		},
 		{
-			label: "Accepted out",
-			value: formatCount(analytics.acceptedOut.length),
-			hint: "Moved to outbound",
+			label: "Accepted (review)",
+			value: formatCount(
+				summaryQuery.data?.by_review_status?.accepted ??
+					summaryQuery.data?.accepted ??
+					0
+			),
+			hint: "Inbound MFC accepted — not outbound packages",
 			icon: CheckCircle2,
 			tone: "text-emerald-700 bg-emerald-500/10",
 		},
 		{
-			label: "Denied out",
-			value: formatCount(analytics.deniedOut.length),
-			hint: "Gainwell denials",
-			icon: XCircle,
-			tone: "text-rose-700 bg-rose-500/10",
+			label: "Outbound sent",
+			value: outboundAvailable
+				? formatCount(analytics.acceptedOut.length)
+				: "—",
+			hint: outboundAvailable
+				? "direction=outbound packages"
+				: "Outbound packages not in core yet",
+			icon: Send,
+			tone: "text-sky-700 bg-sky-500/10",
 		},
 	];
 
-	return (
-		<div className="space-y-4">
-			<ClaimPageHeader
-				title="Inbound Vendor File"
-				description={`Pending review + MFC-rejected (vendor correction) · ${programFilter}`}
-				actions={
-					<div className="flex flex-wrap gap-1.5">
-						<Button asChild variant="outline" size="sm" className="h-9">
-							<Link href="/admin/claim-encounter/outbound">View outbound</Link>
-						</Button>
+	async function handleExportCsv() {
+		if (isMockEnabled()) {
+			toast.message("Export CSV is live-mode only.");
+			return;
+		}
+		try {
+			const result = await exportMutation.mutateAsync(summaryApiParams);
+			downloadBlob(
+				result.filename ?? stampFilename("claim-vendor-files"),
+				result.blob
+			);
+			toast.success("Vendor files CSV downloaded");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Export failed");
+		}
+	}
+
+	if (queueQuery.isLoading) {
+		return (
+			<div className="space-y-4">
+				<ClaimPageHeader
+					title="Inbound Vendor File"
+					description={`Loading queue · ${programFilter}`}
+				/>
+				<p className="text-sm text-muted-foreground">Loading inbound files…</p>
+			</div>
+		);
+	}
+
+	if (queueQuery.isError) {
+		return (
+			<div className="space-y-4">
+				<ClaimPageHeader
+					title="Inbound Vendor File"
+					description={`Pending review · ${programFilter}`}
+					actions={
 						<Button
 							variant="outline"
 							size="sm"
 							className="h-9"
 							onClick={handleRefresh}
-							disabled={refreshing}
+						>
+							<RefreshCw className="mr-1.5 size-3.5" />
+							Retry
+						</Button>
+					}
+				/>
+				<p className="text-sm text-destructive">
+					Could not load inbound vendor files.
+					{queueQuery.error instanceof Error
+						? ` ${queueQuery.error.message}`
+						: ""}
+				</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="space-y-4">
+			<ClaimPageHeader
+				title="Inbound Vendor File"
+				description={
+					<span className="inline-flex flex-wrap items-center gap-x-1">
+						<span>
+							Pending review + MFC-rejected (vendor correction) ·{" "}
+							{programFilter}
+						</span>
+						{openExceptionCount > 0 && !isMockEnabled() ? (
+							<>
+								<span>·</span>
+								<Link
+									href="/admin/claim-encounter/exceptions"
+									className="font-medium text-amber-800 underline-offset-2 hover:underline"
+								>
+									{formatCount(openExceptionCount)} open exceptions
+								</Link>
+							</>
+						) : null}
+					</span>
+				}
+				actions={
+					<div className="flex flex-wrap gap-1.5">
+						<Button asChild variant="outline" size="sm" className="h-9">
+							<Link href="/admin/claim-encounter/outbound">View outbound</Link>
+						</Button>
+						{!isMockEnabled() ? (
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-9"
+								disabled={exportMutation.isPending}
+								onClick={() => void handleExportCsv()}
+							>
+								<Download className="mr-1.5 size-3.5" />
+								{exportMutation.isPending ? "Exporting…" : "Export CSV"}
+							</Button>
+						) : null}
+						{!isMockEnabled() ? (
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-9"
+								onClick={handleSeedDemo}
+								disabled={seedMutation.isPending}
+							>
+								{seedMutation.isPending ? "Seeding…" : "Seed demo"}
+							</Button>
+						) : null}
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-9"
+							onClick={handleRefresh}
+							disabled={refreshing || queueQuery.isFetching}
 						>
 							<RefreshCw
-								className={cn("mr-1.5 size-3.5", refreshing && "animate-spin")}
+								className={cn(
+									"mr-1.5 size-3.5",
+									(refreshing || queueQuery.isFetching) && "animate-spin"
+								)}
 							/>
 							Refresh
 						</Button>
@@ -350,19 +692,102 @@ export function InboundVendorFilePage() {
 
 			<ClaimKpiGrid items={kpis} />
 
+			{!isMockEnabled() && (monitoring || ediCompletion) ? (
+				<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
+						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+							Intake stages
+						</p>
+						<p className="mt-0.5 text-sm font-semibold tabular-nums">
+							{Array.isArray(monitoring?.inbound_file_stages)
+								? (
+										monitoring.inbound_file_stages as { count?: number }[]
+									).reduce((s, r) => s + Number(r.count ?? 0), 0)
+								: "—"}
+						</p>
+						<p className="text-[11px] text-muted-foreground">
+							From GET /monitoring/
+						</p>
+					</div>
+					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
+						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+							Active intake jobs
+						</p>
+						<p className="mt-0.5 text-sm font-semibold tabular-nums">
+							{Array.isArray(monitoring?.active_jobs)
+								? (monitoring.active_jobs as unknown[]).length
+								: "—"}
+						</p>
+						<p className="text-[11px] text-muted-foreground">
+							{Array.isArray(monitoring?.recent_runs)
+								? `${(monitoring.recent_runs as unknown[]).length} recent runs`
+								: "No recent runs"}
+						</p>
+					</div>
+					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
+						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+							EDI types tracked
+						</p>
+						<p className="mt-0.5 text-sm font-semibold tabular-nums">
+							{Array.isArray(ediCompletion?.by_type)
+								? (ediCompletion.by_type as unknown[]).length
+								: "—"}
+						</p>
+						<p className="text-[11px] text-muted-foreground">
+							GET /intake/completion/edi/
+						</p>
+					</div>
+					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
+						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+							EDI completion (top)
+						</p>
+						<p className="mt-0.5 truncate text-sm font-semibold">
+							{Array.isArray(ediCompletion?.by_type) &&
+							(
+								ediCompletion.by_type as {
+									detected_type?: string;
+									completion_percent?: number;
+								}[]
+							).length > 0
+								? (() => {
+										const top = (
+											ediCompletion.by_type as {
+												detected_type?: string;
+												completion_percent?: number;
+											}[]
+										)[0]!;
+										return `${top.detected_type ?? "—"} · ${
+											top.completion_percent != null
+												? `${Math.round(Number(top.completion_percent))}%`
+												: "—"
+										}`;
+									})()
+								: "—"}
+						</p>
+						<p className="text-[11px] text-muted-foreground">
+							First by_type row
+						</p>
+					</div>
+				</div>
+			) : null}
+
 			{/* Review queue — directly under stats */}
 			<div className="flex flex-wrap gap-1.5">
 				{[
 					{
 						id: "all" as const,
 						label: "All inbound",
-						count: inboundQueue.length,
+						count: statusCounts.all,
 					},
-					{ id: "pending" as const, label: "Pending", count: pending.length },
+					{
+						id: "pending" as const,
+						label: "Pending",
+						count: statusCounts.pending,
+					},
 					{
 						id: "rejected" as const,
 						label: "Rejected",
-						count: rejectedIn.length,
+						count: statusCounts.rejected,
 					},
 				].map((chip) => (
 					<button
@@ -386,21 +811,25 @@ export function InboundVendorFilePage() {
 				<span className="mx-1 h-4 w-px bg-border/70" />
 				{(
 					[
-						{ id: "all", label: "Any age", count: pending.length },
+						{
+							id: "all",
+							label: "Any age",
+							count: analytics.under24 + analytics.day1to3 + analytics.over3d,
+						},
 						{
 							id: "fresh",
 							label: "< 24h",
-							count: analytics.ageBuckets[0]?.files ?? 0,
+							count: analytics.under24,
 						},
 						{
 							id: "aging",
-							label: "24–48h",
-							count: analytics.ageBuckets[1]?.files ?? 0,
+							label: "1–3 days",
+							count: analytics.day1to3,
 						},
 						{
 							id: "sla",
-							label: "SLA risk",
-							count: analytics.slaRisk.length,
+							label: "≥ 3 days",
+							count: analytics.over3d,
 						},
 					] as const
 				).map((chip) => (
@@ -573,7 +1002,22 @@ export function InboundVendorFilePage() {
 											colSpan={8}
 											className="h-24 text-center text-muted-foreground"
 										>
-											No inbound files match the current filters.
+											{inboundQueue.length === 0 && !isMockEnabled() ? (
+												<span>
+													No claim vendor files in core yet. Click{" "}
+													<button
+														type="button"
+														className="font-medium text-primary underline-offset-2 hover:underline"
+														onClick={handleSeedDemo}
+														disabled={seedMutation.isPending}
+													>
+														Seed demo
+													</button>{" "}
+													to load the review queue.
+												</span>
+											) : (
+												"No inbound files match the current filters."
+											)}
 										</TableCell>
 									</TableRow>
 								)}
@@ -635,14 +1079,14 @@ export function InboundVendorFilePage() {
 									"flex w-full items-center justify-between rounded-md px-2 py-1 text-xs hover:bg-muted/50",
 									waitBucket !== "all" &&
 										((waitBucket === "fresh" && b.name.startsWith("<")) ||
-											(waitBucket === "aging" && b.name.startsWith("24")) ||
-											(waitBucket === "sla" && b.name.includes("SLA"))) &&
+											(waitBucket === "aging" && b.name.includes("1–3")) ||
+											(waitBucket === "sla" && b.name.includes("3 days"))) &&
 										"bg-muted/60"
 								)}
 								onClick={() => {
 									const next = b.name.startsWith("<")
 										? "fresh"
-										: b.name.startsWith("24")
+										: b.name.includes("1–3")
 											? "aging"
 											: "sla";
 									setWaitBucket((cur) => (cur === next ? "all" : next));
@@ -682,14 +1126,9 @@ export function InboundVendorFilePage() {
 									width={78}
 									tick={{ fontSize: 11 }}
 								/>
-								<Tooltip
-									formatter={(value: number, name: string) => [
-										value,
-										name === "claims" ? "Claims" : "Files",
-									]}
-								/>
+								<Tooltip formatter={(value: number) => [value, "Files"]} />
 								<Bar
-									dataKey="claims"
+									dataKey="files"
 									radius={[0, 4, 4, 0]}
 									cursor="pointer"
 									onClick={(data) => {
@@ -757,10 +1196,19 @@ export function InboundVendorFilePage() {
 									Outbound accept rate
 								</span>
 								<span className="font-semibold tabular-nums">
-									{analytics.acceptRate}%
+									{outboundAvailable ? `${analytics.acceptRate}%` : "—"}
 								</span>
 							</div>
-							<Progress value={analytics.acceptRate} className="mt-1.5 h-1.5" />
+							{outboundAvailable ? (
+								<Progress
+									value={analytics.acceptRate}
+									className="mt-1.5 h-1.5"
+								/>
+							) : (
+								<p className="mt-1.5 text-[11px] text-muted-foreground">
+									Outbound packages not in core yet
+								</p>
+							)}
 						</div>
 					</div>
 				</ClaimSectionCard>
@@ -807,9 +1255,9 @@ export function InboundVendorFilePage() {
 							>
 								<MetricBar
 									label={v.name}
-									value={v.claims}
+									value={v.files}
 									max={analytics.maxVendorClaims}
-									suffix="claims"
+									suffix="files"
 									tone={vendor === v.name ? "bg-primary" : "bg-primary/50"}
 								/>
 							</button>
@@ -829,7 +1277,7 @@ export function InboundVendorFilePage() {
 								Inbound files
 							</p>
 							<p className="text-lg font-semibold tabular-nums">
-								{formatCount(inboundQueue.length)}
+								{formatCount(analytics.totalFiles)}
 							</p>
 						</div>
 						<div className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2">

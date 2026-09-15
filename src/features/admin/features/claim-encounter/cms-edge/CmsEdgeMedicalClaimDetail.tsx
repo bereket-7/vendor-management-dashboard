@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -38,17 +38,26 @@ import {
 	CMS_EDGE_TABLE_CLASS,
 	CMS_EDGE_TABLE_CONTAINER,
 	CMS_EDGE_TABLE_HEAD_CLASS,
-	CmsEdgePairRow,
 	CmsEdgeSectionPanel,
 	CmsEdgeSplitRow,
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
+	useCmsEdgeMedicalClaimDetailQuery,
+	useReplaceMedicalClaimHeaderMutation,
+	useVoidMedicalClaimHeaderMutation,
+} from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import type { CmsEdgeMedicalClaimDetailView } from "@/features/admin/features/claim-encounter/cms-edge/live-medical-claims";
+import {
 	CMS_EDGE_MEDICAL_CLAIM_DETAIL,
 	MEDICAL_CLAIM_DETAIL_STATUS_STYLES,
 	MEDICAL_CLAIM_LINE_VALIDATION_STYLES,
 	MEDICAL_CLAIM_TXN_STYLES,
+	type MedicalClaimDetailCmsStatus,
+	type MedicalClaimLineValidation,
+	type MedicalClaimTransaction,
 } from "@/features/admin/features/claim-encounter/cms-edge/mock-data";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const DETAIL_TAB_TRIGGER =
@@ -91,8 +100,109 @@ function formatCurrency(value: number) {
 	});
 }
 
-function ClaimHeaderPanel() {
-	const d = CMS_EDGE_MEDICAL_CLAIM_DETAIL;
+type MedicalClaimDetail = typeof CMS_EDGE_MEDICAL_CLAIM_DETAIL;
+
+function mapDetailCmsStatus(status: string): MedicalClaimDetailCmsStatus {
+	if (status === "CMS Ready" || status === "Ready") return "CMS Ready";
+	if (status === "Error") return "Error";
+	if (status === "Warning") return "Warning";
+	return "Draft";
+}
+
+function mapDetailTransaction(txn: string): MedicalClaimTransaction {
+	if (txn === "Void" || txn === "Replacement" || txn === "Original") {
+		return txn;
+	}
+	return "Original";
+}
+
+function mapLineValidation(value: string): MedicalClaimLineValidation {
+	if (value === "Error") return "Error";
+	if (value === "Warning") return "Warning";
+	return "Passed";
+}
+
+function mergeMedicalClaimDetail(
+	live: CmsEdgeMedicalClaimDetailView
+): MedicalClaimDetail {
+	const mappedLines = live.lines.map((l) => ({
+		id: l.id,
+		line: l.line,
+		serviceFrom: l.serviceFrom,
+		serviceTo: l.serviceTo,
+		revenueCode: l.revenueCode,
+		serviceQualifier: "HC" as const,
+		procedureCode: l.procedureCode,
+		modifiers: l.modifiers,
+		placeOfService: l.placeOfService,
+		renderingNpi: l.renderingNpi,
+		allowed: l.allowed,
+		planPaid: l.planPaid,
+		validation: mapLineValidation(l.validation),
+		warning: null,
+	}));
+	const warnings = mappedLines.filter((l) => l.validation === "Warning").length;
+	const errors = mappedLines.filter((l) => l.validation === "Error").length;
+	const passed = mappedLines.filter((l) => l.validation === "Passed").length;
+	const cmsStatus = mapDetailCmsStatus(live.cmsStatus);
+	const transaction = mapDetailTransaction(live.transaction);
+
+	return {
+		id: live.id,
+		claimId: live.claimId,
+		cmsStatus,
+		transaction,
+		summary: live.summary.map((s) => ({
+			label: s.label,
+			value: s.value,
+			icon: s.icon as MedicalClaimDetail["summary"][number]["icon"],
+			...(s.label === "Unique Enrollee ID"
+				? { link: "View Member" as const }
+				: {}),
+		})),
+		headerLeft: live.headerLeft.map((f) => ({
+			label: f.label,
+			value: f.value,
+		})),
+		headerRight: live.headerRight.map((f) => ({
+			label: f.label,
+			value: f.value,
+		})),
+		lines: mappedLines,
+		lineTotals: live.lineTotals,
+		cmsValidation: {
+			passed,
+			warnings,
+			errors,
+			warningDetail: {
+				title:
+					warnings > 0 ? "Line validation warnings" : "No validation warnings",
+				affectedField: "—",
+				affectedLine: warnings > 0 ? "See lines below" : "—",
+				cmsCode: "—",
+				severity: warnings > 0 ? "Warning" : "—",
+				message:
+					warnings > 0
+						? "Review flagged claim lines in the table below."
+						: "No validation warnings on loaded claim lines.",
+			},
+		},
+		transactionHistory: [
+			{
+				id: `${live.id}-txn-current`,
+				transaction,
+				claimId: live.claimId,
+				originalClaimId: "—",
+				date: "—",
+				cmsStatus,
+			},
+		],
+		submissionHistory: [],
+	} as unknown as MedicalClaimDetail;
+}
+
+function ClaimHeaderPanel({ claim }: { claim: MedicalClaimDetail }) {
+	const d = claim;
 	return (
 		<CmsEdgeSectionPanel title="1. Claim Header" bodyClassName="px-4 py-4">
 			<div className="grid gap-x-10 gap-y-3 sm:grid-cols-2">
@@ -125,10 +235,10 @@ function ClaimHeaderPanel() {
 	);
 }
 
-function ClaimLinesPanel() {
+function ClaimLinesPanel({ claim }: { claim: MedicalClaimDetail }) {
 	const [expandedLine, setExpandedLine] = useState<string | null>("line-3");
-	const lines = CMS_EDGE_MEDICAL_CLAIM_DETAIL.lines;
-	const totals = CMS_EDGE_MEDICAL_CLAIM_DETAIL.lineTotals;
+	const lines = claim.lines;
+	const totals = claim.lineTotals;
 
 	return (
 		<CmsEdgeSectionPanel title="2. Medical Claim Lines" bodyClassName="pb-2">
@@ -317,11 +427,190 @@ function ClaimLinesPanel() {
 	);
 }
 
-function CmsValidationSidebar() {
+function MedicalFinancialPanel({ claim }: { claim: MedicalClaimDetail }) {
+	const totals = claim.lineTotals;
+	const difference = totals.allowed - totals.planPaid;
+	const balanced = difference >= 0;
+	return (
+		<CmsEdgeSectionPanel title="3. Financial Information" bodyClassName="p-4">
+			<div className="overflow-hidden rounded-lg border border-sky-200/80 bg-sky-50/50">
+				<div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+					{[
+						{ label: "Total Allowed", value: formatCurrency(totals.allowed) },
+						{
+							label: "Plan Paid Amount",
+							value: formatCurrency(totals.planPaid),
+						},
+						{
+							label: "Member / Other Responsibility",
+							value: formatCurrency(difference),
+						},
+						{
+							label: "Financial Difference",
+							value: formatCurrency(Math.abs(difference)),
+						},
+					].map((item) => (
+						<div key={item.label}>
+							<p className="text-[11px] text-muted-foreground">{item.label}</p>
+							<p className="mt-1 text-base font-semibold tabular-nums text-sky-900">
+								{item.value}
+							</p>
+						</div>
+					))}
+				</div>
+				<div className="flex flex-wrap items-center gap-3 border-t border-sky-200/70 bg-card px-4 py-2.5 text-xs">
+					<span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
+						<CheckCircle2 className="size-3.5" />
+						Line totals from medical claim lines
+					</span>
+					<span className="font-mono tabular-nums text-muted-foreground">
+						{formatCurrency(totals.allowed)} = {formatCurrency(totals.planPaid)}{" "}
+						+ {formatCurrency(difference)}
+					</span>
+					<span className="ml-auto">
+						<StatusPill
+							label={`Status: ${balanced ? "Balanced" : "Review"}`}
+							className="border-emerald-200/80 bg-emerald-50 text-emerald-800"
+						/>
+					</span>
+				</div>
+			</div>
+		</CmsEdgeSectionPanel>
+	);
+}
+
+function MedicalValidationHistoryPanel({
+	claim,
+}: {
+	claim: MedicalClaimDetail;
+}) {
+	type ValidationHistoryRow = {
+		id: string;
+		date: string;
+		rule: string;
+		result: MedicalClaimLineValidation;
+		message: string;
+		sourceFile: string;
+		reviewedBy: string;
+	};
+
+	const rows: ValidationHistoryRow[] = claim.lines
+		.filter((line) => line.validation !== "Passed")
+		.map((line) => ({
+			id: line.id,
+			date: line.serviceFrom,
+			rule: line.warning?.code
+				? `CMS ${line.warning.code}`
+				: `Line ${line.line} ${line.validation}`,
+			result: line.validation,
+			message:
+				line.warning?.message ??
+				`${line.validation} on procedure ${line.procedureCode}`,
+			sourceFile: "Medical claim lines",
+			reviewedBy: "—",
+		}));
+
+	if (rows.length === 0 && claim.cmsValidation.warnings > 0) {
+		const w = claim.cmsValidation.warningDetail;
+		rows.push({
+			id: "cms-warning",
+			date: "—",
+			rule: w.title,
+			result: "Warning",
+			message: w.message,
+			sourceFile: `Line ${w.affectedLine}`,
+			reviewedBy: "—",
+		});
+	}
+
+	return (
+		<CmsEdgeSectionPanel title="5. Validation History" bodyClassName="pb-2">
+			<CmsEdgeTableScroll className="border-t border-border/50">
+				<Table
+					containerClassName={CMS_EDGE_TABLE_CONTAINER}
+					className={cn(CMS_EDGE_TABLE_CLASS, "min-w-[900px]")}
+				>
+					<TableHeader>
+						<TableRow className="border-b border-border/50 hover:bg-transparent">
+							<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>Date</TableHead>
+							<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
+								Validation Rule
+							</TableHead>
+							<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
+								Result
+							</TableHead>
+							<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
+								Message
+							</TableHead>
+							<TableHead className={CMS_EDGE_TABLE_HEAD_CLASS}>
+								Source
+							</TableHead>
+							<TableHead className={cn(CMS_EDGE_TABLE_HEAD_CLASS, "pr-4")}>
+								Reviewed By
+							</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{rows.length === 0 ? (
+							<TableRow>
+								<TableCell
+									colSpan={6}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									No validation warnings or errors for this claim.
+								</TableCell>
+							</TableRow>
+						) : (
+							rows.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">
+										{row.date}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 font-medium">
+										{row.rule}
+									</TableCell>
+									<TableCell className="px-3 py-2.5">
+										<span
+											className={cn(
+												"inline-flex items-center gap-1 text-xs font-semibold",
+												MEDICAL_CLAIM_LINE_VALIDATION_STYLES[row.result]
+											)}
+										>
+											{row.result === "Passed" ? (
+												<CheckCircle2 className="size-3.5" />
+											) : (
+												<AlertTriangle className="size-3.5" />
+											)}
+											{row.result}
+										</span>
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-muted-foreground">
+										{row.message}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+										{row.sourceFile}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 pr-4 text-muted-foreground">
+										{row.reviewedBy}
+									</TableCell>
+								</TableRow>
+							))
+						)}
+					</TableBody>
+				</Table>
+			</CmsEdgeTableScroll>
+		</CmsEdgeSectionPanel>
+	);
+}
+
+function CmsValidationSidebar({ claim }: { claim: MedicalClaimDetail }) {
 	const [openSection, setOpenSection] = useState<
 		"warnings" | "errors" | "passed"
 	>("warnings");
-	const v = CMS_EDGE_MEDICAL_CLAIM_DETAIL.cmsValidation;
+	const v = claim.cmsValidation;
 
 	return (
 		<CmsEdgeSectionPanel title="CMS Validation" bodyClassName="space-y-3 p-4">
@@ -447,9 +736,9 @@ function CmsValidationSidebar() {
 	);
 }
 
-function TransactionHistoryPanel() {
+function TransactionHistoryPanel({ claim }: { claim: MedicalClaimDetail }) {
 	return (
-		<CmsEdgeSectionPanel title="Transaction History" bodyClassName="pb-2">
+		<CmsEdgeSectionPanel title="4. Transaction History" bodyClassName="pb-2">
 			<CmsEdgeTableScroll className="border-t border-border/50">
 				<Table
 					containerClassName={CMS_EDGE_TABLE_CONTAINER}
@@ -473,7 +762,7 @@ function TransactionHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_MEDICAL_CLAIM_DETAIL.transactionHistory.map((row) => (
+						{claim.transactionHistory.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -516,7 +805,7 @@ function TransactionHistoryPanel() {
 	);
 }
 
-function SubmissionHistoryPanel() {
+function SubmissionHistoryPanel({ claim }: { claim: MedicalClaimDetail }) {
 	return (
 		<CmsEdgeSectionPanel title="Submission History" bodyClassName="pb-2">
 			<CmsEdgeTableScroll className="border-t border-border/50">
@@ -544,7 +833,7 @@ function SubmissionHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_MEDICAL_CLAIM_DETAIL.submissionHistory.map((row) => (
+						{claim.submissionHistory.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -572,9 +861,60 @@ function SubmissionHistoryPanel() {
 	);
 }
 
-export function CmsEdgeMedicalClaimDetail({ onBack }: { onBack: () => void }) {
+export function CmsEdgeMedicalClaimDetail({
+	id,
+	onBack,
+}: {
+	id: string;
+	onBack: () => void;
+}) {
 	const [tab, setTab] = useState("overview");
-	const claim = CMS_EDGE_MEDICAL_CLAIM_DETAIL;
+	const {
+		data: live,
+		isLoading,
+		isError,
+		error,
+	} = useCmsEdgeMedicalClaimDetailQuery(id);
+	const voidMutation = useVoidMedicalClaimHeaderMutation();
+	const replaceMutation = useReplaceMedicalClaimHeaderMutation();
+
+	const claim = useMemo(
+		() => (live ? mergeMedicalClaimDetail(live) : null),
+		[live]
+	);
+
+	if (isLoading) {
+		return (
+			<div className="flex min-h-[240px] items-center justify-center rounded-sm border border-dashed border-border/70 bg-card px-6 py-12 text-sm text-muted-foreground">
+				Loading medical claim…
+			</div>
+		);
+	}
+
+	if (isError || !claim) {
+		return (
+			<div className="space-y-3">
+				<Button
+					variant="link"
+					className="h-auto gap-1.5 px-0 text-xs font-semibold text-primary"
+					onClick={onBack}
+				>
+					<ArrowLeft className="size-3.5" />
+					Back to Medical Claims
+				</Button>
+				<div className="flex min-h-[240px] flex-col items-center justify-center rounded-sm border border-dashed border-border/70 bg-card px-6 py-12 text-center">
+					<p className="text-sm font-semibold text-foreground">
+						Medical claim not found
+					</p>
+					<p className="mt-1 max-w-md text-sm text-muted-foreground">
+						{error instanceof Error
+							? error.message
+							: "No detail payload returned for this claim id."}
+					</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-4">
@@ -673,27 +1013,22 @@ export function CmsEdgeMedicalClaimDetail({ onBack }: { onBack: () => void }) {
 						className="gap-4"
 						sideWidth="300px"
 						align="start"
-						main={
-							<div className="space-y-4">
-								<ClaimHeaderPanel />
-								<ClaimLinesPanel />
-							</div>
-						}
-						side={<CmsValidationSidebar />}
+						main={<ClaimHeaderPanel claim={claim} />}
+						side={<CmsValidationSidebar claim={claim} />}
 					/>
-					<CmsEdgePairRow
-						className="gap-4"
-						left={<TransactionHistoryPanel />}
-						right={<SubmissionHistoryPanel />}
-					/>
+					<ClaimLinesPanel claim={claim} />
+					<MedicalFinancialPanel claim={claim} />
+					<TransactionHistoryPanel claim={claim} />
+					<MedicalValidationHistoryPanel claim={claim} />
+					<SubmissionHistoryPanel claim={claim} />
 				</TabsContent>
 
 				<TabsContent value="transactions" className="mt-4">
-					<TransactionHistoryPanel />
+					<TransactionHistoryPanel claim={claim} />
 				</TabsContent>
 
 				<TabsContent value="submissions" className="mt-4">
-					<SubmissionHistoryPanel />
+					<SubmissionHistoryPanel claim={claim} />
 				</TabsContent>
 
 				<TabsContent value="audit" className="mt-4">
@@ -713,7 +1048,16 @@ export function CmsEdgeMedicalClaimDetail({ onBack }: { onBack: () => void }) {
 				<Button
 					variant="outline"
 					className="h-9"
-					onClick={() => toast.message("Opening source medical claim.")}
+					onClick={() => {
+						const name = live?.sourceFileName;
+						if (name) {
+							toast.message(`Source vendor file: ${name}`);
+						} else if (live?.vendorFileId) {
+							toast.message(`Source vendor file id: ${live.vendorFileId}`);
+						} else {
+							toast.message("No source vendor file linked to this claim.");
+						}
+					}}
 				>
 					<FileText className="mr-1.5 size-3.5" />
 					View Source Record
@@ -730,7 +1074,26 @@ export function CmsEdgeMedicalClaimDetail({ onBack }: { onBack: () => void }) {
 					<Button
 						variant="outline"
 						className="h-9"
-						onClick={() => toast.message("Void draft created.")}
+						disabled={voidMutation.isPending || replaceMutation.isPending}
+						onClick={() => {
+							if (isMockEnabled()) {
+								toast.message("Void draft created.");
+								return;
+							}
+							voidMutation.mutate(
+								{
+									claimReferenceId: live?.claimId,
+									vendorFileId: live?.vendorFileId,
+								},
+								{
+									onSuccess: () => toast.success("Claim voided."),
+									onError: (err) =>
+										toast.error(
+											err instanceof Error ? err.message : "Void failed"
+										),
+								}
+							);
+						}}
 					>
 						<Ban className="mr-1.5 size-3.5" />
 						Create Void
@@ -738,7 +1101,27 @@ export function CmsEdgeMedicalClaimDetail({ onBack }: { onBack: () => void }) {
 					<Button
 						variant="outline"
 						className="h-9"
-						onClick={() => toast.message("Replacement draft created.")}
+						disabled={voidMutation.isPending || replaceMutation.isPending}
+						onClick={() => {
+							if (isMockEnabled()) {
+								toast.message("Replacement draft created.");
+								return;
+							}
+							replaceMutation.mutate(
+								{
+									claimReferenceId: live?.claimId,
+									vendorFileId: live?.vendorFileId,
+								},
+								{
+									onSuccess: () =>
+										toast.success("Claim marked as replacement."),
+									onError: (err) =>
+										toast.error(
+											err instanceof Error ? err.message : "Replace failed"
+										),
+								}
+							);
+						}}
 					>
 						<RefreshCw className="mr-1.5 size-3.5" />
 						Create Replacement

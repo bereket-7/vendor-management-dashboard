@@ -17,7 +17,29 @@ import type {
 	AppSettingUpdateInput,
 	AuditListQuery,
 	AuditRecordDto,
+	ClaimHeaderDetailDto,
+	ClaimHeaderListDto,
+	ClaimHeaderListQuery,
+	ClaimHeaderSummaryDto,
+	ClaimHeaderVoidReplaceInput,
 	ClaimLineDto,
+	CmsEdgeActivityDto,
+	CmsEdgeAuditRequestDto,
+	CmsEdgeCmsResponseDto,
+	CmsEdgeDocumentDto,
+	CmsEdgeFilePackageCreateInput,
+	CmsEdgeFilePackageDto,
+	CmsEdgeFilePackageListQuery,
+	CmsEdgeListQuery,
+	CmsEdgeOverviewExceptionDto,
+	CmsEdgeOverviewStatsDto,
+	CmsEdgeReportingPeriodDto,
+	CmsEdgeSeedResultDto,
+	CmsEdgeSettingsDto,
+	CmsEdgeSettingsUpdateInput,
+	CmsEdgeSubmissionDto,
+	CmsEdgeValidationRunDto,
+	CmsEdgeWorkflowDto,
 	ConnectionDto,
 	ContractCreateInput,
 	ContractDetailDto,
@@ -282,6 +304,7 @@ export const vendorCoreEndpoints = {
 	memberCoveragesSeed: "/api/v1/member-coverages/seed/",
 	membersList: "/api/v1/members/list/",
 	membersStats: "/api/v1/members/stats/",
+	membersFacets: "/api/v1/members/facets/",
 	membersListExportCsv: "/api/v1/members/list/export/csv/",
 	membersCreate: "/api/v1/members/create/",
 	membersSeed: "/api/v1/members/seed/",
@@ -344,6 +367,8 @@ export const vendorCoreEndpoints = {
 		`/api/v1/pharmacy-claim-rows/${id}/update/`,
 	pharmacyClaimRowDelete: (id: string) =>
 		`/api/v1/pharmacy-claim-rows/${id}/delete/`,
+	pharmacyClaimRowVoid: (id: string) =>
+		`/api/v1/pharmacy-claim-rows/${id}/void/`,
 	memberClaimsList: (id: string) => `/api/v1/members/${id}/claims/list/`,
 	memberClaimsCreate: (id: string) => `/api/v1/members/${id}/claims/create/`,
 	memberClaimUpdate: (id: string, claimId: string) =>
@@ -369,6 +394,8 @@ export const vendorCoreEndpoints = {
 	providersList: "/api/v1/providers/list/",
 	providersCreate: "/api/v1/providers/create/",
 	providersStats: "/api/v1/providers/stats/",
+	providersFacets: "/api/v1/providers/facets/",
+	providersListExportCsv: "/api/v1/providers/list/export/csv/",
 	providersSeed: "/api/v1/providers/seed/",
 	provider: (id: string) => `/api/v1/providers/${id}/`,
 	providerUpdate: (id: string) => `/api/v1/providers/${id}/update/`,
@@ -503,11 +530,25 @@ export const vendorCoreEndpoints = {
 	claimLineHardDelete: (id: string) => `/api/v1/claim-lines/${id}/hard-delete/`,
 	claimLineRestore: (id: string) => `/api/v1/claim-lines/${id}/restore/`,
 	claimVendorFilesList: "/api/v1/claim-vendor-files/list/",
+	claimVendorFilesSeed: "/api/v1/claim-vendor-files/seed/",
+	claimVendorFilesSummary: "/api/v1/claim-vendor-files/summary/",
+	claimVendorFilesExportCsv: "/api/v1/claim-vendor-files/export/csv/",
 	claimVendorFile: (id: string) => `/api/v1/claim-vendor-files/${id}/`,
+	claimVendorFileAccept: (id: string) =>
+		`/api/v1/claim-vendor-files/${id}/accept/`,
+	claimVendorFileReject: (id: string) =>
+		`/api/v1/claim-vendor-files/${id}/reject/`,
+	claimVendorFileSend: (id: string) => `/api/v1/claim-vendor-files/${id}/send/`,
+	claimVendorFileDownload: (id: string) =>
+		`/api/v1/claim-vendor-files/${id}/download/`,
 	claimResponsesList: "/api/v1/claim-responses/list/",
 	claimResponse: (id: string) => `/api/v1/claim-responses/${id}/`,
 	claimExceptionsList: "/api/v1/claim-exceptions/list/",
 	claimException: (id: string) => `/api/v1/claim-exceptions/${id}/`,
+	claimExceptionAssign: (id: string) =>
+		`/api/v1/claim-exceptions/${id}/assign/`,
+	claimExceptionResolve: (id: string) =>
+		`/api/v1/claim-exceptions/${id}/resolve/`,
 	submissionBatchesList: "/api/v1/submission-batches/list/",
 	submissionBatch: (id: string) => `/api/v1/submission-batches/${id}/`,
 	claimDiagnosesList: "/api/v1/claim-diagnoses/list/",
@@ -519,7 +560,35 @@ export const vendorCoreEndpoints = {
 	inboundFileEvents: (id: string) => `/api/v1/inbound-files/${id}/events/`,
 	inboundFileReprocess: (id: string) =>
 		`/api/v1/inbound-files/${id}/reprocess/`,
+	inboundFileDownload: (id: string) => `/api/v1/inbound-files/${id}/download/`,
 	inboundFilesSeed: "/api/v1/inbound-files/seed/",
+	claimHeadersList: "/api/v1/claim-headers/list/",
+	claimHeadersSummary: "/api/v1/claim-headers/summary/",
+	claimHeader: (id: string) => `/api/v1/claim-headers/${id}/`,
+	claimHeaderVoid: (id: string) => `/api/v1/claim-headers/${id}/void/`,
+	claimHeaderReplace: (id: string) => `/api/v1/claim-headers/${id}/replace/`,
+	cmsEdgeSettings: "/api/v1/cms-edge/settings/",
+	cmsEdgeSettingsUpdate: "/api/v1/cms-edge/settings/update/",
+	cmsEdgeSettingsSeed: "/api/v1/cms-edge/settings/seed/",
+	cmsEdgeReportingPeriodsList: "/api/v1/cms-edge/reporting-periods/list/",
+	cmsEdgeOverviewStats: "/api/v1/cms-edge/overview/stats/",
+	cmsEdgeOverviewWorkflow: "/api/v1/cms-edge/overview/workflow/",
+	cmsEdgeOverviewActivityList: "/api/v1/cms-edge/overview/activity/list/",
+	cmsEdgeOverviewExceptionsList: "/api/v1/cms-edge/overview/exceptions/list/",
+	cmsEdgeFilePackagesList: "/api/v1/cms-edge/file-packages/list/",
+	cmsEdgeFilePackagesCreate: "/api/v1/cms-edge/file-packages/create/",
+	cmsEdgeFilePackage: (id: string) => `/api/v1/cms-edge/file-packages/${id}/`,
+	cmsEdgeFilePackageGenerate: (id: string) =>
+		`/api/v1/cms-edge/file-packages/${id}/generate/`,
+	cmsEdgeFilePackagePackage: (id: string) =>
+		`/api/v1/cms-edge/file-packages/${id}/package/`,
+	cmsEdgeFilePackageSubmit: (id: string) =>
+		`/api/v1/cms-edge/file-packages/${id}/submit/`,
+	cmsEdgeSubmissionsList: "/api/v1/cms-edge/submissions/list/",
+	cmsEdgeCmsResponsesList: "/api/v1/cms-edge/cms-responses/list/",
+	cmsEdgeValidationRunsList: "/api/v1/cms-edge/validation-runs/list/",
+	cmsEdgeAuditRequestsList: "/api/v1/cms-edge/audit-requests/list/",
+	cmsEdgeDocumentsList: "/api/v1/cms-edge/documents/list/",
 	validationResultsList: "/api/v1/validation-results/list/",
 	uploads: "/api/v1/intake/uploads/",
 	monitoring: "/api/v1/monitoring/",
@@ -1033,6 +1102,17 @@ export const vendorCoreApi = {
 		} satisfies PaginatedResult<MemberCoverageDto>;
 	},
 
+	getMemberFacets: async (params?: { fields?: string }) => {
+		return vendorCoreFetch<{
+			plan_name?: string[];
+			account_group?: string[];
+		}>(vendorCoreEndpoints.membersFacets, {
+			params: pageParams({
+				fields: params?.fields ?? "plan_name,account_group",
+			}),
+		});
+	},
+
 	getMemberDashboardStats: async (params?: MemberDashboardStatsQuery) => {
 		const raw = await vendorCoreFetch<MemberDashboardStatsDto>(
 			vendorCoreEndpoints.membersStats,
@@ -1345,6 +1425,12 @@ export const vendorCoreApi = {
 			method: "POST",
 		}),
 
+	voidPharmacyClaimRow: (id: string) =>
+		vendorCoreFetch<PharmacyClaimRowDetailDto>(
+			vendorCoreEndpoints.pharmacyClaimRowVoid(id),
+			{ method: "POST", body: JSON.stringify({}) }
+		),
+
 	listMemberClaims: (memberId: string, params?: { claim_kind?: string }) =>
 		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
 			vendorCoreEndpoints.memberClaimsList(memberId),
@@ -1531,6 +1617,18 @@ export const vendorCoreApi = {
 			{ task_id?: string; id?: string } | Record<string, unknown>
 		>(vendorCoreEndpoints.inboundFileReprocess(id), { method: "POST" }),
 
+	downloadInboundFile: async (id: string) => {
+		const result = await vendorCoreFetchBlob(
+			vendorCoreEndpoints.inboundFileDownload(id)
+		);
+		const text = await result.blob.text();
+		return {
+			text,
+			contentType: result.contentType,
+			filename: result.filename,
+		};
+	},
+
 	seedInboundProcessing: (body?: { vendor_id?: string; force?: boolean }) =>
 		vendorCoreFetch<{
 			created: number;
@@ -1705,6 +1803,37 @@ export const vendorCoreApi = {
 			}),
 		});
 		return mapPage(page, normalizeProvider);
+	},
+
+	getProviderFacets: async (params?: { fields?: string }) => {
+		return vendorCoreFetch<{
+			specialty?: string[];
+		}>(vendorCoreEndpoints.providersFacets, {
+			params: pageParams({
+				fields: params?.fields ?? "specialty",
+			}),
+		});
+	},
+
+	exportProviderListCsv: (params?: ProviderListQuery) => {
+		const { limit: _l, offset: _o, ...filters } = params ?? {};
+		return vendorCoreFetchBlob(vendorCoreEndpoints.providersListExportCsv, {
+			params: {
+				...filters,
+				is_visible:
+					filters.is_visible === undefined
+						? undefined
+						: filters.is_visible
+							? "true"
+							: "false",
+				is_deleted:
+					filters.is_deleted === undefined
+						? undefined
+						: filters.is_deleted
+							? "true"
+							: "false",
+			},
+		});
 	},
 
 	getProviderDashboardStats: async (params?: ProviderDashboardStatsQuery) => {
@@ -2087,6 +2216,28 @@ export const vendorCoreApi = {
 			body: JSON.stringify(body ?? {}),
 		}),
 
+	/** Single page — use for CMS EDGE medical claims pagination. */
+	listClaimLinesPage: async (params?: {
+		limit?: number;
+		offset?: number;
+		order_by?: string;
+		claim_reference_id?: string;
+		vendor_file_id?: string;
+	}) => {
+		const page = await vendorCoreFetch<
+			PaginatedResult<Record<string, unknown>>
+		>(vendorCoreEndpoints.claimLinesList, {
+			params: pageParams({
+				limit: params?.limit ?? 50,
+				offset: params?.offset ?? 0,
+				order_by: params?.order_by,
+				claim_reference_id: params?.claim_reference_id,
+				vendor_file_id: params?.vendor_file_id,
+			}),
+		});
+		return mapPage(page, normalizeClaimLine);
+	},
+
 	listClaimLines: async () => {
 		const results = await listAllPages(async ({ limit, offset }) => {
 			const page = await vendorCoreFetch<
@@ -2153,9 +2304,29 @@ export const vendorCoreApi = {
 			created: number;
 			skipped?: boolean;
 			existing_claim_lines?: number;
+			existing_vendor_files?: number;
 			batch_id?: string | null;
+			vendor_file_ids?: string[];
 			claim_line_ids?: string[];
+			exception_ids?: string[];
+			response_ids?: string[];
 		}>(vendorCoreEndpoints.claimLinesSeed, {
+			method: "POST",
+			body: JSON.stringify(body ?? {}),
+		}),
+
+	seedClaimVendorFiles: (body?: { vendor_id?: string; force?: boolean }) =>
+		vendorCoreFetch<{
+			created: number;
+			skipped?: boolean;
+			existing_vendor_files?: number;
+			vendor_id?: string;
+			vendor_file_ids?: string[];
+			claim_line_ids?: string[];
+			exception_ids?: string[];
+			response_ids?: string[];
+			cleared?: Record<string, number>;
+		}>(vendorCoreEndpoints.claimVendorFilesSeed, {
 			method: "POST",
 			body: JSON.stringify(body ?? {}),
 		}),
@@ -3399,16 +3570,92 @@ export const vendorCoreApi = {
 			method: "DELETE",
 		}),
 
-	listClaimVendorFiles: (params?: { limit?: number; offset?: number }) =>
+	listClaimVendorFiles: (params?: {
+		limit?: number;
+		offset?: number;
+		search?: string;
+		vendor_id?: string;
+		status?: string;
+		direction?: string;
+		review_status?: string;
+		wait_bucket?: string;
+		outbound_send_status?: string;
+		transaction_type?: string;
+		program?: string;
+		reject_reason?: string;
+		order_by?: string;
+	}) =>
 		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
 			vendorCoreEndpoints.claimVendorFilesList,
 			{ params: pageParams(params) }
 		),
 
+	getClaimVendorFilesSummary: (
+		params?: Record<string, string | number | null | undefined>
+	) =>
+		vendorCoreFetch<{
+			total_files: number;
+			awaiting_review: number;
+			accepted: number;
+			rejected: number;
+			age_buckets: Record<string, number>;
+			by_status: Record<string, number>;
+			by_review_status: Record<string, number>;
+			by_vendor: Record<string, number>;
+		}>(vendorCoreEndpoints.claimVendorFilesSummary, {
+			params: pageParams(params),
+		}),
+
+	exportClaimVendorFilesCsv: (
+		params?: Record<string, string | number | null | undefined>
+	) =>
+		vendorCoreFetchBlob(vendorCoreEndpoints.claimVendorFilesExportCsv, {
+			params: pageParams(params),
+		}),
+
 	getClaimVendorFile: (id: string) =>
 		vendorCoreFetch<Record<string, unknown>>(
 			vendorCoreEndpoints.claimVendorFile(id)
 		),
+
+	acceptClaimVendorFile: (
+		id: string,
+		body?: { notes?: string; claim_line_ids?: string[] }
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimVendorFileAccept(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	rejectClaimVendorFile: (
+		id: string,
+		body?: { reasons?: string[]; notes?: string; claim_line_ids?: string[] }
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimVendorFileReject(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	sendClaimVendorFile: (
+		id: string,
+		body?: { notes?: string; sync?: boolean; force?: boolean }
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimVendorFileSend(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	downloadClaimVendorFile: async (id: string) => {
+		const result = await vendorCoreFetchBlob(
+			vendorCoreEndpoints.claimVendorFileDownload(id)
+		);
+		const text = await result.blob.text();
+		return {
+			text,
+			contentType: result.contentType,
+			filename: result.filename,
+		};
+	},
 
 	listClaimResponses: (params?: { limit?: number; offset?: number }) =>
 		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
@@ -3432,6 +3679,21 @@ export const vendorCoreApi = {
 			vendorCoreEndpoints.claimException(id)
 		),
 
+	assignClaimException: (
+		id: string,
+		body?: { assigned_to_id?: string | null }
+	) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimExceptionAssign(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	resolveClaimException: (id: string, body?: { notes?: string }) =>
+		vendorCoreFetch<Record<string, unknown>>(
+			vendorCoreEndpoints.claimExceptionResolve(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
 	listSubmissionBatches: (params?: { limit?: number; offset?: number }) =>
 		vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
 			vendorCoreEndpoints.submissionBatchesList,
@@ -3452,6 +3714,162 @@ export const vendorCoreApi = {
 	getClaimDiagnosis: (id: string) =>
 		vendorCoreFetch<Record<string, unknown>>(
 			vendorCoreEndpoints.claimDiagnosis(id)
+		),
+
+	listClaimHeaders: (params?: ClaimHeaderListQuery) =>
+		vendorCoreFetch<PaginatedResult<ClaimHeaderListDto>>(
+			vendorCoreEndpoints.claimHeadersList,
+			{ params: pageParams(params) }
+		),
+
+	getClaimHeadersSummary: (params?: ClaimHeaderListQuery) =>
+		vendorCoreFetch<ClaimHeaderSummaryDto>(
+			vendorCoreEndpoints.claimHeadersSummary,
+			{ params: pageParams(params) }
+		),
+
+	getClaimHeader: (id: string) =>
+		vendorCoreFetch<ClaimHeaderDetailDto>(vendorCoreEndpoints.claimHeader(id)),
+
+	voidClaimHeader: (id: string, body?: ClaimHeaderVoidReplaceInput) =>
+		vendorCoreFetch<ClaimHeaderDetailDto>(
+			vendorCoreEndpoints.claimHeaderVoid(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	replaceClaimHeader: (id: string, body?: ClaimHeaderVoidReplaceInput) =>
+		vendorCoreFetch<ClaimHeaderDetailDto>(
+			vendorCoreEndpoints.claimHeaderReplace(id),
+			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	getCmsEdgeSettings: () =>
+		vendorCoreFetch<CmsEdgeSettingsDto>(vendorCoreEndpoints.cmsEdgeSettings),
+
+	updateCmsEdgeSettings: (body: CmsEdgeSettingsUpdateInput) =>
+		vendorCoreFetch<CmsEdgeSettingsDto>(
+			vendorCoreEndpoints.cmsEdgeSettingsUpdate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	seedCmsEdgeDemo: (body?: { force?: boolean }) =>
+		vendorCoreFetch<CmsEdgeSeedResultDto>(
+			vendorCoreEndpoints.cmsEdgeSettingsSeed,
+			{ method: "POST", body: JSON.stringify(body ?? { force: true }) }
+		),
+
+	listCmsEdgeReportingPeriods: (params?: {
+		is_current?: boolean;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeReportingPeriodDto>>(
+			vendorCoreEndpoints.cmsEdgeReportingPeriodsList,
+			{
+				params: pageParams({
+					limit: params?.limit,
+					offset: params?.offset,
+					is_current:
+						params?.is_current === undefined
+							? undefined
+							: params.is_current
+								? "true"
+								: "false",
+				}),
+			}
+		),
+
+	getCmsEdgeOverviewStats: (params?: { reporting_period?: string }) =>
+		vendorCoreFetch<CmsEdgeOverviewStatsDto>(
+			vendorCoreEndpoints.cmsEdgeOverviewStats,
+			{ params: pageParams(params) }
+		),
+
+	getCmsEdgeOverviewWorkflow: (params?: { reporting_period?: string }) =>
+		vendorCoreFetch<CmsEdgeWorkflowDto>(
+			vendorCoreEndpoints.cmsEdgeOverviewWorkflow,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeOverviewActivity: (params?: { limit?: number; offset?: number }) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeActivityDto>>(
+			vendorCoreEndpoints.cmsEdgeOverviewActivityList,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeOverviewExceptions: (params?: {
+		reporting_period?: string;
+		limit?: number;
+		offset?: number;
+	}) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeOverviewExceptionDto>>(
+			vendorCoreEndpoints.cmsEdgeOverviewExceptionsList,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeFilePackages: (params?: CmsEdgeFilePackageListQuery) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeFilePackageDto>>(
+			vendorCoreEndpoints.cmsEdgeFilePackagesList,
+			{ params: pageParams(params) }
+		),
+
+	createCmsEdgeFilePackage: (body: CmsEdgeFilePackageCreateInput) =>
+		vendorCoreFetch<CmsEdgeFilePackageDto>(
+			vendorCoreEndpoints.cmsEdgeFilePackagesCreate,
+			{ method: "POST", body: JSON.stringify(body) }
+		),
+
+	getCmsEdgeFilePackage: (id: string) =>
+		vendorCoreFetch<CmsEdgeFilePackageDto>(
+			vendorCoreEndpoints.cmsEdgeFilePackage(id)
+		),
+
+	generateCmsEdgeFilePackage: (id: string) =>
+		vendorCoreFetch<CmsEdgeFilePackageDto>(
+			vendorCoreEndpoints.cmsEdgeFilePackageGenerate(id),
+			{ method: "POST", body: JSON.stringify({}) }
+		),
+
+	packageCmsEdgeFilePackage: (id: string) =>
+		vendorCoreFetch<CmsEdgeFilePackageDto>(
+			vendorCoreEndpoints.cmsEdgeFilePackagePackage(id),
+			{ method: "POST", body: JSON.stringify({}) }
+		),
+
+	submitCmsEdgeFilePackage: (id: string) =>
+		vendorCoreFetch<CmsEdgeFilePackageDto>(
+			vendorCoreEndpoints.cmsEdgeFilePackageSubmit(id),
+			{ method: "POST", body: JSON.stringify({}) }
+		),
+
+	listCmsEdgeSubmissions: (params?: CmsEdgeListQuery) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeSubmissionDto>>(
+			vendorCoreEndpoints.cmsEdgeSubmissionsList,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeCmsResponses: (params?: CmsEdgeListQuery) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeCmsResponseDto>>(
+			vendorCoreEndpoints.cmsEdgeCmsResponsesList,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeValidationRuns: (params?: CmsEdgeListQuery) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeValidationRunDto>>(
+			vendorCoreEndpoints.cmsEdgeValidationRunsList,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeAuditRequests: (params?: CmsEdgeListQuery) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeAuditRequestDto>>(
+			vendorCoreEndpoints.cmsEdgeAuditRequestsList,
+			{ params: pageParams(params) }
+		),
+
+	listCmsEdgeDocuments: (params?: CmsEdgeListQuery) =>
+		vendorCoreFetch<PaginatedResult<CmsEdgeDocumentDto>>(
+			vendorCoreEndpoints.cmsEdgeDocumentsList,
+			{ params: pageParams(params) }
 		),
 
 	verifyToken: (token: string) =>

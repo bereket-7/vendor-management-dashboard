@@ -920,8 +920,9 @@ export type CmsEdgeMemberListRow = {
 	subscriberId: string;
 	relationship: MemberRelationship;
 	dateOfBirth: string;
-	sex: "M" | "F";
+	sex: "M" | "F" | "—";
 	zipCode: string;
+	location: string;
 	hiosIssuerId: string;
 	planId: string;
 	coveragePeriod: string;
@@ -1039,6 +1040,7 @@ export const CMS_EDGE_MEMBERS_LIST: CmsEdgeMemberListRow[] = [
 		dateOfBirth: "04/12/1962",
 		sex: "M",
 		zipCode: "02115",
+		location: "Boston, MA 02115",
 		hiosIssuerId: "88888",
 		planId: "P***001",
 		coveragePeriod: "04/01/2027 - 06/30/2027",
@@ -1056,6 +1058,7 @@ export const CMS_EDGE_MEMBERS_LIST: CmsEdgeMemberListRow[] = [
 		dateOfBirth: "09/03/1964",
 		sex: "F",
 		zipCode: "02115",
+		location: "Boston, MA 02115",
 		hiosIssuerId: "88888",
 		planId: "P***001",
 		coveragePeriod: "04/01/2027 - 06/30/2027",
@@ -1073,6 +1076,7 @@ export const CMS_EDGE_MEMBERS_LIST: CmsEdgeMemberListRow[] = [
 		dateOfBirth: "01/22/2008",
 		sex: "F",
 		zipCode: "02115",
+		location: "Boston, MA 02115",
 		hiosIssuerId: "88888",
 		planId: "P***001",
 		coveragePeriod: "04/01/2027 - 06/30/2027",
@@ -1090,6 +1094,7 @@ export const CMS_EDGE_MEMBERS_LIST: CmsEdgeMemberListRow[] = [
 		dateOfBirth: "11/08/1989",
 		sex: "M",
 		zipCode: "02118",
+		location: "Boston, MA 02118",
 		hiosIssuerId: "88888",
 		planId: "P***002",
 		coveragePeriod: "04/01/2027 - 05/15/2027",
@@ -1107,6 +1112,7 @@ export const CMS_EDGE_MEMBERS_LIST: CmsEdgeMemberListRow[] = [
 		dateOfBirth: "06/19/1975",
 		sex: "M",
 		zipCode: "02210",
+		location: "Boston, MA 02210",
 		hiosIssuerId: "88888",
 		planId: "P***003",
 		coveragePeriod: "04/01/2027 - 06/30/2027",

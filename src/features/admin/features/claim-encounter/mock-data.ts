@@ -13,7 +13,12 @@ export type ClaimFileStatus =
 	| "paid"
 	| "denied";
 
-export type MfcReviewStatus = "pending" | "accepted" | "rejected" | "denied";
+export type MfcReviewStatus =
+	| "pending"
+	| "accepted"
+	| "rejected"
+	| "denied"
+	| "partial";
 
 export type RejectReason = {
 	code: string;
@@ -65,8 +70,12 @@ export type ClaimVendorFile = {
 	reviewedBy: string | null;
 	/** For outbound rows: the inbound file this was reviewed from */
 	sourceInboundFileId: string | null;
+	/** Core vendor UUID when known (live list compact) */
+	vendorId?: string | null;
 	/** Queued / sent for accepted outbound; notified for rejected */
-	outboundSendStatus: "queued" | "sent" | "notified" | null;
+	outboundSendStatus: "queued" | "sent" | "notified" | "failed" | null;
+	/** BE download_available — CVF EDI can be streamed */
+	downloadAvailable?: boolean;
 	/** EDI fixture key used by the viewer */
 	ediFixture: "837I" | "835";
 };

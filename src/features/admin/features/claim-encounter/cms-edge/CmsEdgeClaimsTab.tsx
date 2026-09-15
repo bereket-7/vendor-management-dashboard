@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -15,9 +15,9 @@ import {
 	type LucideIcon,
 	MoreVertical,
 	Search,
-	SlidersHorizontal,
 	Upload,
 	User,
+	X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -58,11 +58,15 @@ import {
 	CmsEdgeTableScroll,
 	cmsEdgeKpiAccent,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import { CmsEdgeTablePagination } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeTablePagination";
 import { useCmsEdgeMedicalClaimsList } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
-import { deriveMedicalClaimKpis } from "@/features/admin/features/claim-encounter/cms-edge/live-medical-claims";
+import {
+	deriveMedicalClaimFilterOptions,
+	deriveMedicalClaimKpis,
+	deriveMedicalValidationSummary,
+} from "@/features/admin/features/claim-encounter/cms-edge/live-medical-claims";
 import {
 	CMS_EDGE_MEDICAL_CLAIM_FILTER_TABS,
-	CMS_EDGE_MEDICAL_VALIDATION_SUMMARY,
 	CMS_EDGE_REPORTING_PERIODS,
 	MEDICAL_CLAIM_CMS_STATUS_STYLES,
 	MEDICAL_CLAIM_TXN_STYLES,
@@ -87,9 +91,17 @@ const VALIDATION_ICONS = {
 	dollar: CircleDollarSign,
 	link: Link2,
 } satisfies Record<
-	(typeof CMS_EDGE_MEDICAL_VALIDATION_SUMMARY)[number]["icon"],
+	ReturnType<typeof deriveMedicalValidationSummary>[number]["icon"],
 	LucideIcon
 >;
+
+const DEFAULT_FILTERS = {
+	cmsStatus: "All",
+	transaction: "All",
+	formType: "All",
+	enrolleeId: "All",
+	billingNpi: "All",
+};
 
 const MEDICAL_LINE_COLUMNS = [
 	{ key: "line", label: "Line" },
@@ -118,9 +130,28 @@ export function CmsEdgeClaimsTab() {
 	const [search, setSearch] = useState("");
 	const [period, setPeriod] = useState("q2-2027");
 	const [filterTab, setFilterTab] = useState<MedicalClaimFilterTab>("all");
+	const [filters, setFilters] = useState(DEFAULT_FILTERS);
+	const [filtersOpen, setFiltersOpen] = useState(false);
+	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState(25);
 
-	const { medicalClaims, isLoading, isError, error } =
-		useCmsEdgeMedicalClaimsList();
+	const offset = (page - 1) * pageSize;
+	const { medicalClaims, total, isLoading, isError, error } =
+		useCmsEdgeMedicalClaimsList({ limit: pageSize, offset });
+
+	useEffect(() => {
+		setPage(1);
+	}, [search, filterTab, filters]);
+
+	const filterOptions = useMemo(
+		() => deriveMedicalClaimFilterOptions(medicalClaims),
+		[medicalClaims]
+	);
+
+	const activeFilterCount = useMemo(
+		() => Object.values(filters).filter((v) => v !== "All").length,
+		[filters]
+	);
 
 	const rows = useMemo(() => {
 		let list = medicalClaims;
@@ -137,6 +168,22 @@ export function CmsEdgeClaimsTab() {
 			);
 		}
 
+		if (filters.cmsStatus !== "All") {
+			list = list.filter((row) => row.cmsStatus === filters.cmsStatus);
+		}
+		if (filters.transaction !== "All") {
+			list = list.filter((row) => row.transaction === filters.transaction);
+		}
+		if (filters.formType !== "All") {
+			list = list.filter((row) => row.formType === filters.formType);
+		}
+		if (filters.enrolleeId !== "All") {
+			list = list.filter((row) => row.enrolleeId === filters.enrolleeId);
+		}
+		if (filters.billingNpi !== "All") {
+			list = list.filter((row) => row.billingNpi === filters.billingNpi);
+		}
+
 		const q = search.trim().toLowerCase();
 		if (!q) return list;
 		return list.filter(
@@ -147,7 +194,12 @@ export function CmsEdgeClaimsTab() {
 				row.billingNpi.includes(q) ||
 				row.formType.toLowerCase().includes(q)
 		);
-	}, [filterTab, medicalClaims, search]);
+	}, [filterTab, filters, medicalClaims, search]);
+
+	const validationSummary = useMemo(
+		() => deriveMedicalValidationSummary(rows),
+		[rows]
+	);
 
 	const kpis = useMemo(() => deriveMedicalClaimKpis(rows), [rows]);
 
@@ -164,7 +216,10 @@ export function CmsEdgeClaimsTab() {
 	if (selectedId) {
 		return (
 			<div className={CMS_EDGE_PAGE_STACK}>
-				<CmsEdgeMedicalClaimDetail onBack={() => setSelectedId(null)} />
+				<CmsEdgeMedicalClaimDetail
+					id={selectedId}
+					onBack={() => setSelectedId(null)}
+				/>
 				<CmsEdgePageFooter />
 			</div>
 		);
@@ -201,23 +256,6 @@ export function CmsEdgeClaimsTab() {
 							</SelectContent>
 						</Select>
 					</div>
-					<div className="relative w-[240px]">
-						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Search Claim / Member / Dx"
-							className="h-9 pl-8 text-xs"
-						/>
-					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						className="h-9 border-border/70 bg-card shadow-sm"
-					>
-						<SlidersHorizontal className="mr-1.5 size-3.5" />
-						Filters
-					</Button>
 					<Button
 						size="sm"
 						className="h-9 shadow-sm"
@@ -281,6 +319,85 @@ export function CmsEdgeClaimsTab() {
 			</div>
 
 			<section className={cn("overflow-hidden", CMS_EDGE_PANEL_CLASS)}>
+				<div className="flex flex-wrap items-center gap-3 border-b border-border/60 px-4 py-3">
+					<div className="relative min-w-[220px] flex-1">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+							placeholder="Search claim, enrollee, diagnosis, or NPI"
+							className="h-9 border-border/70 bg-background pl-8 text-xs"
+						/>
+					</div>
+					<div className="flex items-center gap-2">
+						<span className="text-xs tabular-nums text-muted-foreground">
+							{isLoading
+								? "Loading…"
+								: `${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")}`}
+						</span>
+						<Button
+							variant={filtersOpen || activeFilterCount ? "default" : "outline"}
+							size="sm"
+							className="h-9"
+							onClick={() => setFiltersOpen((v) => !v)}
+						>
+							Filters
+							{activeFilterCount > 0 ? (
+								<span className="ml-1.5 rounded-sm bg-background/20 px-1.5 text-[10px] font-semibold">
+									{activeFilterCount}
+								</span>
+							) : null}
+						</Button>
+						{activeFilterCount > 0 ? (
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-9 px-2 text-muted-foreground"
+								onClick={() => setFilters(DEFAULT_FILTERS)}
+							>
+								<X className="mr-1 size-3.5" />
+								Clear
+							</Button>
+						) : null}
+					</div>
+				</div>
+
+				{filtersOpen ? (
+					<div className="grid gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+						{(
+							[
+								["cmsStatus", "CMS status", filterOptions.cmsStatus],
+								["transaction", "Transaction", filterOptions.transaction],
+								["formType", "Form type", filterOptions.formType],
+								["enrolleeId", "Enrollee ID", filterOptions.enrolleeId],
+								["billingNpi", "Billing NPI", filterOptions.billingNpi],
+							] as const
+						).map(([key, label, options]) => (
+							<label key={key} className="block space-y-1">
+								<span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+									{label}
+								</span>
+								<Select
+									value={filters[key]}
+									onValueChange={(value) =>
+										setFilters((prev) => ({ ...prev, [key]: value }))
+									}
+								>
+									<SelectTrigger className="h-8 w-full border-border/70 bg-card text-xs">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{options.map((option) => (
+											<SelectItem key={option} value={option}>
+												{option}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</label>
+						))}
+					</div>
+				) : null}
 				<div className="flex flex-wrap items-center gap-1 border-b border-border/50 px-3">
 					{CMS_EDGE_MEDICAL_CLAIM_FILTER_TABS.map((tab) => {
 						const active = filterTab === tab.id;
@@ -559,14 +676,27 @@ export function CmsEdgeClaimsTab() {
 						</TableBody>
 					</Table>
 				</CmsEdgeTableScroll>
+				<CmsEdgeTablePagination
+					page={page}
+					pageSize={pageSize}
+					total={total}
+					onPageChange={setPage}
+					onPageSizeChange={(size) => {
+						setPageSize(size);
+						setPage(1);
+					}}
+				/>
 			</section>
 
 			<section className="space-y-3">
 				<h3 className="text-sm font-semibold text-foreground">
 					Medical Validation Summary
 				</h3>
+				<p className="text-[11px] text-muted-foreground">
+					Computed from current page — not fixture counts
+				</p>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-					{CMS_EDGE_MEDICAL_VALIDATION_SUMMARY.map((item) => {
+					{validationSummary.map((item) => {
 						const Icon = VALIDATION_ICONS[item.icon];
 						return (
 							<div key={item.id} className={cn(CMS_EDGE_KPI_CARD_CLASS, "p-3")}>

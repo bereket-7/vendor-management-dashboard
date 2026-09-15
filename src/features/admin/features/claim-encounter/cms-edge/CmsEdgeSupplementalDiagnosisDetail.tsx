@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -39,11 +39,15 @@ import {
 	CmsEdgeSplitRow,
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import { useCmsEdgeSupplementalDiagnosisDetailQuery } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import type { CmsEdgeSupplementalDxDetailView } from "@/features/admin/features/claim-encounter/cms-edge/live-supplemental-diagnoses";
 import {
 	CMS_EDGE_SUPPLEMENTAL_DX_DETAIL,
 	SUPPLEMENTAL_DX_DETAIL_STATUS_STYLES,
 	SUPPLEMENTAL_DX_HISTORY_RESULT_STYLES,
 	SUPPLEMENTAL_DX_TXN_STYLES,
+	type SupplementalDxDetailCmsStatus,
+	type SupplementalDxTransaction,
 } from "@/features/admin/features/claim-encounter/cms-edge/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +65,110 @@ const SUMMARY_ICONS = {
 	(typeof CMS_EDGE_SUPPLEMENTAL_DX_DETAIL.summary)[number]["icon"],
 	LucideIcon
 >;
+
+type SupplementalDxDetail = typeof CMS_EDGE_SUPPLEMENTAL_DX_DETAIL;
+
+function mapSupplementalCmsStatus(
+	status: string
+): SupplementalDxDetailCmsStatus {
+	if (status === "CMS Ready" || status === "Ready") return "CMS Ready";
+	if (status === "Error") return "Error";
+	if (status === "Warning") return "Warning";
+	return "Draft";
+}
+
+function mapSupplementalTransaction(txn: string): SupplementalDxTransaction {
+	if (txn === "Void" || txn === "Replacement" || txn === "Original") {
+		return txn;
+	}
+	return "Original";
+}
+
+function mergeSupplementalDxDetail(
+	live: CmsEdgeSupplementalDxDetailView
+): SupplementalDxDetail {
+	const pick = (label: string) =>
+		live.summary.find((s) => s.label === label)?.value ??
+		live.recordInfoLeft.find((f) => f.label === label)?.value ??
+		live.recordInfoRight.find((f) => f.label === label)?.value ??
+		"—";
+	const cmsStatus = mapSupplementalCmsStatus(live.cmsStatus);
+	const transaction = mapSupplementalTransaction(live.transaction);
+	const claimRef = pick("Original Medical Claim ID");
+	const enrollee = pick("Unique Enrollee ID");
+	const claimLink = pick("Claim Link");
+	const dxCode = pick("Diagnosis Code");
+	const ready = cmsStatus === "CMS Ready";
+	const errored = cmsStatus === "Error";
+
+	return {
+		id: live.id,
+		recordId: live.recordId,
+		cmsStatus,
+		transaction,
+		summary: live.summary.map((s) => ({
+			label: s.label,
+			value: s.value,
+			icon: s.icon as (typeof CMS_EDGE_SUPPLEMENTAL_DX_DETAIL.summary)[number]["icon"],
+		})),
+		recordInfoLeft: live.recordInfoLeft.map((f) => ({
+			label: f.label,
+			value: f.value,
+		})),
+		recordInfoRight: live.recordInfoRight.map((f) => ({
+			label: f.label,
+			value: f.value,
+		})),
+		memberLink: {
+			name: "—",
+			enrolleeId: enrollee,
+			enrollmentStatus: "—",
+			coveragePeriod: "—",
+		},
+		claimLink: {
+			claimId: claimRef,
+			claimStatus: claimLink,
+			primaryDiagnosis: dxCode,
+			allowedAmount: "—",
+			planPaid: "—",
+			matched: claimLink.toLowerCase() === "matched",
+		},
+		transactionHistory: [
+			{
+				id: `${live.id}-txn-current`,
+				transaction,
+				recordId: live.recordId,
+				originalDetailRecordId: "—",
+				diagnosisCode: dxCode,
+				processedDate: "—",
+				cmsStatus,
+			},
+		],
+		submissionHistory: [],
+		cmsValidation: {
+			passed: ready ? 1 : 0,
+			warnings: cmsStatus === "Warning" ? 1 : 0,
+			errors: errored ? 1 : 0,
+			checks: [
+				{
+					id: "dx-code",
+					label: "Diagnosis code present",
+					result: dxCode !== "—" ? "Passed" : "Failed",
+				},
+				{
+					id: "claim-link",
+					label: "Medical claim link",
+					result: claimLink.toLowerCase() === "matched" ? "Passed" : "Warning",
+				},
+			],
+			alert: errored
+				? "Diagnosis record failed CMS readiness checks."
+				: claimLink.toLowerCase() !== "matched"
+					? "Medical claim link is unmatched for this diagnosis row."
+					: null,
+		},
+	} as unknown as SupplementalDxDetail;
+}
 
 function StatusPill({
 	label,
@@ -105,8 +213,8 @@ function FieldGrid({
 	);
 }
 
-function RecordInfoPanel() {
-	const d = CMS_EDGE_SUPPLEMENTAL_DX_DETAIL;
+function RecordInfoPanel({ detail }: { detail: SupplementalDxDetail }) {
+	const d = detail;
 	return (
 		<CmsEdgeSectionPanel
 			title="1. Record & Diagnosis Information"
@@ -117,8 +225,8 @@ function RecordInfoPanel() {
 	);
 }
 
-function LinkagePanel() {
-	const d = CMS_EDGE_SUPPLEMENTAL_DX_DETAIL;
+function LinkagePanel({ detail }: { detail: SupplementalDxDetail }) {
+	const d = detail;
 	return (
 		<CmsEdgeSectionPanel
 			title="2. Member & Medical Claim Linkage"
@@ -212,7 +320,7 @@ function LinkagePanel() {
 	);
 }
 
-function TransactionHistoryPanel() {
+function TransactionHistoryPanel({ detail }: { detail: SupplementalDxDetail }) {
 	return (
 		<CmsEdgeSectionPanel title="3. Transaction History" bodyClassName="pb-2">
 			<CmsEdgeTableScroll className="border-t border-border/50">
@@ -246,7 +354,7 @@ function TransactionHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_SUPPLEMENTAL_DX_DETAIL.transactionHistory.map((row) => (
+						{detail.transactionHistory.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -302,7 +410,7 @@ function TransactionHistoryPanel() {
 	);
 }
 
-function SubmissionHistoryPanel() {
+function SubmissionHistoryPanel({ detail }: { detail: SupplementalDxDetail }) {
 	return (
 		<CmsEdgeSectionPanel
 			title="4. Submission & Validation History"
@@ -334,7 +442,7 @@ function SubmissionHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_SUPPLEMENTAL_DX_DETAIL.submissionHistory.map((row) => (
+						{detail.submissionHistory.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -369,8 +477,8 @@ function SubmissionHistoryPanel() {
 	);
 }
 
-function CmsValidationSidebar() {
-	const v = CMS_EDGE_SUPPLEMENTAL_DX_DETAIL.cmsValidation;
+function CmsValidationSidebar({ detail }: { detail: SupplementalDxDetail }) {
+	const v = detail.cmsValidation;
 	return (
 		<div className="space-y-3">
 			<CmsEdgeSectionPanel title="CMS Validation" bodyClassName="space-y-3 p-4">
@@ -425,12 +533,57 @@ function CmsValidationSidebar() {
 }
 
 export function CmsEdgeSupplementalDiagnosisDetail({
+	id,
 	onBack,
 }: {
+	id: string;
 	onBack: () => void;
 }) {
 	const [tab, setTab] = useState("overview");
-	const detail = CMS_EDGE_SUPPLEMENTAL_DX_DETAIL;
+	const {
+		data: live,
+		isLoading,
+		isError,
+		error,
+	} = useCmsEdgeSupplementalDiagnosisDetailQuery(id);
+
+	const detail = useMemo(
+		() => (live ? mergeSupplementalDxDetail(live) : null),
+		[live]
+	);
+
+	if (isLoading) {
+		return (
+			<div className="flex min-h-[240px] items-center justify-center rounded-sm border border-dashed border-border/70 bg-card px-6 py-12 text-sm text-muted-foreground">
+				Loading supplemental diagnosis…
+			</div>
+		);
+	}
+
+	if (isError || !detail) {
+		return (
+			<div className="space-y-3">
+				<Button
+					variant="link"
+					className="h-auto gap-1.5 px-0 text-xs font-semibold text-primary"
+					onClick={onBack}
+				>
+					<ArrowLeft className="size-3.5" />
+					Back to Supplemental Diagnoses
+				</Button>
+				<div className="flex min-h-[240px] flex-col items-center justify-center rounded-sm border border-dashed border-border/70 bg-card px-6 py-12 text-center">
+					<p className="text-sm font-semibold text-foreground">
+						Supplemental diagnosis not found
+					</p>
+					<p className="mt-1 max-w-md text-sm text-muted-foreground">
+						{error instanceof Error
+							? error.message
+							: "No detail payload returned for this record id."}
+					</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-4">
@@ -527,26 +680,26 @@ export function CmsEdgeSupplementalDiagnosisDetail({
 						align="start"
 						main={
 							<div className="space-y-4">
-								<RecordInfoPanel />
-								<LinkagePanel />
-								<TransactionHistoryPanel />
-								<SubmissionHistoryPanel />
+								<RecordInfoPanel detail={detail} />
+								<LinkagePanel detail={detail} />
+								<TransactionHistoryPanel detail={detail} />
+								<SubmissionHistoryPanel detail={detail} />
 							</div>
 						}
-						side={<CmsValidationSidebar />}
+						side={<CmsValidationSidebar detail={detail} />}
 					/>
 				</TabsContent>
 
 				<TabsContent value="validation" className="mt-4 max-w-md">
-					<CmsValidationSidebar />
+					<CmsValidationSidebar detail={detail} />
 				</TabsContent>
 
 				<TabsContent value="transactions" className="mt-4">
-					<TransactionHistoryPanel />
+					<TransactionHistoryPanel detail={detail} />
 				</TabsContent>
 
 				<TabsContent value="submissions" className="mt-4">
-					<SubmissionHistoryPanel />
+					<SubmissionHistoryPanel detail={detail} />
 				</TabsContent>
 			</Tabs>
 

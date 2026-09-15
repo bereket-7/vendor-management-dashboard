@@ -35,8 +35,9 @@ import {
 	CmsEdgeSectionPanel,
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import { useCmsEdgeProviderDetailQuery } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import type { CmsEdgeProviderDetailView } from "@/features/admin/features/claim-encounter/cms-edge/live-providers";
 import {
-	CMS_EDGE_PROVIDER_DETAIL,
 	PROVIDER_CLAIM_STATUS_STYLES,
 	PROVIDER_ERROR_STATUS_STYLES,
 	PROVIDER_ROLE_STYLES,
@@ -54,7 +55,7 @@ const KPI_ICONS = {
 	pill: Pill,
 	alert: AlertTriangle,
 } satisfies Record<
-	(typeof CMS_EDGE_PROVIDER_DETAIL.kpis)[number]["icon"],
+	CmsEdgeProviderDetailView["kpis"][number]["icon"],
 	LucideIcon
 >;
 
@@ -70,9 +71,13 @@ function StatusPill({
 	);
 }
 
-function ProviderIdentificationPanel() {
-	const left = CMS_EDGE_PROVIDER_DETAIL.identificationLeft;
-	const right = CMS_EDGE_PROVIDER_DETAIL.identificationRight;
+function ProviderIdentificationPanel({
+	provider,
+}: {
+	provider: CmsEdgeProviderDetailView;
+}) {
+	const left = provider.identificationLeft;
+	const right = provider.identificationRight;
 
 	return (
 		<CmsEdgeSectionPanel
@@ -107,8 +112,12 @@ function ProviderIdentificationPanel() {
 	);
 }
 
-function NpiValidationPanel() {
-	const v = CMS_EDGE_PROVIDER_DETAIL.npiValidation;
+function NpiValidationPanel({
+	provider,
+}: {
+	provider: CmsEdgeProviderDetailView;
+}) {
+	const v = provider.npiValidation;
 	return (
 		<CmsEdgeSectionPanel title="NPI Validation" bodyClassName="space-y-3 p-4">
 			<div className="flex flex-wrap gap-4 text-xs font-semibold">
@@ -139,12 +148,16 @@ function NpiValidationPanel() {
 	);
 }
 
-function AssociatedClaimsPanel() {
+function AssociatedClaimsPanel({
+	provider,
+}: {
+	provider: CmsEdgeProviderDetailView;
+}) {
 	const [claimTab, setClaimTab] = useState<"medical" | "pharmacy">("medical");
 	const rows =
-		claimTab === "medical"
-			? CMS_EDGE_PROVIDER_DETAIL.medicalClaims
-			: CMS_EDGE_PROVIDER_DETAIL.pharmacyClaims;
+		claimTab === "medical" ? provider.medicalClaims : provider.pharmacyClaims;
+	const medicalCount = provider.medicalClaims.length;
+	const pharmacyCount = provider.pharmacyClaims.length;
 
 	return (
 		<CmsEdgeSectionPanel
@@ -168,7 +181,7 @@ function AssociatedClaimsPanel() {
 								claimTab === "medical" ? "bg-primary-foreground/20" : "bg-muted"
 							)}
 						>
-							4,521
+							{medicalCount.toLocaleString("en-US")}
 						</span>
 					</button>
 					<button
@@ -190,7 +203,7 @@ function AssociatedClaimsPanel() {
 									: "bg-muted"
 							)}
 						>
-							0
+							{pharmacyCount.toLocaleString("en-US")}
 						</span>
 					</button>
 				</div>
@@ -249,7 +262,7 @@ function AssociatedClaimsPanel() {
 									colSpan={10}
 									className="px-3 py-8 text-center text-muted-foreground"
 								>
-									No pharmacy claims for this provider.
+									No {claimTab} claims for this provider.
 								</TableCell>
 							</TableRow>
 						) : (
@@ -307,7 +320,11 @@ function AssociatedClaimsPanel() {
 	);
 }
 
-function ErrorHistoryPanel() {
+function ErrorHistoryPanel({
+	provider,
+}: {
+	provider: CmsEdgeProviderDetailView;
+}) {
 	return (
 		<CmsEdgeSectionPanel title="NPI Error History" bodyClassName="pb-2">
 			<CmsEdgeTableScroll className="border-t border-border/50">
@@ -341,37 +358,48 @@ function ErrorHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_PROVIDER_DETAIL.errorHistory.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">
-									{row.date}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 font-mono text-[11px]">
-									{row.errorCode}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-muted-foreground">
-									{row.description}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-right tabular-nums">
-									{row.claimsImpacted}
-								</TableCell>
-								<TableCell className="px-3 py-2.5">
-									<StatusPill
-										label={row.status}
-										className={PROVIDER_ERROR_STATUS_STYLES[row.status]}
-									/>
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-muted-foreground">
-									{row.resolution}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 pr-4 text-muted-foreground">
-									{row.resolvedBy}
+						{provider.errorHistory.length === 0 ? (
+							<TableRow>
+								<TableCell
+									colSpan={7}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									No NPI errors recorded for this provider.
 								</TableCell>
 							</TableRow>
-						))}
+						) : (
+							provider.errorHistory.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">
+										{row.date}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+										{row.errorCode}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-muted-foreground">
+										{row.description}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-right tabular-nums">
+										{row.claimsImpacted}
+									</TableCell>
+									<TableCell className="px-3 py-2.5">
+										<StatusPill
+											label={row.status}
+											className={PROVIDER_ERROR_STATUS_STYLES[row.status]}
+										/>
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-muted-foreground">
+										{row.resolution}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 pr-4 text-muted-foreground">
+										{row.resolvedBy}
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -379,7 +407,11 @@ function ErrorHistoryPanel() {
 	);
 }
 
-function SubmissionHistoryPanel() {
+function SubmissionHistoryPanel({
+	provider,
+}: {
+	provider: CmsEdgeProviderDetailView;
+}) {
 	return (
 		<CmsEdgeSectionPanel title="Submission History" bodyClassName="pb-2">
 			<CmsEdgeTableScroll className="border-t border-border/50">
@@ -407,31 +439,42 @@ function SubmissionHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_PROVIDER_DETAIL.submissionHistory.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className="px-3 py-2.5 font-medium">
-									{row.submissionType}
-								</TableCell>
-								<TableCell className="px-3 py-2.5">
-									{row.reportingPeriod}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 tabular-nums">
-									{row.submittedDate}
-								</TableCell>
-								<TableCell className="px-3 py-2.5">
-									<StatusPill
-										label={row.status}
-										className="border-emerald-200/80 bg-emerald-50 text-emerald-800"
-									/>
-								</TableCell>
-								<TableCell className="px-3 py-2.5 pr-4 font-mono text-[11px]">
-									{row.fileName}
+						{provider.submissionHistory.length === 0 ? (
+							<TableRow>
+								<TableCell
+									colSpan={5}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									No submission history for this provider.
 								</TableCell>
 							</TableRow>
-						))}
+						) : (
+							provider.submissionHistory.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className="px-3 py-2.5 font-medium">
+										{row.submissionType}
+									</TableCell>
+									<TableCell className="px-3 py-2.5">
+										{row.reportingPeriod}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 tabular-nums">
+										{row.submittedDate}
+									</TableCell>
+									<TableCell className="px-3 py-2.5">
+										<StatusPill
+											label={row.status}
+											className="border-emerald-200/80 bg-emerald-50 text-emerald-800"
+										/>
+									</TableCell>
+									<TableCell className="px-3 py-2.5 pr-4 font-mono text-[11px]">
+										{row.fileName}
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -439,9 +482,53 @@ function SubmissionHistoryPanel() {
 	);
 }
 
-export function CmsEdgeProviderDetail({ onBack }: { onBack: () => void }) {
+export function CmsEdgeProviderDetail({
+	id,
+	onBack,
+}: {
+	id: string;
+	onBack: () => void;
+}) {
 	const [tab, setTab] = useState("overview");
-	const provider = CMS_EDGE_PROVIDER_DETAIL;
+	const {
+		data: provider,
+		isLoading,
+		isError,
+		error,
+	} = useCmsEdgeProviderDetailQuery(id);
+
+	if (isLoading) {
+		return (
+			<div className="flex min-h-[240px] items-center justify-center rounded-sm border border-dashed border-border/70 bg-card px-6 py-12 text-sm text-muted-foreground">
+				Loading provider…
+			</div>
+		);
+	}
+
+	if (isError || !provider) {
+		return (
+			<div className="space-y-3">
+				<Button
+					variant="link"
+					className="h-auto gap-1.5 px-0 text-xs font-semibold text-primary"
+					onClick={onBack}
+				>
+					<ArrowLeft className="size-3.5" />
+					Back to Providers
+				</Button>
+				<div className="flex min-h-[240px] flex-col items-center justify-center rounded-sm border border-dashed border-border/70 bg-card px-6 py-12 text-center">
+					<p className="text-sm font-semibold text-foreground">
+						Provider not found
+					</p>
+					<p className="mt-1 max-w-md text-sm text-muted-foreground">
+						{error instanceof Error
+							? error.message
+							: "No detail payload returned for this provider id."}
+					</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-4">
@@ -541,27 +628,27 @@ export function CmsEdgeProviderDetail({ onBack }: { onBack: () => void }) {
 
 				<TabsContent value="overview" className="mt-4 space-y-4">
 					<div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-						<ProviderIdentificationPanel />
-						<NpiValidationPanel />
+						<ProviderIdentificationPanel provider={provider} />
+						<NpiValidationPanel provider={provider} />
 					</div>
-					<AssociatedClaimsPanel />
-					<ErrorHistoryPanel />
+					<AssociatedClaimsPanel provider={provider} />
+					<ErrorHistoryPanel provider={provider} />
 				</TabsContent>
 
 				<TabsContent value="claims" className="mt-4">
-					<AssociatedClaimsPanel />
+					<AssociatedClaimsPanel provider={provider} />
 				</TabsContent>
 
 				<TabsContent value="npi" className="mt-4 max-w-xl">
-					<NpiValidationPanel />
+					<NpiValidationPanel provider={provider} />
 				</TabsContent>
 
 				<TabsContent value="errors" className="mt-4">
-					<ErrorHistoryPanel />
+					<ErrorHistoryPanel provider={provider} />
 				</TabsContent>
 
 				<TabsContent value="submissions" className="mt-4">
-					<SubmissionHistoryPanel />
+					<SubmissionHistoryPanel provider={provider} />
 				</TabsContent>
 			</Tabs>
 
@@ -577,16 +664,29 @@ export function CmsEdgeProviderDetail({ onBack }: { onBack: () => void }) {
 				<Button
 					variant="outline"
 					className="h-9"
-					onClick={() =>
-						toast.message("Source record opens in provider network.")
-					}
+					onClick={() => {
+						const source =
+							provider.submissionHistory[0]?.fileName ||
+							provider.identificationRight.find(
+								(f) => f.label === "Source Vendor"
+							)?.value;
+						if (source && source !== "—") {
+							toast.message(`Source: ${source}`);
+						} else {
+							toast.message("No vendor source record for this provider.");
+						}
+					}}
 				>
 					View Source Record
 				</Button>
 				<Button
 					variant="outline"
 					className="h-9"
-					onClick={() => toast.success("Provider export started.")}
+					onClick={() => {
+						toast.message(
+							"Use Providers list Export for CSV. Detail PDF export not available."
+						);
+					}}
 				>
 					<Download className="mr-1.5 size-3.5" />
 					Export Provider

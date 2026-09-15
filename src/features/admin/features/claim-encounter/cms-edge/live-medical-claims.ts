@@ -166,6 +166,102 @@ export function medicalMockRowsToGroups(
 	}));
 }
 
+export function deriveMedicalClaimFilterOptions(
+	groups: CmsEdgeMedicalClaimGroup[]
+) {
+	const uniq = (values: string[]) => [
+		"All",
+		...Array.from(new Set(values.filter(Boolean))).sort(),
+	];
+
+	return {
+		cmsStatus: uniq(groups.map((g) => g.cmsStatus)),
+		transaction: uniq(groups.map((g) => g.transaction)),
+		formType: uniq(groups.map((g) => g.formType)),
+		enrolleeId: uniq(groups.map((g) => g.enrolleeId).filter((v) => v !== "—")),
+		billingNpi: uniq(groups.map((g) => g.billingNpi).filter((v) => v !== "—")),
+	};
+}
+
+export function deriveMedicalValidationSummary(
+	groups: CmsEdgeMedicalClaimGroup[]
+) {
+	const total = groups.length;
+	const pct = (n: number) =>
+		total > 0 ? `${((n / total) * 100).toFixed(2)}% of page` : "0% of page";
+
+	const procRevMismatch = groups.filter((g) =>
+		g.lines.some(
+			(line) =>
+				line.revenueCode !== "—" &&
+				line.procedureCode !== "—" &&
+				g.formType === "Professional"
+		)
+	).length;
+	const invalidDx = groups.filter(
+		(g) => !g.primaryDiagnosis || g.primaryDiagnosis === "—"
+	).length;
+	const missingNpi = groups.filter(
+		(g) => !g.billingNpi || g.billingNpi === "—"
+	).length;
+	const financialMismatch = groups.filter(
+		(g) => g.allowedAmount > 0 && g.planPaid > g.allowedAmount + 0.01
+	).length;
+	const voidLink = groups.filter(
+		(g) =>
+			(g.transaction === "Void" || g.transaction === "Replacement") &&
+			g.cmsStatus === "Error"
+	).length;
+
+	return [
+		{
+			id: "proc-rev",
+			label: "Procedure/Revenue Mismatch",
+			value: procRevMismatch.toLocaleString("en-US"),
+			hint: pct(procRevMismatch),
+			tone: "text-amber-700 bg-amber-500/10",
+			valueClassName: "text-amber-700",
+			icon: "alert" as const,
+		},
+		{
+			id: "invalid-dx",
+			label: "Invalid Diagnosis Code",
+			value: invalidDx.toLocaleString("en-US"),
+			hint: pct(invalidDx),
+			tone: "text-violet-700 bg-violet-500/10",
+			valueClassName: "text-violet-700",
+			icon: "ban" as const,
+		},
+		{
+			id: "missing-npi",
+			label: "Missing Rendering NPI",
+			value: missingNpi.toLocaleString("en-US"),
+			hint: pct(missingNpi),
+			tone: "text-red-700 bg-red-500/10",
+			valueClassName: "text-red-600",
+			icon: "user" as const,
+		},
+		{
+			id: "financial",
+			label: "Financial Mismatch",
+			value: financialMismatch.toLocaleString("en-US"),
+			hint: pct(financialMismatch),
+			tone: "text-sky-700 bg-sky-500/10",
+			valueClassName: "text-sky-700",
+			icon: "dollar" as const,
+		},
+		{
+			id: "void-link",
+			label: "Void/Replacement Link Error",
+			value: voidLink.toLocaleString("en-US"),
+			hint: pct(voidLink),
+			tone: "text-teal-700 bg-teal-500/10",
+			valueClassName: "text-teal-700",
+			icon: "link" as const,
+		},
+	];
+}
+
 export function deriveMedicalClaimKpis(groups: CmsEdgeMedicalClaimGroup[]) {
 	const total = groups.length;
 	const ready = groups.filter((g) => g.cmsStatus === "Ready").length;
@@ -228,4 +324,117 @@ export function deriveMedicalClaimKpis(groups: CmsEdgeMedicalClaimGroup[]) {
 			icon: "user" as const,
 		},
 	];
+}
+
+export type CmsEdgeMedicalClaimDetailView = {
+	id: string;
+	claimId: string;
+	cmsStatus: string;
+	transaction: string;
+	formType: string;
+	summary: { label: string; value: string; icon: string }[];
+	headerLeft: { label: string; value: string }[];
+	headerRight: { label: string; value: string }[];
+	lines: {
+		id: string;
+		line: number;
+		serviceFrom: string;
+		serviceTo: string;
+		revenueCode: string;
+		procedureCode: string;
+		modifiers: string;
+		placeOfService: string;
+		renderingNpi: string;
+		allowed: number;
+		planPaid: number;
+		validation: string;
+	}[];
+	lineTotals: { allowed: number; planPaid: number };
+	sourceFileName?: string | null;
+	vendorFileId?: string | null;
+};
+
+/** Build EDGE medical claim detail from sibling claim-line DTOs. */
+export function claimLineDtosToMedicalClaimDetailView(
+	lines: ClaimLineDto[]
+): CmsEdgeMedicalClaimDetailView | null {
+	if (!lines.length) return null;
+	const groups = claimLineDtosToMedicalClaimGroups(lines);
+	const group = groups[0]!;
+	const sorted = [...lines].sort(
+		(a, b) => (a.line_number ?? 0) - (b.line_number ?? 0)
+	);
+
+	return {
+		id: group.id,
+		claimId: group.claimId,
+		cmsStatus:
+			group.cmsStatus === "Ready"
+				? "CMS Ready"
+				: group.cmsStatus === "Error"
+					? "Error"
+					: "Warning",
+		transaction: group.transaction,
+		formType: group.formType,
+		summary: [
+			{ label: "Unique Enrollee ID", value: group.enrolleeId, icon: "user" },
+			{ label: "Form Type", value: group.formType, icon: "file" },
+			{ label: "Statement From", value: group.statementFrom, icon: "calendar" },
+			{
+				label: "Statement Through",
+				value: group.statementThrough,
+				icon: "calendar",
+			},
+			{
+				label: "Total Allowed",
+				value: group.allowedAmount.toLocaleString("en-US", {
+					style: "currency",
+					currency: "USD",
+				}),
+				icon: "dollar",
+			},
+			{
+				label: "Plan Paid",
+				value: group.planPaid.toLocaleString("en-US", {
+					style: "currency",
+					currency: "USD",
+				}),
+				icon: "dollar",
+			},
+		],
+		headerLeft: [
+			{ label: "Claim ID", value: group.claimId },
+			{ label: "Original Claim ID", value: "—" },
+			{ label: "Form Type", value: group.formType },
+			{ label: "Transaction", value: group.transaction },
+			{ label: "Billing NPI", value: group.billingNpi },
+		],
+		headerRight: [
+			{ label: "Primary Diagnosis", value: group.primaryDiagnosis },
+			{ label: "Statement From", value: group.statementFrom },
+			{ label: "Statement Through", value: group.statementThrough },
+			{ label: "CMS Status", value: group.cmsStatus },
+			{ label: "Line Count", value: String(group.lines.length) },
+		],
+		lines: sorted.map((dto) => ({
+			id: dto.id,
+			line: dto.line_number ?? 1,
+			serviceFrom: formatDate(dto.service_date),
+			serviceTo: formatDate(dto.service_date),
+			revenueCode: dto.revenue_code?.trim() || "—",
+			procedureCode: dto.procedure_code?.trim() || "—",
+			modifiers: "—",
+			placeOfService: "—",
+			renderingNpi: "—",
+			allowed: num(dto.allowed_amount ?? dto.billed_amount),
+			planPaid: num(dto.paid_amount),
+			validation: mapStatus(dto.status) === "Error" ? "Error" : "Passed",
+		})),
+		lineTotals: {
+			allowed: group.allowedAmount,
+			planPaid: group.planPaid,
+		},
+		vendorFileId: sorted[0]?.vendor_file_id ?? null,
+		sourceFileName: null,
+	};
 }

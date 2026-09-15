@@ -833,6 +833,9 @@ export type PharmacyClaimRowListQuery = {
 	date_of_service_to?: string;
 	limit?: number;
 	offset?: number;
+	/** Backend ListOrderingMixin field (not `ordering`). */
+	order_by?: string;
+	/** @deprecated Prefer order_by — ignored by pharmacy-claim-rows list. */
 	ordering?: string;
 };
 
@@ -2948,3 +2951,280 @@ export function normalizeWorkQueueBlockerRow(
 		migration_status: pickString(raw, "migration_status") || "",
 	};
 }
+
+/* -------------------------------------------------------------------------- */
+/* CMS EDGE + claim headers (wired 2026-09-09)                                */
+/* -------------------------------------------------------------------------- */
+
+export type CmsEdgeSettingsDto = {
+	id: string;
+	reference_id: string;
+	hios_issuer_id: string;
+	state_code: string;
+	marketplace: string;
+	current_reporting_period: string;
+	medical_enabled: boolean;
+	pharmacy_enabled: boolean;
+	enrollment_enabled: boolean;
+	sdr_enabled: boolean;
+	environment: string;
+	is_active: boolean;
+	updated_at: string;
+};
+
+export type CmsEdgeSettingsUpdateInput = {
+	hios_issuer_id?: string;
+	state_code?: string;
+	marketplace?: string;
+	current_reporting_period?: string;
+	medical_enabled?: boolean;
+	pharmacy_enabled?: boolean;
+	enrollment_enabled?: boolean;
+	sdr_enabled?: boolean;
+	environment?: string;
+};
+
+export type CmsEdgeSeedResultDto = {
+	created: Record<string, number>;
+	reporting_period: string;
+	hios_issuer_id: string;
+	force: boolean;
+};
+
+export type CmsEdgeReportingPeriodDto = {
+	id: string;
+	reference_id: string;
+	code: string;
+	label: string;
+	start_date: string;
+	end_date: string;
+	is_current: boolean;
+};
+
+export type CmsEdgeOverviewStatsDto = {
+	reporting_period: string;
+	data_readiness_pct: number;
+	files_required: number;
+	files_generated: number;
+	submission_status: string;
+	critical_errors: number;
+	reconciliation_pct: number;
+	members_total: number;
+	members_ready: number;
+	members_errors: number;
+	providers_total: number;
+	providers_ready: number;
+	providers_errors: number;
+	claims_total: number;
+	claims_ready: number;
+	claims_errors: number;
+	pharmacy_total: number;
+	pharmacy_ready: number;
+	pharmacy_errors: number;
+	hios_issuer_id?: string;
+	state_code?: string;
+	file_types?: Record<string, boolean>;
+};
+
+export type CmsEdgeWorkflowStageDto = {
+	key: string;
+	label: string;
+	status: string;
+	completed_at?: string | null;
+};
+
+export type CmsEdgeWorkflowDto = {
+	reporting_period: string;
+	stages: CmsEdgeWorkflowStageDto[];
+};
+
+export type CmsEdgeActivityDto = {
+	id: string;
+	event_type: string;
+	file_name: string;
+	environment: string;
+	status: string;
+	owner: string;
+	occurred_at: string | null;
+};
+
+export type CmsEdgeOverviewExceptionDto = {
+	id: string;
+	exception_type: string;
+	count: number;
+	severity: string;
+	owner: string;
+	reporting_period: string;
+	status: string;
+};
+
+export type CmsEdgeFilePackageDto = {
+	id: string;
+	reference_id: string;
+	name: string;
+	file_type: string;
+	reporting_period: string;
+	environment: string;
+	status: string;
+	record_count: number;
+	error_count: number;
+	artifact_uri: string;
+	submitted_at: string | null;
+	owner: string;
+	notes: string;
+	created_at: string;
+	updated_at: string;
+};
+
+export type CmsEdgeFilePackageCreateInput = {
+	name?: string;
+	file_type: string;
+	reporting_period?: string;
+	environment?: string;
+	owner?: string;
+	notes?: string;
+};
+
+export type CmsEdgeFilePackageListQuery = {
+	reporting_period?: string;
+	file_type?: string;
+	status?: string;
+	environment?: string;
+	limit?: number;
+	offset?: number;
+};
+
+export type CmsEdgeSubmissionDto = {
+	id: string;
+	reference_id: string;
+	package_id: string | null;
+	file_type: string;
+	reporting_period: string;
+	environment: string;
+	status: string;
+	submitted_at: string | null;
+	cms_tracking_id: string;
+	record_count: number;
+	owner: string;
+	created_at: string;
+};
+
+export type CmsEdgeCmsResponseDto = {
+	id: string;
+	reference_id: string;
+	submission_id: string | null;
+	filename: string;
+	response_type: string;
+	reporting_period: string;
+	status: string;
+	received_at: string | null;
+	error_count: number;
+	summary: string;
+	created_at: string;
+};
+
+export type CmsEdgeValidationRunDto = {
+	id: string;
+	reference_id: string;
+	kind: string;
+	scope: string;
+	reporting_period: string;
+	status: string;
+	passed_count: number;
+	warning_count: number;
+	error_count: number;
+	started_at: string | null;
+	finished_at: string | null;
+	owner: string;
+	created_at: string;
+};
+
+export type CmsEdgeAuditRequestDto = {
+	id: string;
+	reference_id: string;
+	title: string;
+	request_type: string;
+	reporting_period: string;
+	status: string;
+	due_date: string | null;
+	owner: string;
+	report_uri: string;
+	summary: string;
+	created_at: string;
+};
+
+export type CmsEdgeDocumentDto = {
+	id: string;
+	reference_id: string;
+	title: string;
+	document_type: string;
+	reporting_period: string;
+	uri: string;
+	owner: string;
+	created_at: string;
+};
+
+export type CmsEdgeListQuery = {
+	reporting_period?: string;
+	status?: string;
+	environment?: string;
+	kind?: string;
+	document_type?: string;
+	limit?: number;
+	offset?: number;
+};
+
+export type ClaimHeaderListQuery = {
+	search?: string;
+	claim_reference_id?: string;
+	vendor_file_id?: string;
+	source_inbound_file_id?: string;
+	status?: string;
+	reporting_period?: string;
+	limit?: number;
+	offset?: number;
+};
+
+export type ClaimHeaderListDto = {
+	id: string;
+	reference_id?: string;
+	source_inbound_file_id: string | null;
+	claim_reference_id: string;
+	frequency_code?: string;
+	related_claim_reference_id?: string;
+	subscriber_id?: string;
+	billing_provider_npi?: string;
+	rendering_provider_npi?: string;
+	total_billed_amount?: number | null;
+	facility_code?: string;
+	status: string;
+	validation_status: string;
+	is_duplicate: boolean;
+	primary_diagnosis_code?: string;
+	created_at: string;
+	updated_at: string;
+	vendor_file?: Record<string, unknown> | null;
+};
+
+export type ClaimHeaderDetailDto = ClaimHeaderListDto & {
+	claim_level_amount?: number | null;
+	lines?: Record<string, unknown>[];
+	diagnoses?: Record<string, unknown>[];
+	exceptions?: Record<string, unknown>[];
+	validations?: Record<string, unknown>[];
+};
+
+export type ClaimHeaderVoidReplaceInput = {
+	related_claim_reference_id?: string;
+};
+
+export type ClaimHeaderSummaryDto = {
+	total_claims: number;
+	total_lines: number;
+	total_billed: number;
+	invalid_count: number;
+	warning_count: number;
+	duplicate_count: number;
+	by_frequency: Record<string, number>;
+	by_vendor: Record<string, number>;
+};

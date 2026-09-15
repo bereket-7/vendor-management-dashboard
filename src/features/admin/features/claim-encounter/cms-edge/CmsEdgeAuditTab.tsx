@@ -54,8 +54,10 @@ import {
 	CMS_EDGE_AUDIT_STATUS_MIX,
 	PRIORITY_DOT,
 	REPORT_STATUS_STYLES,
+	useCmsEdgeAuditRequestsList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 function PanelLink({ children }: { children: ReactNode }) {
@@ -173,13 +175,16 @@ function AuditKpiRow() {
 }
 
 function AuditRequestsTable() {
+	const { auditRequests } = useCmsEdgeAuditRequestsList();
+	const rows = isMockEnabled() ? CMS_EDGE_AUDIT_REQUESTS : auditRequests;
+
 	return (
 		<CmsEdgeSectionPanel
 			title="Audit Requests"
 			action={<PanelLink>View All</PanelLink>}
 			footer={
 				<TableFooter
-					left="Showing 1 to 8 of 8 entries"
+					left={`Showing ${rows.length === 0 ? 0 : 1} to ${rows.length} of ${rows.length} entries`}
 					page={1}
 					pageCount={1}
 				/>
@@ -225,7 +230,7 @@ function AuditRequestsTable() {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{CMS_EDGE_AUDIT_REQUESTS.map((row) => (
+							{rows.map((row) => (
 								<TableRow
 									key={row.id}
 									className="border-b border-border/40 hover:bg-muted/20"
@@ -507,11 +512,17 @@ function AuditSlaPerformance() {
 }
 
 function AuditAttentionSummary() {
-	const overdue = CMS_EDGE_AUDIT_KPIS.overdue.count;
-	const inProgress = CMS_EDGE_AUDIT_KPIS.inProgress.count;
+	const { auditRequests } = useCmsEdgeAuditRequestsList();
+	const requestRows = isMockEnabled() ? CMS_EDGE_AUDIT_REQUESTS : auditRequests;
+	const overdue = isMockEnabled()
+		? CMS_EDGE_AUDIT_KPIS.overdue.count
+		: requestRows.filter((r) => r.status === "Overdue").length;
+	const inProgress = isMockEnabled()
+		? CMS_EDGE_AUDIT_KPIS.inProgress.count
+		: requestRows.filter((r) => r.status === "In Progress").length;
 	const nextDue =
-		CMS_EDGE_AUDIT_REQUESTS.find((row) => row.status === "Overdue") ??
-		CMS_EDGE_AUDIT_REQUESTS.find((row) => row.status === "In Progress");
+		requestRows.find((row) => row.status === "Overdue") ??
+		requestRows.find((row) => row.status === "In Progress");
 
 	return (
 		<CmsEdgeSectionPanel title="Audit Alerts">

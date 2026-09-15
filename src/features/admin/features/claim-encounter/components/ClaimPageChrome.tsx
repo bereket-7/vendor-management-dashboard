@@ -20,7 +20,7 @@ export function ClaimPageHeader({
 	actions,
 }: {
 	title: string;
-	description: string;
+	description: ReactNode;
 	actions?: ReactNode;
 }) {
 	return (

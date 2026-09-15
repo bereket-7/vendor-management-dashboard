@@ -10,16 +10,16 @@
 
 ## Done (2026-09-03)
 
-| Area                                                          | Where to check                                                          |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| List KPI cards (`…/stats/`)                                   | `/admin/providers` — Total / Active / Pending / Termed / Inactive       |
-| Seed demo button                                              | `/admin/providers` header (live mode)                                   |
-| Demographics preferred name / language / race / ethnicity     | Detail → **Demographics**                                               |
-| Identifiers / Locations / Networks / Credentials / Exceptions | Detail tabs — pill **Add** + row **Edit** / trash **Delete**            |
-| Section CRUD (wizard chrome, 1 step)                          | `/admin/providers/:id/edit?section=locations` (+ optional `&itemId=`)   |
-| Claims analytics (read)                                       | Detail → **Claims & Encounters**, **Rejection Trends**, Overview charts |
-| Partial load banner                                           | Detail — amber banner if a tab fetch fails                              |
-| Restore / hard delete                                         | Detail → **Lifecycle** menu                                             |
+| Area | Where to check |
+| ------------------------------------------------------------- | .----------------------------------------------------------------------- |
+| List KPI cards (`…/stats/`) | `/admin/providers` — Total / Active / Pending / Termed / Inactive |
+| Seed demo button | `/admin/providers` header (live mode) |
+| Demographics preferred name / language / race / ethnicity | Detail → **Demographics** |
+| Identifiers / Locations / Networks / Credentials / Exceptions | Detail tabs — pill **Add** + row **Edit** / trash **Delete** |
+| Section CRUD (wizard chrome, 1 step) | `/admin/providers/:id/edit?section=locations` (+ optional `&itemId=`) |
+| Claims analytics (read) | Detail → **Claims & Encounters**, **Rejection Trends**, Overview charts |
+| Partial load banner | Detail — amber banner if a tab fetch fails |
+| Restore / hard delete | Detail → **Lifecycle** menu |
 
 ---
 

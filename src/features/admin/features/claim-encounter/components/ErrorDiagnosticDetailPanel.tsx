@@ -131,6 +131,7 @@ export function ErrorDiagnosticDetailPanel({
 	exception,
 	onClose,
 	onStatusChange,
+	onAssign,
 }: {
 	exception: ClaimException;
 	onClose: () => void;
@@ -138,7 +139,8 @@ export function ErrorDiagnosticDetailPanel({
 		id: string,
 		status: ClaimException["status"],
 		notes?: string
-	) => void;
+	) => void | Promise<void>;
+	onAssign?: (id: string) => void | Promise<void>;
 }) {
 	const [status, setStatus] = useState<ClaimException["status"]>(
 		exception.status
@@ -146,16 +148,26 @@ export function ErrorDiagnosticDetailPanel({
 	const [ediOpen, setEdiOpen] = useState(false);
 	const [attachments, setAttachments] = useState(exception.attachmentsCount);
 
-	function markInProgress() {
-		setStatus("in_progress");
-		onStatusChange(exception.id, "in_progress", exception.resolutionNotes);
-		toast.success("Exception marked in progress.");
+	async function markInProgress() {
+		try {
+			await onStatusChange(
+				exception.id,
+				"in_progress",
+				exception.resolutionNotes
+			);
+			setStatus("in_progress");
+		} catch {
+			/* toast already shown by parent */
+		}
 	}
 
-	function markResolved() {
-		setStatus("resolved");
-		onStatusChange(exception.id, "resolved", exception.resolutionNotes);
-		toast.success("Exception marked resolved.");
+	async function markResolved() {
+		try {
+			await onStatusChange(exception.id, "resolved", exception.resolutionNotes);
+			setStatus("resolved");
+		} catch {
+			/* toast already shown by parent */
+		}
 	}
 
 	return (
@@ -345,12 +357,16 @@ export function ErrorDiagnosticDetailPanel({
 										variant="outline"
 										size="sm"
 										className="h-7 text-[11px]"
-										onClick={() =>
+										onClick={() => {
+											if (onAssign) {
+												void onAssign(exception.id);
+												return;
+											}
 											toast.message("Reassign", {
 												description:
 													"Reassignment will connect in a later cutover.",
-											})
-										}
+											});
+										}}
 									>
 										<UserRound className="mr-1.5 size-3" />
 										Reassign

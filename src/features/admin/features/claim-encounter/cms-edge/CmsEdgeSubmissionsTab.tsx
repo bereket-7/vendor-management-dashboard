@@ -54,7 +54,6 @@ import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_SUBMISSION_ENVIRONMENTS,
 	CMS_EDGE_SUBMISSION_FILE_TYPES,
-	CMS_EDGE_SUBMISSION_HISTORY,
 	CMS_EDGE_SUBMISSION_KPIS,
 	CMS_EDGE_SUBMISSION_PROCESS_STEPS,
 	CMS_EDGE_SUBMISSION_STATUSES,
@@ -62,8 +61,10 @@ import {
 	type SubmissionEnvironment,
 	type SubmissionFileType,
 	type SubmissionStatus,
+	useCmsEdgeSubmissionHistoryList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const PANEL_SHADOW =
@@ -403,19 +404,21 @@ export function CmsEdgeSubmissionsTab() {
 	);
 	const [fileType, setFileType] = useState<SubmissionFileType | "all">("all");
 	const [status, setStatus] = useState<SubmissionStatus | "all">("all");
+	const { submissionHistory } = useCmsEdgeSubmissionHistoryList();
 
 	const filteredRows = useMemo(() => {
 		const periodLabel = periodValueToLabel(reportingPeriod);
+		const useMock = isMockEnabled();
 
-		return CMS_EDGE_SUBMISSION_HISTORY.filter((row) => {
-			if (row.reportingPeriod !== periodLabel) return false;
+		return submissionHistory.filter((row) => {
+			if (useMock && row.reportingPeriod !== periodLabel) return false;
 			if (environment !== "all" && row.environment !== environment)
 				return false;
 			if (fileType !== "all" && row.fileType !== fileType) return false;
 			if (status !== "all" && row.status !== status) return false;
 			return true;
 		});
-	}, [reportingPeriod, environment, fileType, status]);
+	}, [reportingPeriod, environment, fileType, status, submissionHistory]);
 
 	const hasFilters =
 		environment !== "all" || fileType !== "all" || status !== "all";

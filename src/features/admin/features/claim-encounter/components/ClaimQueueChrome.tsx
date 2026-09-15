@@ -13,23 +13,38 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 export function parseClaimDate(value: string): Date {
-	// "2026-07-20 07:14" → Date
-	return new Date(`${value.replace(" ", "T")}:00`);
+	if (!value?.trim()) return new Date(Number.NaN);
+	const trimmed = value.trim();
+	// Live ISO / RFC3339 (do not append ":00")
+	if (
+		trimmed.includes("T") ||
+		/[zZ]$/.test(trimmed) ||
+		/[+-]\d{2}:\d{2}$/.test(trimmed)
+	) {
+		return new Date(trimmed);
+	}
+	// Mock fixture style: "2026-07-20 07:14"
+	return new Date(`${trimmed.replace(" ", "T")}:00`);
 }
 
-/** Age in hours vs reference (defaults to 2026-07-31 noon for stable mock UX). */
+/** Age in hours. Mock fixtures use a fixed "now"; live uses wall clock. */
 export function hoursSince(
 	receivedAt: string,
-	now = new Date("2026-07-31T12:00:00")
+	now = isMockEnabled() ? new Date("2026-07-31T12:00:00") : new Date()
 ) {
-	const ms = now.getTime() - parseClaimDate(receivedAt).getTime();
+	const received = parseClaimDate(receivedAt);
+	if (Number.isNaN(received.getTime())) return 0;
+	const ms = now.getTime() - received.getTime();
+	if (!Number.isFinite(ms)) return 0;
 	return Math.max(0, Math.round(ms / (1000 * 60 * 60)));
 }
 
 export function formatWaitLabel(hours: number) {
+	if (!Number.isFinite(hours) || hours < 0) return "—";
 	if (hours < 24) return `${hours}h`;
 	const days = Math.floor(hours / 24);
 	const rem = hours % 24;

@@ -70,8 +70,10 @@ import {
 	RECORD_SEVERITY_STYLES,
 	RESOLUTION_STATUS_DOT,
 	type RecordResolutionStatus,
+	useCmsEdgeValidationRunsList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 type ValidationSubTab = "internal" | "external";
@@ -271,6 +273,8 @@ function InternalValidationSummaryPanel() {
 }
 
 function InternalFileValidationPanel() {
+	const { validationRuns } = useCmsEdgeValidationRunsList();
+
 	return (
 		<CmsEdgeSectionPanel
 			title="Internal File Validation"
@@ -343,7 +347,10 @@ function InternalFileValidationPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_INTERNAL_FILE_VALIDATION.map((row) => (
+						{(isMockEnabled()
+							? CMS_EDGE_INTERNAL_FILE_VALIDATION
+							: validationRuns
+						).map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"

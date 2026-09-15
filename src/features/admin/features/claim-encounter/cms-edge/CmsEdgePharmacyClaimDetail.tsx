@@ -40,13 +40,17 @@ import {
 	CmsEdgeSplitRow,
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
-import { useCmsEdgePharmacyClaimDetailQuery } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import {
+	useCmsEdgePharmacyClaimDetailQuery,
+	useVoidPharmacyClaimMutation,
+} from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import type { CmsEdgePharmacyClaimDetailView } from "@/features/admin/features/claim-encounter/cms-edge/live-pharmacy-claims";
 import {
 	PHARMACY_CLAIM_DETAIL_STATUS_STYLES,
 	PHARMACY_CLAIM_TXN_STYLES,
 	PHARMACY_CLAIM_VALIDATION_RESULT_STYLES,
 } from "@/features/admin/features/claim-encounter/cms-edge/mock-data";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const DETAIL_TAB_TRIGGER =
@@ -481,6 +485,7 @@ export function CmsEdgePharmacyClaimDetail({
 		isError,
 		error,
 	} = useCmsEdgePharmacyClaimDetailQuery(id);
+	const voidMutation = useVoidPharmacyClaimMutation();
 
 	if (isLoading) {
 		return (
@@ -590,7 +595,7 @@ export function CmsEdgePharmacyClaimDetail({
 					</TabsList>
 				</div>
 
-				<TabsContent value="overview" className="mt-4 space-y-0">
+				<TabsContent value="overview" className="mt-4 space-y-4">
 					<CmsEdgeSplitRow
 						className="gap-4"
 						sideWidth="300px"
@@ -599,21 +604,24 @@ export function CmsEdgePharmacyClaimDetail({
 							<div className="space-y-4">
 								<ClaimInfoPanel claim={claim} />
 								<DrugInfoPanel claim={claim} />
-								<FinancialPanel claim={claim} />
-								<TransactionHistoryPanel claim={claim} />
-								<ValidationHistoryPanel claim={claim} />
 							</div>
 						}
 						side={<CmsValidationSidebar claim={claim} />}
 					/>
+					<FinancialPanel claim={claim} />
+					<TransactionHistoryPanel claim={claim} />
+					<ValidationHistoryPanel claim={claim} />
 				</TabsContent>
 
 				<TabsContent value="transactions" className="mt-4">
 					<TransactionHistoryPanel claim={claim} />
 				</TabsContent>
 
-				<TabsContent value="validation" className="mt-4 max-w-md">
-					<CmsValidationSidebar claim={claim} />
+				<TabsContent value="validation" className="mt-4">
+					<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+						<ValidationHistoryPanel claim={claim} />
+						<CmsValidationSidebar claim={claim} />
+					</div>
 				</TabsContent>
 
 				<TabsContent value="submissions" className="mt-4">
@@ -646,7 +654,20 @@ export function CmsEdgePharmacyClaimDetail({
 					<Button
 						variant="outline"
 						className="h-9"
-						onClick={() => toast.message("Void draft created.")}
+						disabled={voidMutation.isPending}
+						onClick={() => {
+							if (isMockEnabled()) {
+								toast.message("Void draft created.");
+								return;
+							}
+							voidMutation.mutate(claim.id, {
+								onSuccess: () => toast.success("Pharmacy claim voided."),
+								onError: (err) =>
+									toast.error(
+										err instanceof Error ? err.message : "Void failed"
+									),
+							});
+						}}
 					>
 						<Ban className="mr-1.5 size-3.5" />
 						Generate Void

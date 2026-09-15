@@ -53,8 +53,15 @@ import {
 	REJECT_REASON_CATALOG,
 	exceptionsForProgram,
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
+import {
+	useAssignClaimExceptionMutation,
+	useClaimExceptionsQuery,
+	useResolveClaimExceptionMutation,
+} from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
+import { vendorCoreMe } from "@/lib/vendor-core/client";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 function timeOnly(value: string) {
@@ -64,6 +71,10 @@ function timeOnly(value: string) {
 
 export function ExceptionsRejectionsPage() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
+	const mockMode = isMockEnabled();
+	const exceptionsQuery = useClaimExceptionsQuery();
+	const resolveMutation = useResolveClaimExceptionMutation();
+	const assignMutation = useAssignClaimExceptionMutation();
 	const [vendor, setVendor] = useState("all");
 	const [severity, setSeverity] = useState("all");
 	const [status, setStatus] = useState("all");
@@ -78,6 +89,9 @@ export function ExceptionsRejectionsPage() {
 	const [notesOverrides, setNotesOverrides] = useState<Record<string, string>>(
 		{}
 	);
+	const [assignOverrides, setAssignOverrides] = useState<
+		Record<string, string>
+	>({});
 	const [isXl, setIsXl] = useState(false);
 	const pageSize = 8;
 	const detailDismissedRef = useRef(false);
@@ -90,13 +104,22 @@ export function ExceptionsRejectionsPage() {
 		return () => mq.removeEventListener("change", sync);
 	}, []);
 
+	const sourceRows = useMemo(() => {
+		if (mockMode) return exceptionsForProgram(programFilter);
+		const rows = exceptionsQuery.data ?? [];
+		return rows.filter(
+			(e) => e.program === programFilter || programFilter === "MDH"
+		);
+	}, [exceptionsQuery.data, mockMode, programFilter]);
+
 	const baseRows = useMemo(() => {
-		return exceptionsForProgram(programFilter).map((row) => ({
+		return sourceRows.map((row) => ({
 			...row,
 			status: statusOverrides[row.id] ?? row.status,
 			resolutionNotes: notesOverrides[row.id] ?? row.resolutionNotes,
+			assignedTo: assignOverrides[row.id] ?? row.assignedTo,
 		}));
-	}, [notesOverrides, programFilter, statusOverrides]);
+	}, [assignOverrides, notesOverrides, sourceRows, statusOverrides]);
 
 	const vendors = VENDOR_NAMES;
 
@@ -203,18 +226,78 @@ export function ExceptionsRejectionsPage() {
 
 	async function handleRefresh() {
 		setRefreshing(true);
-		await new Promise((r) => setTimeout(r, 500));
-		setRefreshing(false);
+		try {
+			if (!mockMode) {
+				await exceptionsQuery.refetch();
+			} else {
+				await new Promise((r) => setTimeout(r, 500));
+			}
+		} finally {
+			setRefreshing(false);
+		}
 	}
 
-	function handleStatusChange(
+	async function handleStatusChange(
 		id: string,
 		nextStatus: ClaimException["status"],
 		notes?: string
 	) {
+		if (!mockMode) {
+			try {
+				if (nextStatus === "resolved") {
+					await resolveMutation.mutateAsync({ id, notes });
+					toast.success("Exception resolved.");
+				} else if (nextStatus === "in_progress") {
+					const me = await vendorCoreMe();
+					await assignMutation.mutateAsync({
+						id,
+						assigned_to_id: me.id,
+					});
+					const label =
+						me.full_name?.trim() ||
+						[me.first_name, me.last_name].filter(Boolean).join(" ").trim() ||
+						me.username ||
+						me.id;
+					setAssignOverrides((prev) => ({ ...prev, [id]: label }));
+					toast.success("Exception assigned.");
+				}
+			} catch (err) {
+				toast.error(
+					err instanceof Error ? err.message : "Exception update failed"
+				);
+				throw err;
+			}
+		} else if (nextStatus === "resolved") {
+			toast.success("Exception marked resolved.");
+		} else if (nextStatus === "in_progress") {
+			toast.success("Exception marked in progress.");
+		}
 		setStatusOverrides((prev) => ({ ...prev, [id]: nextStatus }));
 		if (notes != null) {
 			setNotesOverrides((prev) => ({ ...prev, [id]: notes }));
+		}
+	}
+
+	async function handleAssign(id: string) {
+		if (mockMode) {
+			setAssignOverrides((prev) => ({ ...prev, [id]: "You" }));
+			setStatusOverrides((prev) => ({ ...prev, [id]: "in_progress" }));
+			toast.success("Exception assigned (mock).");
+			return;
+		}
+		try {
+			const me = await vendorCoreMe();
+			await assignMutation.mutateAsync({ id, assigned_to_id: me.id });
+			const label =
+				me.full_name?.trim() ||
+				[me.first_name, me.last_name].filter(Boolean).join(" ").trim() ||
+				me.username ||
+				me.id;
+			setAssignOverrides((prev) => ({ ...prev, [id]: label }));
+			setStatusOverrides((prev) => ({ ...prev, [id]: "in_progress" }));
+			toast.success("Exception assigned to you.");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Assign failed");
 		}
 	}
 
@@ -437,8 +520,7 @@ export function ExceptionsRejectionsPage() {
 													<DropdownMenuItem
 														onClick={(e) => {
 															e.stopPropagation();
-															handleStatusChange(alert.id, "resolved");
-															toast.success("Exception marked resolved.");
+															void handleStatusChange(alert.id, "resolved");
 														}}
 													>
 														Mark resolved
@@ -639,6 +721,7 @@ export function ExceptionsRejectionsPage() {
 								exception={selected}
 								onClose={closeDetail}
 								onStatusChange={handleStatusChange}
+								onAssign={handleAssign}
 							/>
 						</div>
 					</div>
@@ -666,6 +749,7 @@ export function ExceptionsRejectionsPage() {
 								exception={selected}
 								onClose={closeDetail}
 								onStatusChange={handleStatusChange}
+								onAssign={handleAssign}
 							/>
 						</div>
 					) : null}

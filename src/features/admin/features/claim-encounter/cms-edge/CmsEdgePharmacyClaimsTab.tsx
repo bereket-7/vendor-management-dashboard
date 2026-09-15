@@ -1,6 +1,12 @@
 "use client";
 
-import { Fragment, useDeferredValue, useMemo, useState } from "react";
+import {
+	Fragment,
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 
 import {
 	AlertTriangle,
@@ -15,9 +21,9 @@ import {
 	type LucideIcon,
 	MoreVertical,
 	Search,
-	SlidersHorizontal,
 	Upload,
 	User,
+	X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -58,15 +64,18 @@ import {
 	CmsEdgeTableScroll,
 	cmsEdgeKpiAccent,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import { CmsEdgeTablePagination } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeTablePagination";
 import {
 	useCmsEdgePharmacyClaimsList,
 	useSeedPharmacyClaims,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import {
 	derivePharmacyClaimKpis,
+	derivePharmacyFilterOptions,
 	derivePharmacyFilterTabBadges,
 	derivePharmacyValidationSummary,
 	groupPharmacyClaimsByClaimNo,
+	pharmacyRowHasIssues,
 } from "@/features/admin/features/claim-encounter/cms-edge/live-pharmacy-claims";
 import {
 	CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS,
@@ -105,6 +114,13 @@ const PHARMACY_LINE_COLUMNS = [
 
 const TABLE_COL_SPAN = 15;
 
+const DEFAULT_FILTERS = {
+	cmsStatus: "All",
+	transaction: "All",
+	network: "All",
+	hasIssues: "All",
+};
+
 function formatCurrency(value: number) {
 	return value.toLocaleString("en-US", {
 		style: "currency",
@@ -119,14 +135,34 @@ export function CmsEdgePharmacyClaimsTab() {
 	const [search, setSearch] = useState("");
 	const [period, setPeriod] = useState("q2-2027");
 	const [filterTab, setFilterTab] = useState<PharmacyClaimFilterTab>("all");
+	const [filters, setFilters] = useState(DEFAULT_FILTERS);
+	const [filtersOpen, setFiltersOpen] = useState(false);
+	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState(25);
 	const deferredSearch = useDeferredValue(search.trim());
+	const offset = (page - 1) * pageSize;
 
-	const { pharmacyClaims, isLoading, isError, error, refetch } =
+	const { pharmacyClaims, total, isLoading, isError, error, refetch } =
 		useCmsEdgePharmacyClaimsList({
 			search: deferredSearch || undefined,
-			limit: 100,
+			limit: pageSize,
+			offset,
 		});
 	const seedPharmacyClaims = useSeedPharmacyClaims();
+
+	useEffect(() => {
+		setPage(1);
+	}, [deferredSearch, filterTab, filters]);
+
+	const filterOptions = useMemo(
+		() => derivePharmacyFilterOptions(pharmacyClaims),
+		[pharmacyClaims]
+	);
+
+	const activeFilterCount = useMemo(
+		() => Object.values(filters).filter((v) => v !== "All").length,
+		[filters]
+	);
 
 	const rows = useMemo(() => {
 		let list = pharmacyClaims;
@@ -143,6 +179,21 @@ export function CmsEdgePharmacyClaimsTab() {
 			);
 		}
 
+		if (filters.cmsStatus !== "All") {
+			list = list.filter((row) => row.cmsStatus === filters.cmsStatus);
+		}
+		if (filters.transaction !== "All") {
+			list = list.filter((row) => row.transaction === filters.transaction);
+		}
+		if (filters.network !== "All") {
+			list = list.filter((row) => row.network === filters.network);
+		}
+		if (filters.hasIssues === "Has issues") {
+			list = list.filter((row) => pharmacyRowHasIssues(row));
+		} else if (filters.hasIssues === "No issues") {
+			list = list.filter((row) => !pharmacyRowHasIssues(row));
+		}
+
 		const q = deferredSearch.toLowerCase();
 		if (q) {
 			list = list.filter(
@@ -156,7 +207,7 @@ export function CmsEdgePharmacyClaimsTab() {
 		}
 
 		return groupPharmacyClaimsByClaimNo(list);
-	}, [filterTab, pharmacyClaims, deferredSearch]);
+	}, [deferredSearch, filterTab, filters, pharmacyClaims]);
 
 	const filterBadges = useMemo(
 		() => derivePharmacyFilterTabBadges(pharmacyClaims),
@@ -220,23 +271,6 @@ export function CmsEdgePharmacyClaimsTab() {
 							</SelectContent>
 						</Select>
 					</div>
-					<div className="relative w-[240px]">
-						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Search Claim / Member / NDC"
-							className="h-9 pl-8 text-xs"
-						/>
-					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						className="h-9 border-border/70 bg-card shadow-sm"
-					>
-						<SlidersHorizontal className="mr-1.5 size-3.5" />
-						Filters
-					</Button>
 					<Button
 						size="sm"
 						className="h-9 shadow-sm"
@@ -269,12 +303,14 @@ export function CmsEdgePharmacyClaimsTab() {
 										});
 										if (result.skipped) {
 											toast.message(
-												`Seed skipped — ${result.existing_rows ?? 0} demo rows already exist.`
+												`Seed skipped — ${result.existing_rows ?? 0} rows already exist.`
 											);
-										} else {
+										} else if (result.created > 0) {
 											toast.success(
 												`Seeded ${result.created} pharmacy claim rows.`
 											);
+										} else {
+											toast.message("Seed API unavailable — no rows created.");
 										}
 										await refetch();
 									} catch (err) {
@@ -342,6 +378,85 @@ export function CmsEdgePharmacyClaimsTab() {
 			</div>
 
 			<section className={cn("overflow-hidden", CMS_EDGE_PANEL_CLASS)}>
+				<div className="flex flex-wrap items-center gap-3 border-b border-border/60 px-4 py-3">
+					<div className="relative min-w-[220px] flex-1">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+							placeholder="Search claim, enrollee, NDC, or NPI"
+							className="h-9 border-border/70 bg-background pl-8 text-xs"
+						/>
+					</div>
+					<div className="flex items-center gap-2">
+						<span className="text-xs tabular-nums text-muted-foreground">
+							{isLoading
+								? "Loading…"
+								: `${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")}`}
+						</span>
+						<Button
+							variant={filtersOpen || activeFilterCount ? "default" : "outline"}
+							size="sm"
+							className="h-9"
+							onClick={() => setFiltersOpen((v) => !v)}
+						>
+							Filters
+							{activeFilterCount > 0 ? (
+								<span className="ml-1.5 rounded-sm bg-background/20 px-1.5 text-[10px] font-semibold">
+									{activeFilterCount}
+								</span>
+							) : null}
+						</Button>
+						{activeFilterCount > 0 ? (
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-9 px-2 text-muted-foreground"
+								onClick={() => setFilters(DEFAULT_FILTERS)}
+							>
+								<X className="mr-1 size-3.5" />
+								Clear
+							</Button>
+						) : null}
+					</div>
+				</div>
+
+				{filtersOpen ? (
+					<div className="grid gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
+						{(
+							[
+								["cmsStatus", "CMS status", filterOptions.cmsStatus],
+								["transaction", "Transaction", filterOptions.transaction],
+								["network", "Network", filterOptions.network],
+								["hasIssues", "Issues", [...filterOptions.hasIssues]],
+							] as const
+						).map(([key, label, options]) => (
+							<label key={key} className="block space-y-1">
+								<span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+									{label}
+								</span>
+								<Select
+									value={filters[key]}
+									onValueChange={(value) =>
+										setFilters((prev) => ({ ...prev, [key]: value }))
+									}
+								>
+									<SelectTrigger className="h-8 w-full border-border/70 bg-card text-xs">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{options.map((option) => (
+											<SelectItem key={option} value={option}>
+												{option}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</label>
+						))}
+					</div>
+				) : null}
+
 				<div className="flex flex-wrap items-center gap-1 border-b border-border/50 px-3">
 					{CMS_EDGE_PHARMACY_CLAIM_FILTER_TABS.map((tab) => {
 						const active = filterTab === tab.id;
@@ -480,7 +595,7 @@ export function CmsEdgePharmacyClaimsTab() {
 										className="px-3 py-8 text-center text-muted-foreground"
 									>
 										{pharmacyClaims.length === 0
-											? "No pharmacy claims yet. Use More → Seed pharmacy claims after the core seed API is deployed."
+											? "No pharmacy claims yet. Use More → Seed pharmacy claims."
 											: "No pharmacy claims match this filter."}
 									</TableCell>
 								</TableRow>
@@ -671,6 +786,16 @@ export function CmsEdgePharmacyClaimsTab() {
 						</TableBody>
 					</Table>
 				</CmsEdgeTableScroll>
+				<CmsEdgeTablePagination
+					page={page}
+					pageSize={pageSize}
+					total={total}
+					onPageChange={setPage}
+					onPageSizeChange={(size) => {
+						setPageSize(size);
+						setPage(1);
+					}}
+				/>
 			</section>
 
 			<section className="space-y-3">

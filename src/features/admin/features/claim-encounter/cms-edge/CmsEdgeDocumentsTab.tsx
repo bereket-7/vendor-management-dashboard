@@ -71,7 +71,9 @@ import {
 	type DocumentFileKind,
 	RETENTION_ALERT_STYLES,
 	filterDocumentLibrary,
+	useCmsEdgeDocumentLibraryList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 function PanelLink({ children }: { children: ReactNode }) {
@@ -230,9 +232,14 @@ function StorageChartLegend({
 
 function DocumentLibraryPanel() {
 	const [search, setSearch] = useState("");
+	const { documentLibrary } = useCmsEdgeDocumentLibraryList();
 	const rows = useMemo(
-		() => filterDocumentLibrary(CMS_EDGE_DOCUMENT_LIBRARY, search),
-		[search]
+		() =>
+			filterDocumentLibrary(
+				isMockEnabled() ? CMS_EDGE_DOCUMENT_LIBRARY : documentLibrary,
+				search
+			),
+		[search, documentLibrary]
 	);
 
 	return (

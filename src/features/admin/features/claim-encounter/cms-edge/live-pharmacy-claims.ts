@@ -467,6 +467,33 @@ export function derivePharmacyClaimKpis(rows: CmsEdgePharmacyClaimRow[]) {
 	];
 }
 
+export function derivePharmacyFilterOptions(rows: CmsEdgePharmacyClaimRow[]) {
+	const uniq = (values: string[]) => [
+		"All",
+		...Array.from(new Set(values.filter(Boolean))).sort(),
+	];
+
+	return {
+		cmsStatus: uniq(rows.map((r) => r.cmsStatus)),
+		transaction: uniq(rows.map((r) => r.transaction)),
+		network: uniq(rows.map((r) => r.network)),
+		hasIssues: ["All", "Has issues", "No issues"] as const,
+	};
+}
+
+export function pharmacyRowHasIssues(row: CmsEdgePharmacyClaimRow): boolean {
+	if (row.cmsStatus !== "Ready") return true;
+	if (!row.ndc || row.ndc === "—") return true;
+	if (
+		!row.dispensingNpi ||
+		row.dispensingNpi === "—" ||
+		!/^\d{10}$/.test(row.dispensingNpi)
+	) {
+		return true;
+	}
+	return false;
+}
+
 /** Live filter-tab badge counts (replaces hard-coded mock badges). */
 export function derivePharmacyFilterTabBadges(rows: CmsEdgePharmacyClaimRow[]) {
 	return {

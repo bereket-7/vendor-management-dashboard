@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
 	CalendarDays,
 	CheckCircle2,
 	Code2,
+	Database,
 	Download,
 	FileText,
 	Link2,
@@ -56,11 +57,16 @@ import {
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import { CmsEdgeSupplementalDiagnosisDetail } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeSupplementalDiagnosisDetail";
 import {
+	useCmsEdgeSupplementalDiagnosesList,
+	useSeedCmsEdgeDemo,
+} from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
+import {
+	deriveSupplementalDxKpis,
+	deriveSupplementalDxValidationSummary,
+} from "@/features/admin/features/claim-encounter/cms-edge/live-supplemental-diagnoses";
+import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_SUPPLEMENTAL_DX_FILTER_TABS,
-	CMS_EDGE_SUPPLEMENTAL_DX_KPIS,
-	CMS_EDGE_SUPPLEMENTAL_DX_LIST,
-	CMS_EDGE_SUPPLEMENTAL_DX_VALIDATION_SUMMARY,
 	SUPPLEMENTAL_DX_CLAIM_LINK_STYLES,
 	SUPPLEMENTAL_DX_CMS_STATUS_STYLES,
 	SUPPLEMENTAL_DX_TXN_STYLES,
@@ -73,9 +79,9 @@ const KPI_ICONS = {
 	check: CheckCircle2,
 	alert: AlertTriangle,
 	unlink: Unlink,
-	code: Code2,
+	link: Link2,
 } satisfies Record<
-	(typeof CMS_EDGE_SUPPLEMENTAL_DX_KPIS)[number]["icon"],
+	ReturnType<typeof deriveSupplementalDxKpis>[number]["icon"],
 	LucideIcon
 >;
 
@@ -86,7 +92,7 @@ const SUMMARY_ICONS = {
 	user: User,
 	link: Link2,
 } satisfies Record<
-	(typeof CMS_EDGE_SUPPLEMENTAL_DX_VALIDATION_SUMMARY)[number]["icon"],
+	ReturnType<typeof deriveSupplementalDxValidationSummary>[number]["icon"],
 	LucideIcon
 >;
 
@@ -96,8 +102,18 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 	const [period, setPeriod] = useState("q2-2027");
 	const [filterTab, setFilterTab] = useState<SupplementalDxFilterTab>("all");
 
+	const deferredSearch = useDeferredValue(search.trim());
+	const { diagnoses, kpis, isLoading, isError, error, refetch } =
+		useCmsEdgeSupplementalDiagnosesList();
+	const seedDemo = useSeedCmsEdgeDemo();
+
+	const validationSummary = useMemo(
+		() => deriveSupplementalDxValidationSummary(diagnoses),
+		[diagnoses]
+	);
+
 	const rows = useMemo(() => {
-		let list = CMS_EDGE_SUPPLEMENTAL_DX_LIST;
+		let list = diagnoses;
 
 		if (filterTab === "ready") {
 			list = list.filter((row) => row.cmsStatus === "Ready");
@@ -111,7 +127,7 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 			);
 		}
 
-		const q = search.trim().toLowerCase();
+		const q = deferredSearch.toLowerCase();
 		if (!q) return list;
 		return list.filter(
 			(row) =>
@@ -121,12 +137,13 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 				row.diagnosisCode.toLowerCase().includes(q) ||
 				row.detailRecordId.toLowerCase().includes(q)
 		);
-	}, [filterTab, search]);
+	}, [filterTab, diagnoses, deferredSearch]);
 
 	if (selectedId) {
 		return (
 			<div className={CMS_EDGE_PAGE_STACK}>
 				<CmsEdgeSupplementalDiagnosisDetail
+					id={selectedId}
 					onBack={() => setSelectedId(null)}
 				/>
 				<CmsEdgePageFooter />
@@ -178,6 +195,35 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 						variant="outline"
 						size="sm"
 						className="h-9 border-border/70 bg-card shadow-sm"
+						disabled={seedDemo.isPending}
+						onClick={() => {
+							seedDemo.mutate(
+								{ force: true },
+								{
+									onSuccess: (result) => {
+										const dx = result.created?.supplemental_diagnoses ?? 0;
+										toast.success(
+											`Demo EDGE data seeded${dx ? ` (${dx} supplemental DX)` : ""}.`
+										);
+										void refetch();
+									},
+									onError: (err) =>
+										toast.error(
+											err instanceof Error
+												? err.message
+												: "Seed failed. Deploy POST /cms-edge/settings/seed/ then retry."
+										),
+								}
+							);
+						}}
+					>
+						<Database className="mr-1.5 size-3.5" />
+						{seedDemo.isPending ? "Seeding…" : "Seed demo data"}
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9 border-border/70 bg-card shadow-sm"
 					>
 						<SlidersHorizontal className="mr-1.5 size-3.5" />
 						Filters
@@ -196,7 +242,7 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-				{CMS_EDGE_SUPPLEMENTAL_DX_KPIS.map((kpi) => {
+				{kpis.map((kpi) => {
 					const Icon = KPI_ICONS[kpi.icon];
 					return (
 						<div key={kpi.id} className={CMS_EDGE_KPI_CARD_CLASS}>
@@ -306,97 +352,120 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{rows.map((row, index) => (
-								<TableRow
-									key={row.id}
-									className={cn(
-										"border-b border-border/40 hover:bg-muted/20",
-										index % 2 === 1 && "bg-muted/10"
-									)}
-								>
-									<TableCell className="px-3 py-2.5 font-mono text-[11px] font-medium text-primary">
-										{row.recordId}
-									</TableCell>
-									<TableCell className="px-3 py-2.5 font-mono text-[11px]">
-										{row.enrolleeId}
-									</TableCell>
-									<TableCell className="px-3 py-2.5 font-mono text-[11px]">
-										{row.originalClaimId ?? "—"}
-									</TableCell>
-									<TableCell className="px-3 py-2.5 font-mono text-[11px]">
-										{row.detailRecordId}
-									</TableCell>
-									<TableCell className="px-3 py-2.5">
-										{row.diagnosisType}
-									</TableCell>
-									<TableCell className="px-3 py-2.5 font-mono text-[11px] font-semibold">
-										{row.diagnosisCode}
-									</TableCell>
-									<TableCell className="px-3 py-2.5 tabular-nums">
-										{row.serviceFrom}
-									</TableCell>
-									<TableCell className="px-3 py-2.5 tabular-nums">
-										{row.serviceTo}
-									</TableCell>
-									<TableCell className="px-3 py-2.5">
-										<span
-											className={cn(
-												CMS_EDGE_STATUS_PILL_CLASS,
-												SUPPLEMENTAL_DX_TXN_STYLES[row.transaction]
-											)}
-										>
-											{row.transaction}
-										</span>
-									</TableCell>
-									<TableCell className="px-3 py-2.5">
-										<span
-											className={cn(
-												CMS_EDGE_STATUS_PILL_CLASS,
-												SUPPLEMENTAL_DX_CLAIM_LINK_STYLES[row.claimLink]
-											)}
-										>
-											{row.claimLink}
-										</span>
-									</TableCell>
-									<TableCell className="px-3 py-2.5">
-										<span
-											className={cn(
-												CMS_EDGE_STATUS_PILL_CLASS,
-												SUPPLEMENTAL_DX_CMS_STATUS_STYLES[row.cmsStatus]
-											)}
-										>
-											{row.cmsStatus}
-										</span>
-									</TableCell>
-									<TableCell className="px-3 py-2.5 pr-4">
-										<DropdownMenu>
-											<DropdownMenuTrigger asChild>
-												<Button
-													variant="ghost"
-													size="icon"
-													className="size-7 text-muted-foreground"
-												>
-													<MoreVertical className="size-4" />
-													<span className="sr-only">Open record actions</span>
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
-												<DropdownMenuItem onClick={() => setSelectedId(row.id)}>
-													View details
-												</DropdownMenuItem>
-												<DropdownMenuItem
-													onClick={() =>
-														toast.message(`Revalidating ${row.recordId}`)
-													}
-												>
-													Revalidate
-												</DropdownMenuItem>
-											</DropdownMenuContent>
-										</DropdownMenu>
+							{isLoading ? (
+								<TableRow>
+									<TableCell
+										colSpan={12}
+										className="px-3 py-8 text-center text-muted-foreground"
+									>
+										Loading supplemental diagnoses…
 									</TableCell>
 								</TableRow>
-							))}
-							{rows.length === 0 ? (
+							) : isError ? (
+								<TableRow>
+									<TableCell
+										colSpan={12}
+										className="px-3 py-8 text-center text-red-600"
+									>
+										Failed to load supplemental diagnoses
+										{error instanceof Error ? `: ${error.message}` : "."}
+									</TableCell>
+								</TableRow>
+							) : (
+								rows.map((row, index) => (
+									<TableRow
+										key={row.id}
+										className={cn(
+											"border-b border-border/40 hover:bg-muted/20",
+											index % 2 === 1 && "bg-muted/10"
+										)}
+									>
+										<TableCell className="px-3 py-2.5 font-mono text-[11px] font-medium text-primary">
+											{row.recordId}
+										</TableCell>
+										<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+											{row.enrolleeId}
+										</TableCell>
+										<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+											{row.originalClaimId ?? "—"}
+										</TableCell>
+										<TableCell className="px-3 py-2.5 font-mono text-[11px]">
+											{row.detailRecordId}
+										</TableCell>
+										<TableCell className="px-3 py-2.5">
+											{row.diagnosisType}
+										</TableCell>
+										<TableCell className="px-3 py-2.5 font-mono text-[11px] font-semibold">
+											{row.diagnosisCode}
+										</TableCell>
+										<TableCell className="px-3 py-2.5 tabular-nums">
+											{row.serviceFrom}
+										</TableCell>
+										<TableCell className="px-3 py-2.5 tabular-nums">
+											{row.serviceTo}
+										</TableCell>
+										<TableCell className="px-3 py-2.5">
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													SUPPLEMENTAL_DX_TXN_STYLES[row.transaction]
+												)}
+											>
+												{row.transaction}
+											</span>
+										</TableCell>
+										<TableCell className="px-3 py-2.5">
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													SUPPLEMENTAL_DX_CLAIM_LINK_STYLES[row.claimLink]
+												)}
+											>
+												{row.claimLink}
+											</span>
+										</TableCell>
+										<TableCell className="px-3 py-2.5">
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													SUPPLEMENTAL_DX_CMS_STATUS_STYLES[row.cmsStatus]
+												)}
+											>
+												{row.cmsStatus}
+											</span>
+										</TableCell>
+										<TableCell className="px-3 py-2.5 pr-4">
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														variant="ghost"
+														size="icon"
+														className="size-7 text-muted-foreground"
+													>
+														<MoreVertical className="size-4" />
+														<span className="sr-only">Open record actions</span>
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem
+														onClick={() => setSelectedId(row.id)}
+													>
+														View details
+													</DropdownMenuItem>
+													<DropdownMenuItem
+														onClick={() =>
+															toast.message(`Revalidating ${row.recordId}`)
+														}
+													>
+														Revalidate
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</TableCell>
+									</TableRow>
+								))
+							)}
+							{!isLoading && !isError && rows.length === 0 ? (
 								<TableRow>
 									<TableCell
 										colSpan={12}
@@ -416,7 +485,7 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 					Supplemental Diagnosis Validation Summary
 				</h3>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-					{CMS_EDGE_SUPPLEMENTAL_DX_VALIDATION_SUMMARY.map((item) => {
+					{validationSummary.map((item) => {
 						const Icon = SUMMARY_ICONS[item.icon];
 						return (
 							<div
@@ -442,7 +511,7 @@ export function CmsEdgeSupplementalDiagnosesTab() {
 												item.valueClassName
 											)}
 										>
-											{item.value}
+											{isLoading ? "—" : item.value}
 										</p>
 									</div>
 								</div>

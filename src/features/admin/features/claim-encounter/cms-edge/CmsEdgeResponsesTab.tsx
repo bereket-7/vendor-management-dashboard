@@ -45,7 +45,6 @@ import {
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
 	CMS_EDGE_REPORTING_PERIODS,
-	CMS_EDGE_RESPONSES_LIST,
 	CMS_EDGE_RESPONSE_FILE_TYPES,
 	CMS_EDGE_RESPONSE_KPIS,
 	CMS_EDGE_RESPONSE_LATEST_SUMMARY,
@@ -55,6 +54,7 @@ import {
 	type CmsResponseFileType,
 	type CmsResponseStatus,
 	type CmsResponseType,
+	useCmsEdgeCmsResponsesList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
 import { cn } from "@/lib/utils";
@@ -431,12 +431,12 @@ export function CmsEdgeResponsesTab() {
 		"all"
 	);
 	const [status, setStatus] = useState<CmsResponseStatus | "all">("all");
+	const { cmsResponses } = useCmsEdgeCmsResponsesList();
 
 	const periodLabel = periodValueToLabel(reportingPeriod);
 
 	const filteredRows = useMemo(() => {
-		return CMS_EDGE_RESPONSES_LIST.filter((row) => {
-			if (row.reportingPeriod !== periodLabel) return false;
+		return cmsResponses.filter((row) => {
 			if (fileType !== "all" && row.fileType !== fileType) return false;
 			if (responseType !== "all" && row.responseType !== responseType) {
 				return false;
@@ -444,7 +444,7 @@ export function CmsEdgeResponsesTab() {
 			if (status !== "all" && row.status !== status) return false;
 			return true;
 		});
-	}, [periodLabel, fileType, responseType, status]);
+	}, [fileType, responseType, status, cmsResponses]);
 
 	const hasFilters =
 		fileType !== "all" || responseType !== "all" || status !== "all";

@@ -44,6 +44,12 @@ import {
 	CmsEdgeTableScroll,
 	cmsEdgeKpiAccent,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import type { OverviewEntitySnapshot } from "@/features/admin/features/claim-encounter/cms-edge/feature/api/cms-edgeApi";
+import {
+	useCmsEdgeOverviewEntities,
+	useCmsEdgeOverviewLivePanels,
+	useCmsEdgeOverviewShell,
+} from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import {
 	CMS_EDGE_OVERVIEW_ACTIVITY,
 	CMS_EDGE_OVERVIEW_CONFIG,
@@ -55,6 +61,7 @@ import {
 	OVERVIEW_SEVERITY_STYLES,
 	type OverviewWorkflowState,
 } from "@/features/admin/features/claim-encounter/cms-edge/mock-data";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 
 const KPI_ICONS = {
@@ -74,10 +81,7 @@ const ENTITY_ICONS = {
 	members: Users,
 	providers: Stethoscope,
 	claims: FileText,
-} satisfies Record<
-	(typeof CMS_EDGE_OVERVIEW_ENTITIES)[number]["icon"],
-	LucideIcon
->;
+} satisfies Record<OverviewEntitySnapshot["icon"], LucideIcon>;
 
 const WORKFLOW_ICONS = {
 	database: Database,
@@ -121,9 +125,31 @@ const WORKFLOW_STATUS: Record<OverviewWorkflowState, string> = {
 };
 
 function OverviewKpiRow() {
+	const { data: shell, isLoading } = useCmsEdgeOverviewShell();
+	const kpis = shell?.kpis ?? [];
+
+	if (isLoading && kpis.length === 0) {
+		return (
+			<div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
+				{CMS_EDGE_OVERVIEW_KPI_CARDS.map((kpi) => (
+					<div key={kpi.id} className={CMS_EDGE_KPI_CARD_CLASS}>
+						<p className="pl-1.5 text-xs text-muted-foreground">Loading…</p>
+					</div>
+				))}
+			</div>
+		);
+	}
+
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
-			{CMS_EDGE_OVERVIEW_KPI_CARDS.map((kpi) => {
+			{(kpis.length
+				? kpis
+				: CMS_EDGE_OVERVIEW_KPI_CARDS.map((k) => ({
+						...k,
+						value: "—",
+						hint: "Live submission metrics unavailable",
+					}))
+			).map((kpi) => {
 				const Icon = KPI_ICONS[kpi.icon];
 				return (
 					<div key={kpi.id} className={CMS_EDGE_KPI_CARD_CLASS}>
@@ -175,69 +201,98 @@ function OverviewKpiRow() {
 function EntityCards({
 	onNavigate,
 }: {
-	onNavigate?: (
-		tabId: (typeof CMS_EDGE_OVERVIEW_ENTITIES)[number]["tabId"]
-	) => void;
+	onNavigate?: (tabId: OverviewEntitySnapshot["tabId"]) => void;
 }) {
+	const { data: liveEntities, isLoading } = useCmsEdgeOverviewEntities();
+	const useMock = isMockEnabled();
+	const entities: OverviewEntitySnapshot[] = useMock
+		? CMS_EDGE_OVERVIEW_ENTITIES.map((e) => ({
+				id: e.id,
+				title: e.title,
+				description: e.description,
+				icon: e.icon,
+				stats: e.stats.map((s) => ({ ...s })),
+				cta: e.cta,
+				tabId: e.tabId as OverviewEntitySnapshot["tabId"],
+			}))
+		: (liveEntities ?? []);
+
 	return (
 		<div className="grid gap-4 lg:grid-cols-3">
-			{CMS_EDGE_OVERVIEW_ENTITIES.map((entity) => {
-				const Icon = ENTITY_ICONS[entity.icon];
-				return (
-					<section
-						key={entity.id}
-						className="flex flex-col overflow-hidden rounded-lg border border-border/70 border-t-[3px] border-t-primary bg-card shadow-sm"
-					>
-						<div className="flex flex-1 flex-col gap-4 p-4">
-							<div className="flex items-start gap-3">
-								<div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/5 text-primary">
-									<Icon className="size-5" aria-hidden />
-								</div>
-								<div className="min-w-0">
-									<h3 className="text-sm font-semibold text-foreground">
-										{entity.title}
-									</h3>
-									<p className="mt-0.5 text-xs text-muted-foreground">
-										{entity.description}
-									</p>
-								</div>
-							</div>
-							<dl className="space-y-2 border-t border-border/50 pt-3 text-xs">
-								{entity.stats.map((stat) => (
-									<div
-										key={stat.label}
-										className="flex items-center justify-between gap-3"
-									>
-										<dt className="text-muted-foreground">{stat.label}</dt>
-										<dd
-											className={cn(
-												"font-semibold tabular-nums",
-												STAT_TONE[stat.tone]
-											)}
-										>
-											{stat.value}
-										</dd>
+			{isLoading && !useMock ? (
+				<div className="col-span-full rounded-lg border border-dashed border-border/70 bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+					Loading live entity counts…
+				</div>
+			) : entities.length === 0 ? (
+				<div className="col-span-full rounded-lg border border-dashed border-border/70 bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+					No live entity data available.
+				</div>
+			) : (
+				entities.map((entity) => {
+					const Icon = ENTITY_ICONS[entity.icon];
+					return (
+						<section
+							key={entity.id}
+							className="flex flex-col overflow-hidden rounded-lg border border-border/70 border-t-[3px] border-t-primary bg-card shadow-sm"
+						>
+							<div className="flex flex-1 flex-col gap-4 p-4">
+								<div className="flex items-start gap-3">
+									<div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/5 text-primary">
+										<Icon className="size-5" aria-hidden />
 									</div>
-								))}
-							</dl>
-						</div>
-						<div className="p-4 pt-0">
-							<Button
-								className="h-9 w-full justify-between"
-								onClick={() => onNavigate?.(entity.tabId)}
-							>
-								{entity.cta}
-								<ArrowRight className="size-4" />
-							</Button>
-						</div>
-					</section>
-				);
-			})}
+									<div className="min-w-0">
+										<h3 className="text-sm font-semibold text-foreground">
+											{entity.title}
+										</h3>
+										<p className="mt-0.5 text-xs text-muted-foreground">
+											{entity.description}
+										</p>
+									</div>
+								</div>
+								<dl className="space-y-2 border-t border-border/50 pt-3 text-xs">
+									{entity.stats.map((stat) => (
+										<div
+											key={stat.label}
+											className="flex items-center justify-between gap-3"
+										>
+											<dt className="text-muted-foreground">{stat.label}</dt>
+											<dd
+												className={cn(
+													"font-semibold tabular-nums",
+													STAT_TONE[stat.tone]
+												)}
+											>
+												{stat.value}
+											</dd>
+										</div>
+									))}
+								</dl>
+							</div>
+							<div className="p-4 pt-0">
+								<Button
+									className="h-9 w-full justify-between"
+									onClick={() =>
+										onNavigate?.(
+											entity.tabId as OverviewEntitySnapshot["tabId"]
+										)
+									}
+								>
+									{entity.cta}
+									<ArrowRight className="size-4" />
+								</Button>
+							</div>
+						</section>
+					);
+				})
+			)}
 		</div>
 	);
 }
 
 function SubmissionWorkflow() {
+	const { data: shell } = useCmsEdgeOverviewShell();
+	const stages = shell?.workflow ?? [];
+
 	return (
 		<section className={cn("overflow-hidden", CMS_EDGE_PANEL_CLASS)}>
 			<div className="border-b border-border/50 px-4 py-3">
@@ -245,50 +300,62 @@ function SubmissionWorkflow() {
 					Submission Workflow
 				</h3>
 			</div>
-			<div className="px-4 py-6 sm:px-8">
-				<div className="flex items-start justify-between gap-1">
-					{CMS_EDGE_OVERVIEW_WORKFLOW.map((stage, index) => {
-						const Icon = WORKFLOW_ICONS[stage.icon];
-						return (
-							<div
-								key={stage.id}
-								className="relative flex min-w-0 flex-1 flex-col items-center"
-							>
-								{index > 0 ? (
-									<div
-										className="absolute top-5 right-[calc(50%+22px)] left-[calc(-50%+22px)] h-px border-t border-dashed border-border"
-										aria-hidden
-									/>
-								) : null}
-								<div
-									className={cn(
-										"relative z-10 flex size-10 items-center justify-center rounded-full border-2",
-										WORKFLOW_RING[stage.state]
-									)}
-								>
-									<Icon className="size-4" aria-hidden />
-								</div>
-								<p className="mt-2.5 text-center text-xs font-semibold text-foreground">
-									{stage.label}
-								</p>
-								<p
-									className={cn(
-										"mt-0.5 text-center text-[11px] font-medium",
-										WORKFLOW_STATUS[stage.state]
-									)}
-								>
-									{stage.status}
-								</p>
-							</div>
-						);
-					})}
+			{stages.length === 0 ? (
+				<div className="px-4 py-10 text-center text-sm text-muted-foreground">
+					No workflow data available.
 				</div>
-			</div>
+			) : (
+				<div className="px-4 py-6 sm:px-8">
+					<div className="flex items-start justify-between gap-1">
+						{stages.map((stage, index) => {
+							const Icon = WORKFLOW_ICONS[stage.icon];
+							return (
+								<div
+									key={stage.id}
+									className="relative flex min-w-0 flex-1 flex-col items-center"
+								>
+									{index > 0 ? (
+										<div
+											className="absolute top-5 right-[calc(50%+22px)] left-[calc(-50%+22px)] h-px border-t border-dashed border-border"
+											aria-hidden
+										/>
+									) : null}
+									<div
+										className={cn(
+											"relative z-10 flex size-10 items-center justify-center rounded-full border-2",
+											WORKFLOW_RING[stage.state]
+										)}
+									>
+										<Icon className="size-4" aria-hidden />
+									</div>
+									<p className="mt-2.5 text-center text-xs font-semibold text-foreground">
+										{stage.label}
+									</p>
+									<p
+										className={cn(
+											"mt-0.5 text-center text-[11px] font-medium",
+											WORKFLOW_STATUS[stage.state]
+										)}
+									>
+										{stage.status}
+									</p>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			)}
 		</section>
 	);
 }
 
 function ExceptionsPanel({ onViewAll }: { onViewAll?: () => void }) {
+	const useMock = isMockEnabled();
+	const { data, isLoading } = useCmsEdgeOverviewLivePanels();
+	const rows = useMock
+		? CMS_EDGE_OVERVIEW_EXCEPTIONS
+		: (data?.exceptions ?? []);
+
 	return (
 		<CmsEdgeSectionPanel
 			title="Exceptions Requiring Action"
@@ -329,40 +396,60 @@ function ExceptionsPanel({ onViewAll }: { onViewAll?: () => void }) {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_OVERVIEW_EXCEPTIONS.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className="px-3 py-2.5 font-medium">
-									{row.type}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-right tabular-nums">
-									{row.count}
-								</TableCell>
-								<TableCell className="px-3 py-2.5">
-									<span
-										className={cn(
-											CMS_EDGE_STATUS_PILL_CLASS,
-											OVERVIEW_SEVERITY_STYLES[row.severity]
-										)}
-									>
-										{row.severity}
-									</span>
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-muted-foreground">
-									{row.owner}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 pr-4">
-									<Button
-										variant="link"
-										className="h-auto p-0 text-xs font-semibold text-primary"
-									>
-										Review
-									</Button>
+						{isLoading && !useMock ? (
+							<TableRow>
+								<TableCell
+									colSpan={5}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									Loading exceptions…
 								</TableCell>
 							</TableRow>
-						))}
+						) : rows.length === 0 ? (
+							<TableRow>
+								<TableCell
+									colSpan={5}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									No exceptions requiring action.
+								</TableCell>
+							</TableRow>
+						) : (
+							rows.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className="px-3 py-2.5 font-medium">
+										{row.type}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-right tabular-nums">
+										{row.count}
+									</TableCell>
+									<TableCell className="px-3 py-2.5">
+										<span
+											className={cn(
+												CMS_EDGE_STATUS_PILL_CLASS,
+												OVERVIEW_SEVERITY_STYLES[row.severity]
+											)}
+										>
+											{row.severity}
+										</span>
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-muted-foreground">
+										{row.owner}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 pr-4">
+										<Button
+											variant="link"
+											className="h-auto p-0 text-xs font-semibold text-primary"
+										>
+											Review
+										</Button>
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -371,6 +458,10 @@ function ExceptionsPanel({ onViewAll }: { onViewAll?: () => void }) {
 }
 
 function ActivityPanel() {
+	const useMock = isMockEnabled();
+	const { data, isLoading } = useCmsEdgeOverviewLivePanels();
+	const rows = useMock ? CMS_EDGE_OVERVIEW_ACTIVITY : (data?.activity ?? []);
+
 	return (
 		<CmsEdgeSectionPanel
 			title="Latest Activity"
@@ -411,38 +502,58 @@ function ActivityPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{CMS_EDGE_OVERVIEW_ACTIVITY.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className="px-3 py-2.5 font-medium">
-									{row.activity}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-muted-foreground">
-									{row.fileType}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 text-muted-foreground">
-									{row.environment}
-								</TableCell>
-								<TableCell className="px-3 py-2.5">
-									<span
-										className={cn(
-											CMS_EDGE_STATUS_PILL_CLASS,
-											OVERVIEW_ACTIVITY_STATUS_STYLES[row.status]
-										)}
-									>
-										{row.status}
-									</span>
-								</TableCell>
-								<TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">
-									{row.date}
-								</TableCell>
-								<TableCell className="px-3 py-2.5 pr-4 text-muted-foreground">
-									{row.owner}
+						{isLoading && !useMock ? (
+							<TableRow>
+								<TableCell
+									colSpan={6}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									Loading activity…
 								</TableCell>
 							</TableRow>
-						))}
+						) : rows.length === 0 ? (
+							<TableRow>
+								<TableCell
+									colSpan={6}
+									className="px-3 py-8 text-center text-muted-foreground"
+								>
+									No recent activity.
+								</TableCell>
+							</TableRow>
+						) : (
+							rows.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className="px-3 py-2.5 font-medium">
+										{row.activity}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-muted-foreground">
+										{row.fileType}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 text-muted-foreground">
+										{row.environment}
+									</TableCell>
+									<TableCell className="px-3 py-2.5">
+										<span
+											className={cn(
+												CMS_EDGE_STATUS_PILL_CLASS,
+												OVERVIEW_ACTIVITY_STATUS_STYLES[row.status]
+											)}
+										>
+											{row.status}
+										</span>
+									</TableCell>
+									<TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">
+										{row.date}
+									</TableCell>
+									<TableCell className="px-3 py-2.5 pr-4 text-muted-foreground">
+										{row.owner}
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -451,6 +562,9 @@ function ActivityPanel() {
 }
 
 function ConfigurationPanel({ onViewAll }: { onViewAll?: () => void }) {
+	const { data: shell } = useCmsEdgeOverviewShell();
+	const items = shell?.config ?? [];
+
 	return (
 		<CmsEdgeSectionPanel
 			title="CMS Configuration"
@@ -464,29 +578,36 @@ function ConfigurationPanel({ onViewAll }: { onViewAll?: () => void }) {
 					View configuration
 				</Button>
 			}
-			bodyClassName="pb-0"
 		>
-			<ul className="grid grid-cols-1 divide-y divide-border/40 border-t border-border/50 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x lg:divide-border/40">
-				{CMS_EDGE_OVERVIEW_CONFIG.map((item) => {
-					const Icon = CONFIG_ICONS[item.icon];
-					return (
-						<li
-							key={item.id}
-							className="flex items-center gap-3 px-4 py-4 text-sm"
-						>
-							<span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-								<Icon className="size-3.5" aria-hidden />
-							</span>
-							<div className="min-w-0">
-								<p className="text-xs text-muted-foreground">{item.label}</p>
-								<p className="mt-0.5 font-semibold tabular-nums text-foreground">
-									{item.value}
-								</p>
+			{items.length === 0 ? (
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					No configuration loaded.
+				</p>
+			) : (
+				<div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+					{items.map((item) => {
+						const Icon = CONFIG_ICONS[item.icon];
+						return (
+							<div
+								key={item.id}
+								className="flex items-start gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5"
+							>
+								<span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border/70 bg-card text-muted-foreground">
+									<Icon className="size-4" aria-hidden />
+								</span>
+								<div className="min-w-0">
+									<p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+										{item.label}
+									</p>
+									<p className="mt-0.5 truncate text-sm font-semibold text-foreground">
+										{item.value}
+									</p>
+								</div>
 							</div>
-						</li>
-					);
-				})}
-			</ul>
+						);
+					})}
+				</div>
+			)}
 		</CmsEdgeSectionPanel>
 	);
 }
