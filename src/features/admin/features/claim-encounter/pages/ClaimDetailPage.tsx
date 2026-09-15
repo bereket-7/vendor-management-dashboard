@@ -1,11 +1,20 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 import {
 	AlertTriangle,
+	ArrowLeft,
 	ChevronDown,
+	ChevronLeft,
 	ChevronRight,
 	ExternalLink,
 	FileText,
@@ -31,6 +40,11 @@ import {
 } from "@/components/ui/table";
 import { VendorCoreGate } from "@/components/vendor-core/VendorCoreGate";
 import {
+	CMS_EDGE_PAGE_STACK,
+	CMS_EDGE_PANEL_CLASS,
+	CMS_EDGE_STATUS_PILL_CLASS,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import {
 	EdiViewerLoader,
 	loadEdiFixture,
 } from "@/features/admin/features/claim-encounter/edi";
@@ -45,8 +59,10 @@ import { useVendorCoreClaimLines } from "@/features/admin/features/claim-encount
 import { findClaimLineByClaimId } from "@/features/admin/features/claim-encounter/live-claims";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import { Link } from "@/i18n/navigation";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { isClaimVendorFilesMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
+
+const PANEL = CMS_EDGE_PANEL_CLASS;
 
 const MAIN_TABS = [
 	"Claim Summary",
@@ -60,6 +76,133 @@ const MAIN_TABS = [
 type MainTab = (typeof MAIN_TABS)[number];
 
 const RELATED_FILTERS = ["All", "Adjustments", "Voids", "Reversals"] as const;
+
+function ClaimTabsNav({
+	tab,
+	onTabChange,
+}: {
+	tab: MainTab;
+	onTabChange: (next: MainTab) => void;
+}) {
+	const scrollerRef = useRef<HTMLDivElement>(null);
+	const [canLeft, setCanLeft] = useState(false);
+	const [canRight, setCanRight] = useState(false);
+
+	const updateOverflow = useCallback(() => {
+		const el = scrollerRef.current;
+		if (!el) return;
+		const max = el.scrollWidth - el.clientWidth;
+		setCanLeft(el.scrollLeft > 2);
+		setCanRight(max - el.scrollLeft > 2);
+	}, []);
+
+	useEffect(() => {
+		const el = scrollerRef.current;
+		if (!el) return;
+		updateOverflow();
+		el.addEventListener("scroll", updateOverflow, { passive: true });
+		const ro = new ResizeObserver(updateOverflow);
+		ro.observe(el);
+		return () => {
+			el.removeEventListener("scroll", updateOverflow);
+			ro.disconnect();
+		};
+	}, [updateOverflow]);
+
+	useEffect(() => {
+		const el = scrollerRef.current;
+		if (!el) return;
+		const active = el.querySelector<HTMLElement>('[data-active-tab="true"]');
+		if (!active) return;
+		const parentRect = el.getBoundingClientRect();
+		const tabRect = active.getBoundingClientRect();
+		const outLeft = tabRect.left < parentRect.left + 4;
+		const outRight = tabRect.right > parentRect.right - 4;
+		if (outLeft || outRight) {
+			active.scrollIntoView({
+				behavior: "smooth",
+				inline: "nearest",
+				block: "nearest",
+			});
+		}
+		requestAnimationFrame(updateOverflow);
+	}, [tab, updateOverflow]);
+
+	function scrollByDir(dir: -1 | 1) {
+		const el = scrollerRef.current;
+		if (!el) return;
+		el.scrollBy({
+			left: dir * Math.max(160, el.clientWidth * 0.55),
+			behavior: "smooth",
+		});
+	}
+
+	return (
+		<nav className="relative flex items-center gap-1 rounded-xl border border-border/60 bg-card p-1.5 shadow-sm">
+			<button
+				type="button"
+				aria-label="Scroll tabs left"
+				disabled={!canLeft}
+				onClick={() => scrollByDir(-1)}
+				className={cn(
+					"flex size-8 shrink-0 items-center justify-center rounded-lg transition-opacity",
+					canLeft
+						? "text-muted-foreground hover:bg-muted hover:text-foreground"
+						: "pointer-events-none opacity-0"
+				)}
+			>
+				<ChevronLeft className="size-3.5" />
+			</button>
+			<div
+				ref={scrollerRef}
+				className={cn(
+					"flex min-w-0 flex-1 gap-1 overflow-x-auto overflow-y-hidden",
+					"[scrollbar-width:thin] [scrollbar-color:oklch(0.55_0_0_/_0.35)_transparent]",
+					"[&::-webkit-scrollbar]:h-1.5",
+					"[&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-muted/40",
+					"[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-foreground/25",
+					"hover:[&::-webkit-scrollbar-thumb]:bg-foreground/40",
+					"[&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-transparent",
+					"[&::-webkit-scrollbar-thumb]:bg-clip-padding"
+				)}
+			>
+				{MAIN_TABS.map((item) => {
+					const active = tab === item;
+					return (
+						<button
+							key={item}
+							type="button"
+							data-active-tab={active ? "true" : undefined}
+							onClick={() => onTabChange(item)}
+							className={cn(
+								"shrink-0 rounded-lg px-3.5 py-2 text-[11px] font-semibold tracking-wide whitespace-nowrap transition-colors",
+								active
+									? "bg-primary text-primary-foreground shadow-sm"
+									: "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+							)}
+						>
+							{item}
+						</button>
+					);
+				})}
+			</div>
+			<button
+				type="button"
+				aria-label="Scroll tabs right"
+				disabled={!canRight}
+				onClick={() => scrollByDir(1)}
+				className={cn(
+					"flex size-8 shrink-0 items-center justify-center rounded-lg transition-opacity",
+					canRight
+						? "text-muted-foreground hover:bg-muted hover:text-foreground"
+						: "pointer-events-none opacity-0"
+				)}
+			>
+				<ChevronRight className="size-3.5" />
+			</button>
+		</nav>
+	);
+}
 
 function formatDos(iso: string) {
 	const [y, m, d] = iso.split("-");
@@ -81,22 +224,15 @@ function Panel({
 	bodyClassName?: string;
 }) {
 	return (
-		<section
-			className={cn(
-				"flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm",
-				className
-			)}
-		>
-			<div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3">
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+		<section className={cn("flex flex-col overflow-hidden", PANEL, className)}>
+			<div className="shrink-0 border-b border-border/50 px-4 py-2.5">
+				<h2 className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 					{title}
 				</h2>
 			</div>
-			<div className={cn("min-h-0 flex-1 px-4 py-3.5", bodyClassName)}>
-				{children}
-			</div>
+			<div className={cn("min-h-0 flex-1 p-3", bodyClassName)}>{children}</div>
 			{footer ? (
-				<div className="shrink-0 border-t border-border px-4 py-2.5">
+				<div className="shrink-0 border-t border-border/50 px-4 py-2.5">
 					{footer.href ? (
 						<Link
 							href={footer.href}
@@ -121,11 +257,38 @@ function Panel({
 	);
 }
 
-function MetaChip({ label, value }: { label: string; value: ReactNode }) {
+function MoneyTile({
+	label,
+	value,
+	tone = "default",
+}: {
+	label: string;
+	value: string;
+	tone?: "default" | "primary" | "success" | "warning";
+}) {
+	const accent = {
+		default: "border-l-border",
+		primary: "border-l-primary",
+		success: "border-l-emerald-600",
+		warning: "border-l-amber-500",
+	}[tone];
+	const valueClass = {
+		default: "text-foreground",
+		primary: "text-primary",
+		success: "text-emerald-700 dark:text-emerald-300",
+		warning: "text-amber-700 dark:text-amber-300",
+	}[tone];
+
 	return (
-		<div className="min-w-0">
-			<span className="text-muted-foreground">{label}: </span>
-			<span className="font-medium text-foreground">{value}</span>
+		<div className={cn(PANEL, "border-l-2 px-4 py-3.5", accent)}>
+			<p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+				{label}
+			</p>
+			<p
+				className={cn("mt-1.5 text-xl font-semibold tabular-nums", valueClass)}
+			>
+				{value}
+			</p>
 		</div>
 	);
 }
@@ -167,32 +330,30 @@ function FileTable({ rows }: { rows: ClaimDetail["responseFiles"] }) {
 
 function OverviewTab({ claim }: { claim: ClaimDetail }) {
 	return (
-		<div className="space-y-4">
-			<div className="grid gap-4 lg:grid-cols-4">
-				{[
-					["Amount Billed", formatCurrency(claim.amountBilled)],
-					["Amount Allowed", formatCurrency(claim.amountAllowed)],
-					["Amount Paid", formatCurrency(claim.amountPaid)],
-					[
-						"Patient Responsibility",
-						formatCurrency(claim.patientResponsibility),
-					],
-				].map(([label, value]) => (
-					<div
-						key={label}
-						className="rounded-lg border border-border/60 bg-card px-4 py-3.5"
-					>
-						<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-							{label}
-						</p>
-						<p className="mt-1 text-lg font-semibold tabular-nums tracking-tight">
-							{value}
-						</p>
-					</div>
-				))}
+		<div className="space-y-3">
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				<MoneyTile
+					label="Amount Billed"
+					value={formatCurrency(claim.amountBilled)}
+					tone="primary"
+				/>
+				<MoneyTile
+					label="Amount Allowed"
+					value={formatCurrency(claim.amountAllowed)}
+				/>
+				<MoneyTile
+					label="Amount Paid"
+					value={formatCurrency(claim.amountPaid)}
+					tone="success"
+				/>
+				<MoneyTile
+					label="Patient Responsibility"
+					value={formatCurrency(claim.patientResponsibility)}
+					tone="warning"
+				/>
 			</div>
 
-			<div className="grid gap-4 lg:grid-cols-3">
+			<div className="grid gap-3 lg:grid-cols-3">
 				<Panel title="Claim Summary">
 					<dl className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-2.5 text-xs">
 						{[
@@ -253,27 +414,35 @@ function OverviewTab({ claim }: { claim: ClaimDetail }) {
 					<Table>
 						<TableHeader>
 							<TableRow className="hover:bg-transparent">
-								<TableHead className="h-9 pl-0 text-[11px]">Code</TableHead>
-								<TableHead className="h-9 text-[11px]">Mod</TableHead>
-								<TableHead className="h-9 text-[11px]">Diagnosis</TableHead>
-								<TableHead className="h-9 text-right text-[11px]">
+								<TableHead className="h-9 pl-0 text-[11px] font-bold uppercase tracking-wide">
+									Code
+								</TableHead>
+								<TableHead className="h-9 text-[11px] font-bold uppercase tracking-wide">
+									Mod
+								</TableHead>
+								<TableHead className="h-9 text-[11px] font-bold uppercase tracking-wide">
+									Diagnosis
+								</TableHead>
+								<TableHead className="h-9 text-right text-[11px] font-bold uppercase tracking-wide">
 									Units
 								</TableHead>
-								<TableHead className="h-9 text-right text-[11px]">
+								<TableHead className="h-9 text-right text-[11px] font-bold uppercase tracking-wide">
 									Charge
 								</TableHead>
-								<TableHead className="h-9 text-right text-[11px]">
+								<TableHead className="h-9 text-right text-[11px] font-bold uppercase tracking-wide">
 									Allowed
 								</TableHead>
-								<TableHead className="h-9 text-right text-[11px]">
+								<TableHead className="h-9 text-right text-[11px] font-bold uppercase tracking-wide">
 									Paid
 								</TableHead>
-								<TableHead className="h-9 pr-0 text-[11px]">Status</TableHead>
+								<TableHead className="h-9 pr-0 text-[11px] font-bold uppercase tracking-wide">
+									Status
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{claim.serviceLines.map((line) => (
-								<TableRow key={line.id} className="hover:bg-muted/20">
+								<TableRow key={line.id} className="hover:bg-muted/30">
 									<TableCell className="py-2.5 pl-0 font-mono text-xs">
 										{line.code}
 									</TableCell>
@@ -370,32 +539,35 @@ function ServiceLinesTab({ claim }: { claim: ClaimDetail }) {
 function FinancialsTab({ claim }: { claim: ClaimDetail }) {
 	const adjustments = claim.amountAllowed - claim.amountPaid;
 	return (
-		<div className="space-y-4">
+		<div className="space-y-3">
 			<div>
-				<h2 className="text-base font-semibold">Financials</h2>
+				<h2 className="text-sm font-semibold text-foreground">Financials</h2>
 				<p className="mt-1 text-xs text-muted-foreground">
 					Claim payment, member responsibility and remittance summary.
 				</p>
 			</div>
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				{[
-					["Billed Amount", claim.amountBilled],
-					["Allowed Amount", claim.amountAllowed],
-					["Paid Amount", claim.amountPaid],
-					["Member Responsibility", claim.patientResponsibility],
-				].map(([label, value]) => (
-					<div
-						key={label as string}
-						className="rounded-lg border border-border/60 bg-card p-4 shadow-sm"
-					>
-						<p className="text-xs text-muted-foreground">{label}</p>
-						<p className="mt-2 text-xl font-semibold tabular-nums">
-							{formatCurrency(value as number)}
-						</p>
-					</div>
-				))}
+				<MoneyTile
+					label="Billed Amount"
+					value={formatCurrency(claim.amountBilled)}
+					tone="primary"
+				/>
+				<MoneyTile
+					label="Allowed Amount"
+					value={formatCurrency(claim.amountAllowed)}
+				/>
+				<MoneyTile
+					label="Paid Amount"
+					value={formatCurrency(claim.amountPaid)}
+					tone="success"
+				/>
+				<MoneyTile
+					label="Member Responsibility"
+					value={formatCurrency(claim.patientResponsibility)}
+					tone="warning"
+				/>
 			</div>
-			<div className="grid gap-4 xl:grid-cols-2">
+			<div className="grid gap-3 xl:grid-cols-2">
 				<Panel title="Payment Summary">
 					<dl className="space-y-3 text-xs">
 						{[
@@ -421,7 +593,7 @@ function FinancialsTab({ claim }: { claim: ClaimDetail }) {
 				</Panel>
 				<Panel title="Remittance & Reconciliation">
 					<div className="space-y-3 text-xs">
-						<p className="rounded-md bg-emerald-500/10 p-3 text-emerald-800">
+						<p className="rounded-sm border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
 							Payment reconciliation is complete. The remittance amount is
 							aligned to the adjudicated claim total.
 						</p>
@@ -496,9 +668,9 @@ function DocumentsTab({ claim }: { claim: ClaimDetail }) {
 
 function NotesTab({ claim }: { claim: ClaimDetail }) {
 	return (
-		<div className="space-y-4">
+		<div className="space-y-3">
 			<div>
-				<h2 className="text-base font-semibold">Notes</h2>
+				<h2 className="text-sm font-semibold text-foreground">Notes</h2>
 				<p className="mt-1 text-xs text-muted-foreground">
 					Operational notes and claim communication history.
 				</p>
@@ -508,13 +680,13 @@ function NotesTab({ claim }: { claim: ClaimDetail }) {
 					{claim.notes.map((note) => (
 						<div
 							key={note.id}
-							className="rounded-lg border border-border/60 bg-muted/20 p-3"
+							className="rounded-sm border border-primary/15 bg-primary/5 px-3 py-2.5"
 						>
 							<div className="flex justify-between gap-3 text-xs">
-								<p className="font-medium">{note.addedBy}</p>
+								<p className="font-medium text-foreground">{note.addedBy}</p>
 								<p className="text-muted-foreground">{note.date}</p>
 							</div>
-							<p className="mt-2 text-sm">{note.text}</p>
+							<p className="mt-2 text-sm text-foreground">{note.text}</p>
 						</div>
 					))}
 					<Button
@@ -558,66 +730,74 @@ function ContractFinancialsTab({ claim }: { claim: ClaimDetail }) {
 						[
 							"Billed Amount",
 							formatCurrency(claim.amountBilled),
-							"bg-sky-500/15 text-sky-700",
+							"bg-primary text-primary-foreground",
+							"text-primary",
 							FileText,
 						],
 						[
 							"Contracted Amount",
 							formatCurrency(contractedAmount),
-							"bg-emerald-500/15 text-emerald-700",
+							"bg-emerald-600 text-white",
+							"text-emerald-700 dark:text-emerald-300",
 							WalletCards,
 						],
 						[
 							"Allowed Amount",
 							formatCurrency(allowedAmount),
-							"bg-violet-500/15 text-violet-700",
+							"bg-primary text-primary-foreground",
+							"text-primary",
 							WalletCards,
 						],
 						[
 							"Paid Amount",
 							formatCurrency(claim.amountPaid),
-							"bg-cyan-500/15 text-cyan-700",
+							"bg-emerald-600 text-white",
+							"text-emerald-700 dark:text-emerald-300",
 							WalletCards,
 						],
 						[
 							"Contract Variance",
 							`${variance >= 0 ? "+" : ""}${formatCurrency(variance)}`,
-							"bg-amber-500/15 text-amber-700",
+							"bg-amber-500 text-white",
+							"text-amber-700 dark:text-amber-300",
 							AlertTriangle,
 						],
 						[
 							"Contract Status",
 							variance > 0 ? "Review" : "Compliant",
-							"bg-amber-500/15 text-amber-700",
+							variance > 0
+								? "bg-amber-500 text-white"
+								: "bg-emerald-600 text-white",
+							variance > 0
+								? "text-amber-700 dark:text-amber-300"
+								: "text-emerald-700 dark:text-emerald-300",
 							AlertTriangle,
 						],
 					] as const
-				).map(([label, value, tone, Icon]) => {
+				).map(([label, value, well, valueTone, Icon]) => {
 					const MetricIcon = Icon as typeof FileText;
 					return (
 						<div
 							key={label}
-							className="rounded-lg border border-border/60 bg-card px-3 py-3 shadow-sm"
+							className={cn(PANEL, "border-l-2 border-l-border px-3 py-3")}
 						>
 							<div className="flex items-center gap-2">
 								<span
 									className={cn(
-										"flex size-7 items-center justify-center rounded-md",
-										tone
+										"flex size-7 items-center justify-center rounded-full shadow-sm",
+										well
 									)}
 								>
 									<MetricIcon className="size-3.5" />
 								</span>
-								<p className="text-[10px] font-medium text-muted-foreground">
+								<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 									{label}
 								</p>
 							</div>
 							<p
 								className={cn(
 									"mt-2 text-base font-semibold tabular-nums",
-									label === "Contract Variance" &&
-										variance > 0 &&
-										"text-amber-700"
+									valueTone
 								)}
 							>
 								{value}
@@ -816,8 +996,8 @@ function ContractFinancialsTab({ claim }: { claim: ClaimDetail }) {
 					</Table>
 				</Panel>
 				<Panel title="Variance Explanation">
-					<div className="flex gap-2 text-xs text-amber-700">
-						<AlertTriangle className="mt-0.5 size-4 shrink-0" />
+					<div className="flex gap-2 rounded-sm border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+						<AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
 						<div>
 							<p className="font-medium">
 								The allowed amount exceeds the contracted amount by{" "}
@@ -940,9 +1120,9 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 						].map((item) => (
 							<div
 								key={item.label}
-								className="rounded-md border border-border/50 bg-muted/20 px-3 py-3"
+								className="rounded-sm border border-border/50 bg-card px-3 py-3"
 							>
-								<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+								<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 									{item.label}
 								</p>
 								<p
@@ -1435,7 +1615,8 @@ function OperationsAuditTab({ claim }: { claim: ClaimDetail }) {
 }
 
 export function ClaimDetailPage() {
-	if (!isMockEnabled()) {
+	const useFixtures = isClaimVendorFilesMockEnabled();
+	if (!useFixtures) {
 		return (
 			<VendorCoreGate title="Claim Overview">
 				<ClaimDetailBody useLive />
@@ -1539,23 +1720,44 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 	}
 
 	return (
-		<div className="space-y-5">
+		<div className={CMS_EDGE_PAGE_STACK}>
 			{/* Header */}
 			<div className="flex flex-wrap items-start justify-between gap-3">
-				<div className="min-w-0 space-y-1.5">
-					<h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-						Claim Overview
-					</h1>
+				<div className="min-w-0 space-y-2">
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
+						asChild
+					>
+						<Link href="/admin/claim-encounter/claims">
+							<ArrowLeft className="mr-1.5 size-3.5" />
+							Back to Claims
+						</Link>
+					</Button>
 					<div className="flex flex-wrap items-center gap-2">
-						<p className="text-sm">
-							<span className="text-muted-foreground">Claim ID: </span>
-							<span className="font-mono font-semibold text-primary">
-								{claim.claimId}
-							</span>
-						</p>
+						<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+							<span className="font-mono text-primary">{claim.claimId}</span>
+						</h1>
 						<StatusBadge status={claim.status} />
+						{claim.priority !== "Normal" ? (
+							<span
+								className={cn(
+									CMS_EDGE_STATUS_PILL_CLASS,
+									claim.priority === "Urgent"
+										? "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+										: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+								)}
+							>
+								{claim.priority}
+							</span>
+						) : null}
 					</div>
+					<p className="text-sm text-muted-foreground">
+						{claim.claimType} · {claim.vendor} · {claim.program}
+					</p>
 				</div>
+
 				<div className="flex flex-wrap items-center gap-2">
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -1633,48 +1835,58 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 				</div>
 			</div>
 
-			{/* Meta strip */}
-			<div className="flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-border/60 bg-muted/30 px-4 py-3.5 text-xs">
-				<MetaChip
-					label="Member"
-					value={`${claim.memberId} - ${claim.memberName}`}
-				/>
-				<MetaChip label="DOS" value={formatDos(claim.dateOfService)} />
-				<MetaChip label="Provider" value={claim.provider} />
-				<MetaChip label="Vendor" value={claim.vendor} />
-				<MetaChip label="Payer" value={claim.payer} />
-			</div>
-
-			{/* Tabs */}
-			<div className="border-b border-border/60">
-				<div className="flex gap-0">
-					{MAIN_TABS.map((item) => (
-						<button
-							key={item}
-							type="button"
-							onClick={() => setTab(item)}
-							className={cn(
-								"border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-								tab === item
-									? "border-primary text-primary"
-									: "border-transparent text-muted-foreground hover:text-foreground"
-							)}
-						>
-							{item}
-						</button>
+			{/* Metadata strip */}
+			<section className={cn(PANEL, "overflow-hidden")}>
+				<div className="grid grid-cols-2 divide-y divide-border/50 sm:grid-cols-3 sm:divide-x sm:divide-y-0 xl:grid-cols-6">
+					{[
+						{
+							label: "Member",
+							value: `${claim.memberName}`,
+							sub: claim.memberId,
+						},
+						{ label: "DOS", value: formatDos(claim.dateOfService) },
+						{
+							label: "Provider",
+							value: claim.provider,
+							sub: claim.providerNpi,
+						},
+						{ label: "Vendor", value: claim.vendor },
+						{ label: "Payer", value: claim.payer },
+						{ label: "Trace", value: claim.traceId },
+					].map((field) => (
+						<div key={field.label} className="min-w-0 px-3 py-2.5">
+							<p className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+								{field.label}
+							</p>
+							<p
+								className="mt-1 truncate text-xs font-semibold text-foreground"
+								title={field.value}
+							>
+								{field.value}
+							</p>
+							{"sub" in field && field.sub ? (
+								<p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+									{field.sub}
+								</p>
+							) : null}
+						</div>
 					))}
 				</div>
-			</div>
+			</section>
 
-			{tab === "Claim Summary" ? <OverviewTab claim={claim} /> : null}
-			{tab === "Service Lines" ? <ServiceLinesTab claim={claim} /> : null}
-			{tab === "Financials" ? <FinancialsTab claim={claim} /> : null}
-			{tab === "Contract & Financials" ? (
-				<ContractFinancialsTab claim={claim} />
-			) : null}
-			{tab === "History" ? <OperationsAuditTab claim={claim} /> : null}
-			{tab === "Documents (2)" ? <DocumentsTab claim={claim} /> : null}
-			{tab === "Notes" ? <NotesTab claim={claim} /> : null}
+			<ClaimTabsNav tab={tab} onTabChange={setTab} />
+
+			<div>
+				{tab === "Claim Summary" ? <OverviewTab claim={claim} /> : null}
+				{tab === "Service Lines" ? <ServiceLinesTab claim={claim} /> : null}
+				{tab === "Financials" ? <FinancialsTab claim={claim} /> : null}
+				{tab === "Contract & Financials" ? (
+					<ContractFinancialsTab claim={claim} />
+				) : null}
+				{tab === "History" ? <OperationsAuditTab claim={claim} /> : null}
+				{tab === "Documents (2)" ? <DocumentsTab claim={claim} /> : null}
+				{tab === "Notes" ? <NotesTab claim={claim} /> : null}
+			</div>
 		</div>
 	);
 }

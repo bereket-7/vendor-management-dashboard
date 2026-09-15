@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, Gauge } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+	CMS_EDGE_PAGE_STACK,
+	CMS_EDGE_PANEL_CLASS,
+	CMS_EDGE_STATUS_PILL_CLASS,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import { MeasureDetailDenominatorTab } from "@/features/admin/features/claim-encounter/quality-performance/measure-library/MeasureDetailDenominatorTab";
 import { MeasureDetailDocumentsTab } from "@/features/admin/features/claim-encounter/quality-performance/measure-library/MeasureDetailDocumentsTab";
 import { MeasureDetailEligiblePopulationTab } from "@/features/admin/features/claim-encounter/quality-performance/measure-library/MeasureDetailEligiblePopulationTab";
@@ -37,9 +42,11 @@ import {
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
+const PANEL = CMS_EDGE_PANEL_CLASS;
+
 const MEASURE_DETAIL_TAB_TRIGGER = cn(
-	"rounded-none border-b-2 border-transparent px-2.5 py-2 text-xs font-medium shadow-none transition-colors",
-	"text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+	"rounded-none border-b-2 border-transparent px-2.5 py-2.5 text-xs font-medium shadow-none transition-colors",
+	"text-muted-foreground hover:bg-primary/5 hover:text-foreground",
 	"data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none"
 );
 
@@ -56,15 +63,15 @@ function MetadataBar({ measure }: { measure: MeasureDetail }) {
 	];
 
 	return (
-		<div className="rounded-xl border border-border/70 bg-card shadow-sm">
-			<div className="grid grid-cols-2 divide-x divide-y divide-border/50 sm:grid-cols-4">
+		<section className={cn(PANEL, "overflow-hidden")}>
+			<div className="grid grid-cols-2 divide-y divide-border/50 sm:grid-cols-4 sm:divide-x sm:divide-y-0 xl:grid-cols-8">
 				{fields.map((field) => (
-					<div key={field.label} className="min-w-0 px-3 py-2">
-						<p className="truncate text-[10px] font-medium text-muted-foreground">
+					<div key={field.label} className="min-w-0 px-3 py-2.5">
+						<p className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 							{field.label}
 						</p>
 						<p
-							className="mt-0.5 truncate text-xs font-semibold text-foreground"
+							className="mt-1 truncate text-xs font-semibold text-foreground"
 							title={String(field.value)}
 						>
 							{field.value}
@@ -72,13 +79,13 @@ function MetadataBar({ measure }: { measure: MeasureDetail }) {
 					</div>
 				))}
 			</div>
-		</div>
+		</section>
 	);
 }
 
 function PlaceholderTab({ tab }: { tab: MeasureDetailTab }) {
 	return (
-		<div className="rounded-lg border border-border/70 bg-card p-8 text-center shadow-sm">
+		<div className={cn(PANEL, "px-4 py-12 text-center")}>
 			<p className="text-sm font-medium text-foreground">{tab}</p>
 			<p className="mt-2 text-xs text-muted-foreground">
 				Detailed {tab.toLowerCase()} content for this measure will appear here.
@@ -101,6 +108,9 @@ export function MeasureDetailPage({ measure }: { measure: MeasureDetail }) {
 	const documents = getMeasureDocuments(measure.id);
 	const history = getMeasureHistory(measure.id);
 
+	const varianceNegative = measure.varianceToGoal < 0;
+	const onTarget = measure.complianceRate >= measure.planGoal;
+
 	const placeholderTabs = MEASURE_DETAIL_TABS.filter(
 		(tab) =>
 			tab !== "Overview" &&
@@ -118,13 +128,14 @@ export function MeasureDetailPage({ measure }: { measure: MeasureDetail }) {
 	);
 
 	return (
-		<div className="space-y-3 pb-3">
-			<div className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-3">
+		<div className={CMS_EDGE_PAGE_STACK}>
+			{/* Header */}
+			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div className="min-w-0 space-y-2">
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-8 px-2 text-xs"
+						className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
 						asChild
 					>
 						<Link href="/admin/claim-encounter/regulatory/quality-performance/measure-library">
@@ -132,12 +143,67 @@ export function MeasureDetailPage({ measure }: { measure: MeasureDetail }) {
 							Back to Measure Library
 						</Link>
 					</Button>
-					<div>
+					<div className="flex flex-wrap items-center gap-2">
 						<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-							{measure.id} — {measure.name}
+							<span className="font-mono text-primary">{measure.id}</span>
+							<span className="text-muted-foreground"> — </span>
+							{measure.name}
 						</h1>
-						<p className="mt-1 text-sm text-muted-foreground">
-							{measure.measureSet} · {measure.domain}
+						<span
+							className={cn(
+								CMS_EDGE_STATUS_PILL_CLASS,
+								measure.status === "Active"
+									? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+									: "border-border bg-muted text-muted-foreground"
+							)}
+						>
+							{measure.status}
+						</span>
+						<span
+							className={cn(
+								CMS_EDGE_STATUS_PILL_CLASS,
+								"border-primary/30 bg-primary/10 text-primary"
+							)}
+						>
+							{measure.reportingStatus}
+						</span>
+					</div>
+					<p className="text-sm text-muted-foreground">
+						{measure.measureSet} · {measure.domain} · {measure.measurementYear}
+					</p>
+				</div>
+
+				<div
+					className={cn(
+						PANEL,
+						"flex min-w-[11rem] items-center gap-3 border-l-2 border-l-primary px-4 py-3"
+					)}
+				>
+					<span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+						<Gauge className="size-4" />
+					</span>
+					<div>
+						<p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+							Compliance
+						</p>
+						<p className="text-2xl font-semibold tabular-nums text-primary">
+							{measure.complianceRate.toFixed(1)}%
+						</p>
+						<p
+							className={cn(
+								"mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-medium",
+								onTarget
+									? "text-emerald-700 dark:text-emerald-300"
+									: "text-amber-700 dark:text-amber-300"
+							)}
+						>
+							{varianceNegative ? (
+								<ArrowDownRight className="size-3" />
+							) : (
+								<ArrowUpRight className="size-3" />
+							)}
+							{varianceNegative ? "" : "+"}
+							{measure.varianceToGoal.toFixed(1)}% vs goal
 						</p>
 					</div>
 				</div>
@@ -149,7 +215,7 @@ export function MeasureDetailPage({ measure }: { measure: MeasureDetail }) {
 				value={activeTab}
 				onValueChange={(value) => setActiveTab(value as MeasureDetailTab)}
 			>
-				<div className="overflow-x-auto rounded-t-xl border border-b-0 border-border/70 bg-card">
+				<div className={cn(PANEL, "overflow-x-auto rounded-b-none border-b-0")}>
 					<TabsList className="inline-flex h-auto w-max min-w-full justify-start gap-0 rounded-none bg-transparent p-0">
 						{MEASURE_DETAIL_TABS.map((tab) => (
 							<TabsTrigger
@@ -163,7 +229,7 @@ export function MeasureDetailPage({ measure }: { measure: MeasureDetail }) {
 					</TabsList>
 				</div>
 
-				<div className="rounded-b-xl border border-border/70 bg-muted/20 p-3">
+				<div className={cn(PANEL, "rounded-t-none p-3")}>
 					<TabsContent value="Overview" className="mt-0">
 						<MeasureDetailOverviewTab measure={measure} />
 					</TabsContent>

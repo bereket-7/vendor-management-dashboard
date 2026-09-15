@@ -54,18 +54,21 @@ import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_SUBMISSION_ENVIRONMENTS,
 	CMS_EDGE_SUBMISSION_FILE_TYPES,
-	CMS_EDGE_SUBMISSION_KPIS,
 	CMS_EDGE_SUBMISSION_PROCESS_STEPS,
 	CMS_EDGE_SUBMISSION_STATUSES,
 	SUBMISSION_STATUS_STYLES,
 	type SubmissionEnvironment,
 	type SubmissionFileType,
 	type SubmissionStatus,
+	useCmsEdgeReportingOverviewQuery,
 	useCmsEdgeSubmissionHistoryList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
-import { isMockEnabled } from "@/lib/mock-mode";
+import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+
+const SUBMISSION_DETAIL_BASE =
+	"/admin/claim-encounter/regulatory/cms-edge-reporting/submissions";
 
 const PANEL_SHADOW =
 	"rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
@@ -262,12 +265,17 @@ function SubmissionFilterBar({
 function SubmissionKpiCards({
 	activeFilter,
 	onFilter,
+	counts,
 }: {
 	activeFilter: SubmissionStatus | "all";
 	onFilter: (filter: SubmissionStatus | "all") => void;
+	counts: {
+		total: number;
+		accepted: number;
+		inProgress: number;
+		failed: number;
+	};
 }) {
-	const counts = CMS_EDGE_SUBMISSION_KPIS;
-
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 			{KPI_META.map((kpi) => {
@@ -390,38 +398,52 @@ function SubmissionProcessStepper() {
 	);
 }
 
-function periodValueToLabel(value: string) {
-	const match = CMS_EDGE_REPORTING_PERIODS.find(
-		(option) => option.value === value
-	);
-	return match?.label.split(" (")[0] ?? "Q2 2027";
-}
-
 export function CmsEdgeSubmissionsTab() {
+	const router = useRouter();
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
 	const [environment, setEnvironment] = useState<SubmissionEnvironment | "all">(
 		"all"
 	);
 	const [fileType, setFileType] = useState<SubmissionFileType | "all">("all");
 	const [status, setStatus] = useState<SubmissionStatus | "all">("all");
-	const { submissionHistory } = useCmsEdgeSubmissionHistoryList();
 
-	const filteredRows = useMemo(() => {
-		const periodLabel = periodValueToLabel(reportingPeriod);
-		const useMock = isMockEnabled();
+	const {
+		submissionHistory: filteredRows,
+		isLoading,
+		isError,
+	} = useCmsEdgeSubmissionHistoryList({
+		reportingPeriod,
+		environment,
+		fileType,
+		status,
+	});
 
-		return submissionHistory.filter((row) => {
-			if (useMock && row.reportingPeriod !== periodLabel) return false;
-			if (environment !== "all" && row.environment !== environment)
-				return false;
-			if (fileType !== "all" && row.fileType !== fileType) return false;
-			if (status !== "all" && row.status !== status) return false;
-			return true;
-		});
-	}, [reportingPeriod, environment, fileType, status, submissionHistory]);
+	const overviewQuery = useCmsEdgeReportingOverviewQuery(reportingPeriod);
+	const kpiCounts = useMemo(() => {
+		const fromOverview = overviewQuery.data?.kpis;
+		if (fromOverview) {
+			return {
+				total: fromOverview.total,
+				accepted: fromOverview.accepted,
+				inProgress: fromOverview.inProgress,
+				failed: fromOverview.failed,
+			};
+		}
+		return {
+			total: filteredRows.length,
+			accepted: filteredRows.filter((row) => row.status === "Accepted").length,
+			inProgress: filteredRows.filter((row) => row.status === "Processing")
+				.length,
+			failed: filteredRows.filter((row) => row.status === "Failed").length,
+		};
+	}, [filteredRows, overviewQuery.data?.kpis]);
 
 	const hasFilters =
 		environment !== "all" || fileType !== "all" || status !== "all";
+
+	function openSubmission(id: string) {
+		router.push(`${SUBMISSION_DETAIL_BASE}/${encodeURIComponent(id)}`);
+	}
 
 	return (
 		<div className={CMS_EDGE_PAGE_STACK}>
@@ -439,13 +461,22 @@ export function CmsEdgeSubmissionsTab() {
 			<SubmissionKpiCards
 				activeFilter={status}
 				onFilter={(next) => setStatus(next)}
+				counts={kpiCounts}
 			/>
 
 			<section className={cn(PANEL_SHADOW, "overflow-hidden")}>
 				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
 					<p className="text-sm font-semibold text-foreground">
-						{filteredRows.length.toLocaleString()}{" "}
-						{filteredRows.length === 1 ? "submission" : "submissions"}
+						{isLoading
+							? "Loading…"
+							: `${filteredRows.length.toLocaleString()} ${
+									filteredRows.length === 1 ? "submission" : "submissions"
+								}`}
+						{isError ? (
+							<span className="ml-2 text-xs font-normal text-destructive">
+								Failed to load live data
+							</span>
+						) : null}
 					</p>
 					<div className="flex items-center gap-1.5">
 						{hasFilters ? (
@@ -521,13 +552,12 @@ export function CmsEdgeSubmissionsTab() {
 											{index + 1}
 										</TableCell>
 										<TableCell className={td}>
-											<button
-												type="button"
+											<Link
+												href={`${SUBMISSION_DETAIL_BASE}/${encodeURIComponent(row.id)}`}
 												className="font-mono text-[11px] font-medium text-primary transition-colors hover:underline"
-												onClick={() => toast.message(`Open ${row.id}`)}
 											>
 												{row.id}
-											</button>
+											</Link>
 										</TableCell>
 										<TableCell className={cn(td, "font-medium")}>
 											{row.fileType}
@@ -561,7 +591,7 @@ export function CmsEdgeSubmissionsTab() {
 												</DropdownMenuTrigger>
 												<DropdownMenuContent align="end" className="w-44">
 													<DropdownMenuItem
-														onClick={() => toast.message(`View ${row.id}`)}
+														onClick={() => openSubmission(row.id)}
 													>
 														<Eye className="mr-2 size-3.5" />
 														View details

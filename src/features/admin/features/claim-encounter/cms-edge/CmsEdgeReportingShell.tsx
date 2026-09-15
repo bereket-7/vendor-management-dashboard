@@ -32,9 +32,9 @@ import {
 import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_REPORTING_TABS,
-	CMS_EDGE_REPORTING_TAB_BADGES,
 	CMS_EDGE_REPORTING_TAB_META,
 	type CmsEdgeReportingTabId,
+	useCmsEdgeReportingOverviewQuery,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { ClaimPageHeader } from "@/features/admin/features/claim-encounter/components/ClaimPageChrome";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -69,7 +69,13 @@ function formatBadge(count: number) {
 	return count > 999 ? `${Math.round(count / 100) / 10}k` : String(count);
 }
 
-function ReportingTabs({ activeTab }: { activeTab: CmsEdgeReportingTabId }) {
+function ReportingTabs({
+	activeTab,
+	badges,
+}: {
+	activeTab: CmsEdgeReportingTabId;
+	badges: Partial<Record<CmsEdgeReportingTabId, number>>;
+}) {
 	const scrollerRef = useRef<HTMLDivElement>(null);
 	const [canLeft, setCanLeft] = useState(false);
 	const [canRight, setCanRight] = useState(false);
@@ -159,7 +165,7 @@ function ReportingTabs({ activeTab }: { activeTab: CmsEdgeReportingTabId }) {
 					const href = `${REPORTING_BASE}/${tab.id}`;
 					const isActive = activeTab === tab.id;
 					const Icon = TAB_ICONS[tab.id];
-					const badge = CMS_EDGE_REPORTING_TAB_BADGES[tab.id];
+					const badge = badges[tab.id];
 
 					return (
 						<Link
@@ -185,7 +191,7 @@ function ReportingTabs({ activeTab }: { activeTab: CmsEdgeReportingTabId }) {
 								<Icon className="size-3.5" />
 							</span>
 							<span>{tab.label}</span>
-							{badge != null ? (
+							{badge != null && badge > 0 ? (
 								<span
 									className={cn(
 										"rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums",
@@ -233,6 +239,8 @@ export function CmsEdgeReportingShell({ children }: { children: ReactNode }) {
 	const activeTab = tabFromPathname(pathname);
 	const tabMeta = CMS_EDGE_REPORTING_TAB_META[activeTab];
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
+	const overviewQuery = useCmsEdgeReportingOverviewQuery(reportingPeriod);
+	const badges = overviewQuery.data?.tabBadges ?? {};
 
 	return (
 		<div className="space-y-0">
@@ -271,7 +279,7 @@ export function CmsEdgeReportingShell({ children }: { children: ReactNode }) {
 				/>
 			</div>
 
-			<ReportingTabs activeTab={activeTab} />
+			<ReportingTabs activeTab={activeTab} badges={badges} />
 
 			<div className="bg-muted/30 py-4">{children}</div>
 		</div>

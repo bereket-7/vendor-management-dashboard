@@ -14,6 +14,9 @@ import {
 } from "recharts";
 
 import {
+	MEASURE_CHART_FRAME,
+	MEASURE_CHART_GOAL,
+	MEASURE_CHART_PRIMARY,
 	MEASURE_TABLE_MUTED,
 	MEASURE_TAB_STACK,
 	MeasureAsOfBar,
@@ -106,7 +109,7 @@ export function MeasureDetailPerformanceTab({
 					}
 					bodyClassName="p-0"
 				>
-					<div className="min-h-[280px] rounded-lg border border-border/50 bg-muted/10 p-2">
+					<div className={MEASURE_CHART_FRAME}>
 						<ResponsiveContainer width="100%" height={280}>
 							<LineChart
 								data={data.trend}
@@ -126,13 +129,13 @@ export function MeasureDetailPerformanceTab({
 								<Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
 								<ReferenceLine
 									y={summary.goal}
-									stroke="#22c55e"
+									stroke={MEASURE_CHART_GOAL}
 									strokeDasharray="4 4"
 									label={{
 										value: `Goal (${summary.goal}%)`,
 										position: "insideTopRight",
 										fontSize: 11,
-										fill: "#16a34a",
+										fill: MEASURE_CHART_GOAL,
 									}}
 								/>
 								<Legend wrapperStyle={{ fontSize: 12 }} />
@@ -140,11 +143,11 @@ export function MeasureDetailPerformanceTab({
 									type="monotone"
 									dataKey="rate"
 									name="Performance Rate"
-									stroke="#13446c"
+									stroke={MEASURE_CHART_PRIMARY}
 									strokeWidth={2.5}
 									dot={{
 										r: 4,
-										fill: "#13446c",
+										fill: MEASURE_CHART_PRIMARY,
 										strokeWidth: 2,
 										stroke: "#fff",
 									}}

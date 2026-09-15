@@ -2,6 +2,7 @@
 
 import {
 	ExternalRefLink,
+	MEASURE_CALLOUT,
 	MEASURE_TABLE_MUTED,
 	MEASURE_TAB_STACK,
 	MeasureDataTable,
@@ -27,8 +28,8 @@ export function MeasureDetailSpecificationsTab({
 					action={<PdfLink label="View Full Measure Specification (PDF)" />}
 					bodyClassName="space-y-3 p-0"
 				>
-					<div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<div className={MEASURE_CALLOUT}>
+						<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
 							Measure Description
 						</p>
 						<p className="mt-2 text-sm leading-relaxed text-foreground">
@@ -142,7 +143,7 @@ export function MeasureDetailSpecificationsTab({
 						subtitle="Primary clinical area for this measure"
 						bodyClassName="p-0"
 					>
-						<div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
+						<div className={MEASURE_CALLOUT}>
 							<p className="text-sm font-semibold text-foreground">
 								{specifications.clinicalFocus}
 							</p>

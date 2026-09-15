@@ -46,8 +46,6 @@ import {
 import {
 	CMS_EDGE_REPORTING_PERIODS,
 	CMS_EDGE_RESPONSE_FILE_TYPES,
-	CMS_EDGE_RESPONSE_KPIS,
-	CMS_EDGE_RESPONSE_LATEST_SUMMARY,
 	CMS_EDGE_RESPONSE_STATUSES,
 	CMS_EDGE_RESPONSE_TYPES,
 	CMS_RESPONSE_STATUS_STYLES,
@@ -57,7 +55,14 @@ import {
 	useCmsEdgeCmsResponsesList,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+
+const RESPONSE_DETAIL_BASE =
+	"/admin/claim-encounter/regulatory/cms-edge-reporting/cms-responses";
+
+const SUBMISSION_DETAIL_BASE =
+	"/admin/claim-encounter/regulatory/cms-edge-reporting/submissions";
 
 const PANEL_SHADOW =
 	"rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
@@ -270,12 +275,17 @@ function ResponseFilterBar({
 function ResponseKpiCards({
 	activeFilter,
 	onFilter,
+	counts,
 }: {
 	activeFilter: CmsResponseStatus | "all";
 	onFilter: (filter: CmsResponseStatus | "all") => void;
+	counts: {
+		responseFiles: number;
+		acceptedRecords: number;
+		rejectedRecords: number;
+		pendingResponses: number;
+	};
 }) {
-	const counts = CMS_EDGE_RESPONSE_KPIS;
-
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 			{KPI_META.map((kpi) => {
@@ -338,7 +348,21 @@ function ResponseKpiCards({
 	);
 }
 
-function LatestResponseSummary({ periodLabel }: { periodLabel: string }) {
+function LatestResponseSummary({
+	periodLabel,
+	cards,
+}: {
+	periodLabel: string;
+	cards: {
+		id: string;
+		label: string;
+		accepted: number;
+		rejected: number;
+		acceptanceRate: number;
+	}[];
+}) {
+	if (cards.length === 0) return null;
+
 	return (
 		<section className="space-y-3">
 			<div className="flex items-center justify-between gap-2 px-0.5">
@@ -353,7 +377,7 @@ function LatestResponseSummary({ periodLabel }: { periodLabel: string }) {
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				{CMS_EDGE_RESPONSE_LATEST_SUMMARY.map((card) => {
+				{cards.map((card) => {
 					const meta = SUMMARY_META[card.label];
 					const Icon = meta?.icon ?? FileText;
 					const total = card.accepted + card.rejected;
@@ -425,29 +449,70 @@ function periodValueToLabel(value: string) {
 }
 
 export function CmsEdgeResponsesTab() {
+	const router = useRouter();
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
 	const [fileType, setFileType] = useState<CmsResponseFileType | "all">("all");
 	const [responseType, setResponseType] = useState<CmsResponseType | "all">(
 		"all"
 	);
 	const [status, setStatus] = useState<CmsResponseStatus | "all">("all");
-	const { cmsResponses } = useCmsEdgeCmsResponsesList();
 
 	const periodLabel = periodValueToLabel(reportingPeriod);
 
-	const filteredRows = useMemo(() => {
-		return cmsResponses.filter((row) => {
-			if (fileType !== "all" && row.fileType !== fileType) return false;
-			if (responseType !== "all" && row.responseType !== responseType) {
-				return false;
-			}
-			if (status !== "all" && row.status !== status) return false;
-			return true;
-		});
-	}, [fileType, responseType, status, cmsResponses]);
+	const {
+		cmsResponses: filteredRows,
+		isLoading,
+		isError,
+	} = useCmsEdgeCmsResponsesList({
+		reportingPeriod,
+		fileType,
+		responseType,
+		status,
+	});
+
+	const kpiCounts = useMemo(() => {
+		return {
+			responseFiles: filteredRows.length,
+			acceptedRecords: filteredRows.reduce((sum, row) => sum + row.accepted, 0),
+			rejectedRecords: filteredRows.reduce((sum, row) => sum + row.rejected, 0),
+			pendingResponses: filteredRows.filter((row) => row.status === "Pending")
+				.length,
+		};
+	}, [filteredRows]);
+
+	const summaryCards = useMemo(() => {
+		const byType = new Map<string, { accepted: number; rejected: number }>();
+		for (const row of filteredRows) {
+			const current = byType.get(row.fileType) ?? {
+				accepted: 0,
+				rejected: 0,
+			};
+			current.accepted += row.accepted;
+			current.rejected += row.rejected;
+			byType.set(row.fileType, current);
+		}
+		return Array.from(byType.entries())
+			.map(([label, counts]) => {
+				const total = counts.accepted + counts.rejected;
+				return {
+					id: `sum-${label}`,
+					label,
+					accepted: counts.accepted,
+					rejected: counts.rejected,
+					acceptanceRate: total
+						? Math.round((counts.accepted / total) * 1000) / 10
+						: 0,
+				};
+			})
+			.slice(0, 4);
+	}, [filteredRows]);
 
 	const hasFilters =
 		fileType !== "all" || responseType !== "all" || status !== "all";
+
+	function openResponse(id: string) {
+		router.push(`${RESPONSE_DETAIL_BASE}/${encodeURIComponent(id)}`);
+	}
 
 	return (
 		<div className={CMS_EDGE_PAGE_STACK}>
@@ -465,13 +530,22 @@ export function CmsEdgeResponsesTab() {
 			<ResponseKpiCards
 				activeFilter={status}
 				onFilter={(next) => setStatus(next)}
+				counts={kpiCounts}
 			/>
 
 			<section className={cn(PANEL_SHADOW, "overflow-hidden")}>
 				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
 					<p className="text-sm font-semibold text-foreground">
-						{filteredRows.length.toLocaleString()}{" "}
-						{filteredRows.length === 1 ? "response file" : "response files"}
+						{isLoading
+							? "Loading…"
+							: `${filteredRows.length.toLocaleString()} ${
+									filteredRows.length === 1 ? "response file" : "response files"
+								}`}
+						{isError ? (
+							<span className="ml-2 text-xs font-normal text-destructive">
+								Failed to load live data
+							</span>
+						) : null}
 					</p>
 					<div className="flex items-center gap-1.5">
 						{hasFilters ? (
@@ -548,26 +622,20 @@ export function CmsEdgeResponsesTab() {
 											{index + 1}
 										</TableCell>
 										<TableCell className={td}>
-											<button
-												type="button"
+											<Link
+												href={`${RESPONSE_DETAIL_BASE}/${encodeURIComponent(row.id)}`}
 												className="max-w-[240px] truncate font-mono text-[11px] font-medium text-primary transition-colors hover:underline"
-												onClick={() =>
-													toast.message(`Open ${row.responseFile}`)
-												}
 											>
 												{row.responseFile}
-											</button>
+											</Link>
 										</TableCell>
 										<TableCell className={td}>
-											<button
-												type="button"
+											<Link
+												href={`${SUBMISSION_DETAIL_BASE}/${encodeURIComponent(row.relatedSubmission)}`}
 												className="font-mono text-[11px] font-medium text-primary transition-colors hover:underline"
-												onClick={() =>
-													toast.message(`Open ${row.relatedSubmission}`)
-												}
 											>
 												{row.relatedSubmission}
-											</button>
+											</Link>
 										</TableCell>
 										<TableCell className={cn(td, "font-medium")}>
 											{row.fileType}
@@ -601,11 +669,7 @@ export function CmsEdgeResponsesTab() {
 													variant="link"
 													size="sm"
 													className="h-auto gap-1 p-0 text-[11px] font-medium"
-													onClick={() =>
-														toast.message(
-															`View results for ${row.responseFile}`
-														)
-													}
+													onClick={() => openResponse(row.id)}
 												>
 													<Eye className="size-3" />
 													View Results
@@ -656,7 +720,7 @@ export function CmsEdgeResponsesTab() {
 				</div>
 			</section>
 
-			<LatestResponseSummary periodLabel={periodLabel} />
+			<LatestResponseSummary periodLabel={periodLabel} cards={summaryCards} />
 
 			<CmsEdgePageFooter />
 		</div>

@@ -5,27 +5,32 @@ import {
 	CheckCircle2,
 	Info,
 	RefreshCw,
-	ShieldCheck,
 	XCircle,
 } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import {
+	Bar,
+	BarChart,
+	CartesianGrid,
+	Cell,
+	Pie,
+	PieChart,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+	CMS_EDGE_PANEL_CLASS,
+	CMS_EDGE_STATUS_PILL_CLASS,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 import {
 	type ComponentStatus,
-	MCR_KPIS,
 	MCR_MEASURE_LIBRARY_HREF,
 	MCR_READINESS_BY_DOMAIN,
 	MCR_READINESS_ROWS,
@@ -33,39 +38,29 @@ import {
 	type ReadinessStatus,
 } from "./feature/queries/useMeasureComparisonQuery";
 
-const TABLE_HEAD =
-	"h-8 bg-sky-50 px-2 text-[9px] font-semibold uppercase tracking-wide text-sky-950 dark:bg-sky-950/40 dark:text-sky-100";
-const TABLE_CELL = "px-2 py-2.5 text-xs";
+const PANEL = CMS_EDGE_PANEL_CLASS;
 
-function scoreBarColor(score: number) {
-	if (score >= 80) return "bg-emerald-500";
-	if (score >= 60) return "bg-orange-500";
-	return "bg-red-500";
-}
-
-function domainBarColor(score: number) {
-	if (score >= 75) return "bg-emerald-500";
-	if (score >= 65) return "bg-orange-500";
-	return "bg-red-500";
-}
+/** Primary light → dark for domain bars */
+const PRIMARY_CHART_SCALE = [
+	"color-mix(in oklch, var(--primary) 42%, white)",
+	"color-mix(in oklch, var(--primary) 62%, white)",
+	"color-mix(in oklch, var(--primary) 82%, white)",
+	"var(--primary)",
+] as const;
 
 function ReadinessStatusPill({ status }: { status: ReadinessStatus }) {
 	const styles: Record<ReadinessStatus, string> = {
 		Ready:
-			"bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+			"border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
 		"Needs Review":
-			"bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+			"border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
 		"At Risk":
-			"bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200",
-		"Not Ready": "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+			"border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-200",
+		"Not Ready":
+			"border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200",
 	};
 	return (
-		<span
-			className={cn(
-				"inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
-				styles[status]
-			)}
-		>
+		<span className={cn(CMS_EDGE_STATUS_PILL_CLASS, styles[status])}>
 			{status}
 		</span>
 	);
@@ -74,216 +69,152 @@ function ReadinessStatusPill({ status }: { status: ReadinessStatus }) {
 function ComponentIcon({ status }: { status: ComponentStatus }) {
 	if (status === "pass") {
 		return (
-			<CheckCircle2
-				className="mx-auto size-4 text-emerald-600"
-				aria-label="Pass"
-			/>
+			<CheckCircle2 className="size-3.5 text-emerald-600" aria-label="Pass" />
 		);
 	}
 	if (status === "warn") {
 		return (
-			<AlertTriangle
-				className="mx-auto size-4 text-orange-500"
-				aria-label="Warning"
-			/>
+			<AlertTriangle className="size-3.5 text-amber-500" aria-label="Warning" />
 		);
 	}
-	return <XCircle className="mx-auto size-4 text-red-600" aria-label="Fail" />;
+	return <XCircle className="size-3.5 text-red-600" aria-label="Fail" />;
+}
+
+const COMPONENT_KEYS = [
+	{ key: "dataAvailability" as const, label: "Data" },
+	{ key: "fhirResources" as const, label: "FHIR" },
+	{ key: "logicValidated" as const, label: "Logic" },
+	{ key: "dataQuality" as const, label: "Quality" },
+	{ key: "calculation" as const, label: "Calc" },
+	{ key: "submissionConfig" as const, label: "Submit" },
+];
+
+function scoreRingTone(score: number) {
+	if (score >= 70) return "text-primary";
+	if (score >= 55) return "text-amber-500";
+	return "text-red-600";
+}
+
+function MiniScoreRing({ score }: { score: number }) {
+	const r = 18;
+	const c = 2 * Math.PI * r;
+	const offset = c * (1 - Math.min(score, 100) / 100);
+	return (
+		<svg viewBox="0 0 48 48" className="size-12 -rotate-90">
+			<circle
+				cx="24"
+				cy="24"
+				r={r}
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="4"
+				className="text-muted/50"
+			/>
+			<circle
+				cx="24"
+				cy="24"
+				r={r}
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="4"
+				strokeLinecap="round"
+				strokeDasharray={c}
+				strokeDashoffset={offset}
+				className={scoreRingTone(score)}
+			/>
+		</svg>
+	);
 }
 
 export function ReadinessOverviewSection() {
-	const chartData = MCR_READINESS_SUMMARY.map((item) => ({
+	const pieData = MCR_READINESS_SUMMARY.map((item, i) => ({
 		name: item.label,
 		value: item.count,
-		color: item.color,
+		// Ready uses primary; rest full status colors
+		color:
+			i === 0
+				? "var(--primary)"
+				: i === 1
+					? "#eab308"
+					: i === 2
+						? "#f97316"
+						: "#dc2626",
 	}));
+	const domainChart = MCR_READINESS_BY_DOMAIN.map((d) => ({
+		domain: d.domain.replace(" of Care", "").replace("Care ", ""),
+		full: d.domain,
+		score: d.score,
+		fill:
+			d.score >= 80
+				? PRIMARY_CHART_SCALE[3]
+				: d.score >= 70
+					? PRIMARY_CHART_SCALE[2]
+					: d.score >= 60
+						? "#f59e0b"
+						: "#dc2626",
+	}));
+	const summaryTotal = MCR_READINESS_SUMMARY.reduce((s, i) => s + i.count, 0);
 
 	return (
 		<section className="space-y-3">
-			<div className="flex items-start gap-2">
-				<span className="mt-0.5 flex size-7 items-center justify-center rounded-md bg-sky-500/10 text-sky-700">
-					<ShieldCheck className="size-4" aria-hidden />
-				</span>
+			<div className="flex flex-wrap items-end justify-between gap-2">
 				<div>
-					<h2 className="text-sm font-bold uppercase tracking-wide text-sky-800 dark:text-sky-300">
-						Readiness Overview
+					<h2 className="text-sm font-semibold text-foreground">
+						Digital readiness
 					</h2>
 					<p className="text-xs text-muted-foreground">
-						Check digital readiness for HEDIS measures and submission.
+						Status mix · domain scores · measure checklists
 					</p>
 				</div>
+				<button
+					type="button"
+					className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+					onClick={() => toast.success("Readiness refreshed")}
+				>
+					Updated Jul 30, 2025
+					<RefreshCw className="size-3.5" />
+				</button>
 			</div>
 
-			<div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-				<div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-					<div className="overflow-x-auto">
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead className={TABLE_HEAD} rowSpan={2}>
-										Measure
-									</TableHead>
-									<TableHead className={TABLE_HEAD} rowSpan={2}>
-										Domain
-									</TableHead>
-									<TableHead className={TABLE_HEAD} rowSpan={2}>
-										Readiness Score (0 – 100)
-									</TableHead>
-									<TableHead className={TABLE_HEAD} rowSpan={2}>
-										Readiness Status
-									</TableHead>
-									<TableHead
-										className={cn(TABLE_HEAD, "text-center")}
-										colSpan={6}
-									>
-										Readiness Components
-									</TableHead>
-									<TableHead className={TABLE_HEAD} rowSpan={2}>
-										Last Updated
-									</TableHead>
-									<TableHead className={TABLE_HEAD} rowSpan={2}>
-										Action
-									</TableHead>
-								</TableRow>
-								<TableRow>
-									{[
-										"Data Availability",
-										"FHIR Resources",
-										"Logic Validated",
-										"Data Quality",
-										"Calculation",
-										"Submission Config",
-									].map((label) => (
-										<TableHead
-											key={label}
-											className={cn(TABLE_HEAD, "max-w-[4.5rem] text-center")}
-										>
-											{label}
-										</TableHead>
-									))}
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{MCR_READINESS_ROWS.map((row) => (
-									<TableRow key={row.code}>
-										<TableCell className={TABLE_CELL}>
-											<p className="font-semibold">{row.code}</p>
-											<p className="mt-0.5 max-w-[12rem] text-[11px] leading-snug text-muted-foreground">
-												{row.name}
-											</p>
-										</TableCell>
-										<TableCell
-											className={cn(TABLE_CELL, "text-muted-foreground")}
-										>
-											{row.domain}
-										</TableCell>
-										<TableCell className={TABLE_CELL}>
-											<p className="font-semibold tabular-nums">{row.score}</p>
-											<div className="mt-1.5 h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-												<div
-													className={cn(
-														"h-full rounded-full",
-														scoreBarColor(row.score)
-													)}
-													style={{ width: `${row.score}%` }}
-												/>
-											</div>
-										</TableCell>
-										<TableCell className={TABLE_CELL}>
-											<ReadinessStatusPill status={row.status} />
-										</TableCell>
-										{(
-											[
-												"dataAvailability",
-												"fhirResources",
-												"logicValidated",
-												"dataQuality",
-												"calculation",
-												"submissionConfig",
-											] as const
-										).map((key) => (
-											<TableCell
-												key={key}
-												className={cn(TABLE_CELL, "text-center")}
-											>
-												<ComponentIcon status={row.components[key]} />
-											</TableCell>
-										))}
-										<TableCell
-											className={cn(
-												TABLE_CELL,
-												"whitespace-nowrap text-muted-foreground"
-											)}
-										>
-											{row.lastUpdated}
-										</TableCell>
-										<TableCell className={TABLE_CELL}>
-											<Button
-												variant="outline"
-												size="sm"
-												className="h-7 border-primary/40 px-3 text-xs text-primary"
-												asChild
-											>
-												<Link href={`${MCR_MEASURE_LIBRARY_HREF}/${row.code}`}>
-													View
-												</Link>
-											</Button>
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					</div>
-
-					<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-[11px] text-muted-foreground">
-						<p className="inline-flex max-w-3xl items-start gap-1.5">
-							<Info className="mt-0.5 size-3.5 shrink-0 text-sky-600" />
-							Percentiles are based on NCQA Quality Compass® national benchmarks
-							where available, otherwise internal plan benchmarks.
+			{/* Charts — no tables */}
+			<div className="grid gap-3 lg:grid-cols-2">
+				<section className={cn(PANEL, "overflow-hidden")}>
+					<div className="border-b border-border/50 px-4 py-2.5">
+						<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+							Readiness status mix
 						</p>
-						<button
-							type="button"
-							className="inline-flex items-center gap-1.5 hover:text-foreground"
-							onClick={() => toast.success("Readiness refreshed")}
-						>
-							Last Updated: Jul 30, 2025 02:15 AM
-							<RefreshCw className="size-3.5 text-sky-600" />
-						</button>
 					</div>
-				</div>
-
-				<div className="space-y-4">
-					<section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-						<h3 className="text-sm font-semibold">Readiness Summary</h3>
-						<div className="mt-3 flex flex-col items-center gap-4 sm:flex-row">
-							<div className="relative h-36 w-36 shrink-0">
-								<ResponsiveContainer width="100%" height="100%">
-									<PieChart>
-										<Pie
-											data={chartData}
-											dataKey="value"
-											innerRadius={42}
-											outerRadius={64}
-											paddingAngle={2}
-											strokeWidth={0}
-										>
-											{chartData.map((entry) => (
-												<Cell key={entry.name} fill={entry.color} />
-											))}
-										</Pie>
-									</PieChart>
-								</ResponsiveContainer>
-								<div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-									<p className="text-lg font-semibold tabular-nums leading-none">
-										{MCR_KPIS.totalMeasures.value}
-									</p>
-									<p className="text-[10px] text-muted-foreground">Measures</p>
-								</div>
+					<div className="flex flex-col items-center gap-4 px-4 py-4 sm:flex-row">
+						<div className="relative h-40 w-40 shrink-0">
+							<ResponsiveContainer width="100%" height="100%">
+								<PieChart>
+									<Pie
+										data={pieData}
+										dataKey="value"
+										innerRadius={48}
+										outerRadius={68}
+										paddingAngle={2}
+										strokeWidth={0}
+									>
+										{pieData.map((entry) => (
+											<Cell key={entry.name} fill={entry.color} />
+										))}
+									</Pie>
+								</PieChart>
+							</ResponsiveContainer>
+							<div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+								<p className="text-lg font-semibold tabular-nums leading-none">
+									{summaryTotal}
+								</p>
+								<p className="text-[10px] text-muted-foreground">Measures</p>
 							</div>
-							<ul className="w-full space-y-2 text-xs">
-								{MCR_READINESS_SUMMARY.map((item) => (
+						</div>
+						<ul className="w-full space-y-2.5 text-xs">
+							{pieData.map((item, i) => {
+								const source = MCR_READINESS_SUMMARY[i]!;
+								return (
 									<li
-										key={item.label}
+										key={item.name}
 										className="flex items-center justify-between gap-2"
 									>
 										<span className="inline-flex items-center gap-2">
@@ -291,52 +222,134 @@ export function ReadinessOverviewSection() {
 												className="size-2.5 rounded-full"
 												style={{ backgroundColor: item.color }}
 											/>
-											{item.label}
+											{item.name}
 										</span>
 										<span className="tabular-nums text-muted-foreground">
-											{item.count} ({item.pct}%)
+											{item.value} ({source.pct}%)
 										</span>
+									</li>
+								);
+							})}
+						</ul>
+					</div>
+				</section>
+
+				<section className={cn(PANEL, "overflow-hidden")}>
+					<div className="border-b border-border/50 px-4 py-2.5">
+						<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+							Avg score by domain
+						</p>
+					</div>
+					<div className="h-48 px-2 py-2">
+						<ResponsiveContainer width="100%" height="100%">
+							<BarChart
+								data={domainChart}
+								layout="vertical"
+								margin={{ top: 4, right: 16, left: 4, bottom: 4 }}
+							>
+								<CartesianGrid
+									strokeDasharray="3 3"
+									className="stroke-border/40"
+									horizontal={false}
+								/>
+								<XAxis
+									type="number"
+									domain={[0, 100]}
+									tick={{ fontSize: 10 }}
+								/>
+								<YAxis
+									type="category"
+									dataKey="domain"
+									width={88}
+									tick={{ fontSize: 10 }}
+								/>
+								<Tooltip
+									formatter={(v: number, _n, ctx) => [
+										`${v}/100`,
+										(ctx?.payload as { full?: string } | undefined)?.full ??
+											"Score",
+									]}
+								/>
+								<Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={14}>
+									{domainChart.map((entry) => (
+										<Cell key={entry.full} fill={entry.fill} />
+									))}
+								</Bar>
+							</BarChart>
+						</ResponsiveContainer>
+					</div>
+				</section>
+			</div>
+
+			{/* Measure cards — not a second table */}
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+				{MCR_READINESS_ROWS.map((row) => {
+					const passCount = COMPONENT_KEYS.filter(
+						({ key }) => row.components[key] === "pass"
+					).length;
+					return (
+						<article
+							key={row.code}
+							className={cn(PANEL, "flex flex-col overflow-hidden")}
+						>
+							<div className="flex items-start gap-3 border-b border-border/40 px-4 py-3">
+								<div className="relative shrink-0">
+									<MiniScoreRing score={row.score} />
+									<span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-foreground">
+										{row.score}
+									</span>
+								</div>
+								<div className="min-w-0 flex-1">
+									<div className="flex flex-wrap items-center gap-2">
+										<p className="font-mono text-sm font-bold text-foreground">
+											{row.code}
+										</p>
+										<ReadinessStatusPill status={row.status} />
+									</div>
+									<p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+										{row.name}
+									</p>
+									<p className="mt-1 text-[10px] text-muted-foreground">
+										{row.domain} · {passCount}/{COMPONENT_KEYS.length} checks
+									</p>
+								</div>
+							</div>
+							<ul className="grid grid-cols-2 gap-1.5 p-3 sm:grid-cols-3">
+								{COMPONENT_KEYS.map(({ key, label }) => (
+									<li
+										key={key}
+										className="flex items-center gap-1.5 rounded-sm bg-muted/35 px-2 py-1.5 text-[10px] text-muted-foreground"
+									>
+										<ComponentIcon status={row.components[key]} />
+										{label}
 									</li>
 								))}
 							</ul>
-						</div>
-					</section>
-
-					<section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-						<h3 className="text-sm font-semibold">
-							Readiness by Domain (Avg Score)
-						</h3>
-						<div className="mt-4 space-y-3">
-							{MCR_READINESS_BY_DOMAIN.map((item) => (
-								<div key={item.domain} className="space-y-1">
-									<div className="flex items-center justify-between gap-2 text-xs">
-										<span className="text-muted-foreground">{item.domain}</span>
-										<span className="font-semibold tabular-nums">
-											{item.score}
-										</span>
-									</div>
-									<div className="h-2 overflow-hidden rounded-full bg-muted">
-										<div
-											className={cn(
-												"h-full rounded-full",
-												domainBarColor(item.score)
-											)}
-											style={{ width: `${item.score}%` }}
-										/>
-									</div>
-								</div>
-							))}
-							<div className="flex justify-between pt-1 text-[10px] tabular-nums text-muted-foreground">
-								<span>0</span>
-								<span>25</span>
-								<span>50</span>
-								<span>75</span>
-								<span>100</span>
+							<div className="mt-auto flex items-center justify-between border-t border-border/40 px-4 py-2">
+								<span className="text-[10px] text-muted-foreground">
+									{row.lastUpdated}
+								</span>
+								<Button
+									variant="outline"
+									size="sm"
+									className="h-7 px-2.5 text-xs"
+									asChild
+								>
+									<Link href={`${MCR_MEASURE_LIBRARY_HREF}/${row.code}`}>
+										View
+									</Link>
+								</Button>
 							</div>
-						</div>
-					</section>
-				</div>
+						</article>
+					);
+				})}
 			</div>
+
+			<p className="inline-flex items-start gap-1.5 px-1 text-[11px] text-muted-foreground">
+				<Info className="mt-0.5 size-3.5 shrink-0" />
+				Percentiles use NCQA Quality Compass® national benchmarks where
+				available.
+			</p>
 		</section>
 	);
 }

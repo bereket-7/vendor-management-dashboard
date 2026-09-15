@@ -33,6 +33,21 @@ export function isMembersMockEnabled(): boolean {
 	);
 }
 
+/**
+ * Claim vendor file queues (inbound / outbound) fixtures.
+ * Default on until outbound (and inbound review) are live-wired end-to-end —
+ * remote list today still maps as inbound-shaped and leaves outbound empty.
+ * Set `NEXT_PUBLIC_CLAIM_FILES_USE_MOCK=false` to force empty when USE_MOCK=false.
+ */
+export function isClaimVendorFilesMockEnabled(): boolean {
+	if (isMockEnabled()) return true;
+	const value = process.env.NEXT_PUBLIC_CLAIM_FILES_USE_MOCK;
+	if (value === "false" || value === "0") return false;
+	return (
+		value === undefined || value === "" || value === "true" || value === "1"
+	);
+}
+
 /** Inverse of {@link isMockEnabled} — NestJS / vendor-core are expected. */
 export function isLiveIntegrationEnabled(): boolean {
 	return !isMockEnabled();

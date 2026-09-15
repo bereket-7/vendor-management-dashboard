@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
 	AlertCircle,
@@ -39,15 +39,10 @@ import {
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
-	CMS_EDGE_CORRECTIONS_LIST,
-	CMS_EDGE_CORRECTION_QUEUE,
-	CMS_EDGE_EXCEPTIONS_LIST,
 	CMS_EDGE_EXCEPTION_DATASETS,
 	CMS_EDGE_EXCEPTION_ERROR_TYPES,
-	CMS_EDGE_EXCEPTION_KPIS,
 	CMS_EDGE_EXCEPTION_STATUSES,
 	CMS_EDGE_REPORTING_PERIODS,
-	CMS_EDGE_VOID_REPLACEMENTS_LIST,
 	CORRECTION_STATUS_STYLES,
 	type CorrectionStatus,
 	EXCEPTION_SEVERITY_STYLES,
@@ -57,9 +52,14 @@ import {
 	type ExceptionSeverity,
 	type ExceptionStatus,
 	VOID_STATUS_STYLES,
+	useCmsEdgeExceptionWorkbench,
 } from "@/features/admin/features/claim-encounter/cms-edge/feature/queries/useCmsEdgeQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+
+const EXCEPTION_DETAIL_BASE =
+	"/admin/claim-encounter/regulatory/cms-edge-reporting/exceptions";
 
 const PANEL_SHADOW =
 	"rounded-sm bg-card shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.04)]";
@@ -145,7 +145,7 @@ const KPI_META: {
 ];
 
 const QUEUE_META: {
-	key: keyof typeof CMS_EDGE_CORRECTION_QUEUE;
+	key: "draft" | "awaitingReview" | "approved" | "resubmitted";
 	label: string;
 	icon: LucideIcon;
 	well: string;
@@ -289,13 +289,18 @@ function ExceptionKpiCards({
 	onOpenExceptions,
 	onCritical,
 	onCorrections,
+	counts,
 }: {
 	onOpenExceptions: () => void;
 	onCritical: () => void;
 	onCorrections: () => void;
+	counts: {
+		openExceptions: number;
+		critical: number;
+		correctionsDrafted: number;
+		readyForResubmission: number;
+	};
 }) {
-	const counts = CMS_EDGE_EXCEPTION_KPIS;
-
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 			{KPI_META.map((kpi) => {
@@ -358,9 +363,16 @@ function ExceptionKpiCards({
 	);
 }
 
-function CorrectionQueue() {
-	const queue = CMS_EDGE_CORRECTION_QUEUE;
-
+function CorrectionQueue({
+	queue,
+}: {
+	queue: {
+		draft: number;
+		awaitingReview: number;
+		approved: number;
+		resubmitted: number;
+	};
+}) {
 	return (
 		<section className="space-y-3">
 			<div className="px-0.5">
@@ -447,14 +459,8 @@ function exceptionActionLabel(
 	return "View";
 }
 
-function periodValueToLabel(value: string) {
-	const match = CMS_EDGE_REPORTING_PERIODS.find(
-		(option) => option.value === value
-	);
-	return match?.label.split(" (")[0] ?? "Q2 2027";
-}
-
 export function CmsEdgeExceptionsTab() {
+	const router = useRouter();
 	const [reportingPeriod, setReportingPeriod] = useState("q2-2027");
 	const [dataset, setDataset] = useState<ExceptionDataset | "all">("all");
 	const [errorType, setErrorType] = useState<ExceptionErrorType | "all">("all");
@@ -464,36 +470,21 @@ export function CmsEdgeExceptionsTab() {
 		ExceptionSeverity | "all"
 	>("all");
 
-	const periodLabel = periodValueToLabel(reportingPeriod);
-
-	const exceptionRows = useMemo(() => {
-		return CMS_EDGE_EXCEPTIONS_LIST.filter((row) => {
-			if (row.reportingPeriod !== periodLabel) return false;
-			if (dataset !== "all" && row.dataset !== dataset) return false;
-			if (errorType !== "all" && row.errorType !== errorType) return false;
-			if (status !== "all" && row.status !== status) return false;
-			if (severityFilter !== "all" && row.severity !== severityFilter) {
-				return false;
-			}
-			return true;
-		});
-	}, [periodLabel, dataset, errorType, status, severityFilter]);
-
-	const correctionRows = useMemo(() => {
-		return CMS_EDGE_CORRECTIONS_LIST.filter((row) => {
-			if (row.reportingPeriod !== periodLabel) return false;
-			if (dataset !== "all" && row.dataset !== dataset) return false;
-			return true;
-		});
-	}, [periodLabel, dataset]);
-
-	const voidRows = useMemo(() => {
-		return CMS_EDGE_VOID_REPLACEMENTS_LIST.filter((row) => {
-			if (row.reportingPeriod !== periodLabel) return false;
-			if (dataset !== "all" && row.dataset !== dataset) return false;
-			return true;
-		});
-	}, [periodLabel, dataset]);
+	const {
+		exceptions: exceptionRows,
+		corrections: correctionRows,
+		voids: voidRows,
+		kpis,
+		correctionQueue,
+		isLoading,
+		isError,
+	} = useCmsEdgeExceptionWorkbench({
+		reportingPeriod,
+		dataset,
+		errorType,
+		status,
+		severity: severityFilter,
+	});
 
 	const hasFilters =
 		dataset !== "all" ||
@@ -507,6 +498,19 @@ export function CmsEdgeExceptionsTab() {
 			: workbench === "corrections"
 				? correctionRows.length
 				: voidRows.length;
+
+	function openException(id: string) {
+		router.push(`${EXCEPTION_DETAIL_BASE}/${encodeURIComponent(id)}`);
+	}
+
+	function openExceptionForRecord(recordId: string) {
+		const match = exceptionRows.find((row) => row.recordId === recordId);
+		if (match) {
+			openException(match.id);
+			return;
+		}
+		toast.message(`No exception linked to ${recordId}`);
+	}
 
 	return (
 		<div className={CMS_EDGE_PAGE_STACK}>
@@ -525,6 +529,7 @@ export function CmsEdgeExceptionsTab() {
 			/>
 
 			<ExceptionKpiCards
+				counts={kpis}
 				onOpenExceptions={() => {
 					setWorkbench("exceptions");
 					setSeverityFilter("all");
@@ -540,6 +545,15 @@ export function CmsEdgeExceptionsTab() {
 					setSeverityFilter("all");
 				}}
 			/>
+
+			{isError ? (
+				<p className="text-xs text-destructive">Failed to load live data</p>
+			) : null}
+			{isLoading ? (
+				<p className="text-xs text-muted-foreground">Loading…</p>
+			) : null}
+
+			<CorrectionQueue queue={correctionQueue} />
 
 			<section className={cn(PANEL_SHADOW, "overflow-hidden")}>
 				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3">
@@ -640,13 +654,12 @@ export function CmsEdgeExceptionsTab() {
 														{index + 1}
 													</TableCell>
 													<TableCell className={td}>
-														<button
-															type="button"
+														<Link
+															href={`${EXCEPTION_DETAIL_BASE}/${encodeURIComponent(row.id)}`}
 															className="font-mono text-[11px] font-medium text-primary hover:underline"
-															onClick={() => toast.message(`Open ${row.id}`)}
 														>
 															{row.id}
-														</button>
+														</Link>
 													</TableCell>
 													<TableCell className={cn(td, "font-medium")}>
 														{row.dataset}
@@ -686,9 +699,7 @@ export function CmsEdgeExceptionsTab() {
 															variant="outline"
 															size="sm"
 															className="h-7 rounded-sm border-primary/30 px-2.5 text-[11px] font-medium text-primary shadow-none hover:bg-primary/5"
-															onClick={() =>
-																toast.message(`${action} · ${row.id}`)
-															}
+															onClick={() => openException(row.id)}
 														>
 															{action}
 														</Button>
@@ -754,12 +765,20 @@ export function CmsEdgeExceptionsTab() {
 													{index + 1}
 												</TableCell>
 												<TableCell className={td}>
-													<span className="font-mono text-[11px] font-medium text-primary">
+													<Link
+														href={`${EXCEPTION_DETAIL_BASE}/${encodeURIComponent(row.exceptionId)}`}
+														className="font-mono text-[11px] font-medium text-primary hover:underline"
+													>
 														{row.id}
-													</span>
+													</Link>
 												</TableCell>
 												<TableCell className={cn(td, "font-mono text-[11px]")}>
-													{row.exceptionId}
+													<Link
+														href={`${EXCEPTION_DETAIL_BASE}/${encodeURIComponent(row.exceptionId)}`}
+														className="text-primary hover:underline"
+													>
+														{row.exceptionId}
+													</Link>
 												</TableCell>
 												<TableCell className={cn(td, "font-medium")}>
 													{row.dataset}
@@ -789,9 +808,7 @@ export function CmsEdgeExceptionsTab() {
 														variant="outline"
 														size="sm"
 														className="h-7 rounded-sm border-primary/30 px-2.5 text-[11px] font-medium text-primary shadow-none hover:bg-primary/5"
-														onClick={() =>
-															toast.message(`Open correction ${row.id}`)
-														}
+														onClick={() => openException(row.exceptionId)}
 													>
 														Open
 													</Button>
@@ -885,7 +902,9 @@ export function CmsEdgeExceptionsTab() {
 														variant="outline"
 														size="sm"
 														className="h-7 rounded-sm border-primary/30 px-2.5 text-[11px] font-medium text-primary shadow-none hover:bg-primary/5"
-														onClick={() => toast.message(`Open ${row.id}`)}
+														onClick={() =>
+															openExceptionForRecord(row.originalClaimId)
+														}
 													>
 														Review
 													</Button>
@@ -903,8 +922,6 @@ export function CmsEdgeExceptionsTab() {
 					</>
 				) : null}
 			</section>
-
-			<CorrectionQueue />
 
 			<CmsEdgePageFooter />
 		</div>

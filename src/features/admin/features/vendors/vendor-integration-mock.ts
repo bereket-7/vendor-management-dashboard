@@ -132,7 +132,7 @@ export type VendorDirectoryRow = {
 };
 
 /** Directory used by the Vendors list page (matches ops console mock). */
-export const VENDOR_DIRECTORY: VendorDirectoryRow[] = fixtureList([
+const VENDOR_DIRECTORY_SEED: VendorDirectoryRow[] = [
 	{
 		id: "vnd-1",
 		name: "UST Healthcare",
@@ -273,7 +273,12 @@ export const VENDOR_DIRECTORY: VendorDirectoryRow[] = fixtureList([
 		mark: "D",
 		avatarBg: "bg-[#0f766e]",
 	},
-]);
+];
+
+/** Fixture-gated for vendor directory UI when global mock is off. */
+export const VENDOR_DIRECTORY: VendorDirectoryRow[] = fixtureList(
+	VENDOR_DIRECTORY_SEED
+);
 
 /** Canonical vendor display names — use this everywhere mock UIs list vendors. */
 export const VENDOR_NAMES = VENDOR_DIRECTORY.map((v) => v.name);
@@ -294,8 +299,12 @@ export function claimFileTypeForVendorType(vendorType: string): string {
 	}
 }
 
-/** Seed metadata for claim/encounter files (same vendors as Vendor Comparison). */
-export const CLAIM_VENDOR_SEED = VENDOR_DIRECTORY.map((v) => ({
+/**
+ * Seed metadata for claim/encounter files.
+ * Always available (not fixture-gated) so claim inbound/outbound demos work when
+ * `NEXT_PUBLIC_CLAIM_FILES_USE_MOCK` is on but global `USE_MOCK` is off.
+ */
+export const CLAIM_VENDOR_SEED = VENDOR_DIRECTORY_SEED.map((v) => ({
 	id: v.id,
 	name: v.name,
 	fileType: claimFileTypeForVendorType(v.vendorType),
@@ -303,6 +312,9 @@ export const CLAIM_VENDOR_SEED = VENDOR_DIRECTORY.map((v) => ({
 	mark: v.mark,
 	avatarBg: v.avatarBg,
 }));
+
+/** Names for claim-file filter dropdowns (always seeded with CLAIM_VENDOR_SEED). */
+export const CLAIM_VENDOR_NAMES = CLAIM_VENDOR_SEED.map((v) => v.name);
 
 export function summarizeVendorDirectory(rows: VendorDirectoryRow[]) {
 	const total = rows.length;
