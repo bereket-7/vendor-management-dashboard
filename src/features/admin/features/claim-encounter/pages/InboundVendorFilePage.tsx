@@ -6,15 +6,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
 	AlertTriangle,
 	ArrowUpDown,
-	CheckCircle2,
-	ClipboardList,
 	Clock3,
 	Download,
+	ExternalLink,
+	Eye,
+	FileOutput,
 	FileSearch,
 	Hourglass,
+	type LucideIcon,
+	MoreHorizontal,
 	RefreshCw,
 	ScrollText,
-	Send,
+	Search,
+	X,
 	XCircle,
 } from "lucide-react";
 import {
@@ -32,8 +36,13 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -50,15 +59,13 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import {
-	ClaimKpiGrid,
-	ClaimPageHeader,
-} from "@/features/admin/features/claim-encounter/components/ClaimPageChrome";
+	CMS_EDGE_PANEL_CLASS,
+	CMS_EDGE_TABLE_CONTAINER,
+	CmsEdgeSectionPanel,
+	CmsEdgeTableScroll,
+} from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
-	ClaimFilterBar,
-	ClaimSectionCard,
 	ClaimTablePagination,
-	FilterField,
-	MetricBar,
 	formatWaitLabel,
 	hoursSince,
 	pct,
@@ -77,7 +84,7 @@ import {
 } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { featureQueryKey } from "@/features/admin/shared/feature-contract";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { downloadBlob, stampFilename } from "@/lib/export/csv";
 import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
@@ -87,6 +94,78 @@ type SortKey = "receivedAt" | "records" | "vendor" | "wait";
 
 /** Align wait chips / SLA with BE summary age_buckets.over_3d (72h). */
 const SLA_HOURS = 72;
+
+const PANEL = CMS_EDGE_PANEL_CLASS;
+
+const toolbarBtn =
+	"h-9 gap-1.5 rounded-sm px-3 text-xs font-medium shadow-none transition-all duration-200 ease-out";
+
+const selectField = cn(
+	"h-8 w-auto min-w-[7.5rem] rounded-sm border border-border bg-background text-xs shadow-none transition-colors duration-200",
+	"hover:border-foreground/20",
+	"focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+);
+
+const th =
+	"h-9 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-foreground";
+const td = "px-3 py-2.5 text-[12px] align-middle text-foreground";
+
+const STAT_SHADOW =
+	"shadow-[0_1px_2px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)]";
+const STAT_SHADOW_HOVER =
+	"hover:shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(15,23,42,0.10)]";
+
+function ReviewStatusPill({
+	status,
+}: {
+	status: ClaimVendorFile["reviewStatus"];
+}) {
+	const rejected = status === "rejected";
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold capitalize",
+				rejected
+					? "border-rose-200/80 bg-rose-50 text-rose-800"
+					: "border-amber-200/80 bg-amber-50 text-amber-950"
+			)}
+		>
+			{rejected ? (
+				<XCircle className="size-2.5" />
+			) : (
+				<Clock3 className="size-2.5" />
+			)}
+			{rejected ? "MFC rejected" : "Pending"}
+		</span>
+	);
+}
+
+function WaitPill({ wait }: { wait: number }) {
+	const sla = wait >= SLA_HOURS;
+	const aging = wait >= 24 && wait < SLA_HOURS;
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+				sla
+					? "border-rose-200/80 bg-rose-50 text-rose-800"
+					: aging
+						? "border-amber-200/80 bg-amber-50 text-amber-950"
+						: "border-sky-200/80 bg-sky-50 text-sky-900"
+			)}
+		>
+			{formatWaitLabel(wait)}
+		</span>
+	);
+}
+
+function TxBadge({ label }: { label: string }) {
+	return (
+		<span className="rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-muted-foreground">
+			{label}
+		</span>
+	);
+}
 
 export function InboundVendorFilePage() {
 	const programFilter = useAdminModuleStore((s) => s.fileType);
@@ -198,8 +277,6 @@ export function InboundVendorFilePage() {
 	const outboundAvailable =
 		queueQuery.data?.outboundAvailable ?? isMockEnabled();
 	const openExceptionCount = queueQuery.data?.openExceptionCount ?? 0;
-	const monitoring = queueQuery.data?.monitoring ?? null;
-	const ediCompletion = queueQuery.data?.ediCompletion ?? null;
 
 	const pending = useMemo(
 		() => inboundQueue.filter((f) => f.reviewStatus === "pending"),
@@ -502,64 +579,96 @@ export function InboundVendorFilePage() {
 		}
 	}
 
-	const kpis = [
+	const pendingCount =
+		summaryQuery.data?.by_review_status?.pending ??
+		summaryQuery.data?.awaiting_review ??
+		pending.length;
+	const rejectedCount =
+		summaryQuery.data?.by_review_status?.rejected ??
+		summaryQuery.data?.rejected ??
+		rejectedIn.length;
+	const packageTotal = Math.max(statusCounts.all, 1);
+
+	const inboundKpis: {
+		id: string;
+		label: string;
+		value: string | number;
+		hint: string;
+		icon: LucideIcon;
+		accent: string;
+		valueTone: string;
+		iconTone: string;
+		ring: string;
+		active: boolean;
+		onClick: () => void;
+	}[] = [
 		{
+			id: "pending",
 			label: "Awaiting review",
-			value: formatCount(
-				summaryQuery.data?.by_review_status?.pending ??
-					summaryQuery.data?.awaiting_review ??
-					pending.length
-			),
-			hint: `${formatCount(analytics.claimsPending)} claims`,
+			value: pendingCount,
+			hint: `${formatCount(analytics.claimsPending)} claims · ${pct(Number(pendingCount), packageTotal)}%`,
 			icon: Clock3,
-			tone: "text-amber-700 bg-amber-500/10",
+			accent: "from-amber-500/80 to-amber-400/40",
+			valueTone: "text-amber-700 dark:text-amber-300",
+			iconTone: "text-amber-700 bg-amber-500/10 dark:text-amber-200",
+			ring: "ring-amber-500/20",
+			active: statusFilter === "pending",
+			onClick: () => {
+				setStatusFilter((s) => (s === "pending" ? "all" : "pending"));
+				setPage(1);
+			},
 		},
 		{
+			id: "rejected",
 			label: "MFC rejected",
-			value: formatCount(
-				summaryQuery.data?.by_review_status?.rejected ??
-					summaryQuery.data?.rejected ??
-					rejectedIn.length
-			),
+			value: rejectedCount,
 			hint: `${formatCount(analytics.claimsRejected)} claims · vendor rework`,
 			icon: XCircle,
-			tone: "text-red-700 bg-red-500/10",
+			accent: "from-rose-500/80 to-rose-400/40",
+			valueTone: "text-rose-700 dark:text-rose-300",
+			iconTone: "text-rose-700 bg-rose-500/10 dark:text-rose-300",
+			ring: "ring-rose-500/20",
+			active: statusFilter === "rejected",
+			onClick: () => {
+				setStatusFilter((s) => (s === "rejected" ? "all" : "rejected"));
+				setPage(1);
+			},
 		},
 		{
+			id: "sla",
 			label: "Age risk (≥3d)",
-			value: formatCount(analytics.over3d),
-			hint: "Summary age_buckets.over_3d",
+			value: analytics.over3d,
+			hint: `${pct(analytics.over3d, packageTotal)}% past SLA`,
 			icon: AlertTriangle,
-			tone: "text-red-700 bg-red-500/10",
+			accent: "from-rose-500/80 to-rose-400/40",
+			valueTone: "text-rose-700 dark:text-rose-300",
+			iconTone: "text-rose-700 bg-rose-500/10 dark:text-rose-300",
+			ring: "ring-rose-500/20",
+			active: waitBucket === "sla",
+			onClick: () => {
+				setWaitBucket((b) => (b === "sla" ? "all" : "sla"));
+				setPage(1);
+			},
 		},
 		{
+			id: "avg-wait",
 			label: "Avg wait",
 			value: formatWaitLabel(analytics.avgWait),
 			hint: "Across pending files",
 			icon: Hourglass,
-			tone: "text-orange-700 bg-orange-500/10",
-		},
-		{
-			label: "Accepted (review)",
-			value: formatCount(
-				summaryQuery.data?.by_review_status?.accepted ??
-					summaryQuery.data?.accepted ??
-					0
-			),
-			hint: "Inbound MFC accepted — not outbound packages",
-			icon: CheckCircle2,
-			tone: "text-emerald-700 bg-emerald-500/10",
-		},
-		{
-			label: "Outbound sent",
-			value: outboundAvailable
-				? formatCount(analytics.acceptedOut.length)
-				: "—",
-			hint: outboundAvailable
-				? "direction=outbound packages"
-				: "Outbound packages not in core yet",
-			icon: Send,
-			tone: "text-sky-700 bg-sky-500/10",
+			accent: "from-sky-500/80 to-sky-400/40",
+			valueTone: "text-sky-700 dark:text-sky-300",
+			iconTone: "text-sky-700 bg-sky-500/10 dark:text-sky-300",
+			ring: "ring-sky-500/20",
+			active:
+				statusFilter === "all" &&
+				waitBucket === "all" &&
+				vendor === "all" &&
+				fileType === "all" &&
+				!search.trim(),
+			onClick: () => {
+				clearFilters();
+			},
 		},
 	];
 
@@ -583,10 +692,16 @@ export function InboundVendorFilePage() {
 	if (queueQuery.isLoading) {
 		return (
 			<div className="space-y-4">
-				<ClaimPageHeader
-					title="Inbound Vendor File"
-					description={`Loading queue · ${programFilter}`}
-				/>
+				<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
+					<div className="min-w-0 space-y-1">
+						<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+							Inbound
+						</h1>
+						<p className="text-sm text-muted-foreground">
+							Loading queue · {programFilter}
+						</p>
+					</div>
+				</div>
 				<p className="text-sm text-muted-foreground">Loading inbound files…</p>
 			</div>
 		);
@@ -595,21 +710,28 @@ export function InboundVendorFilePage() {
 	if (queueQuery.isError) {
 		return (
 			<div className="space-y-4">
-				<ClaimPageHeader
-					title="Inbound Vendor File"
-					description={`Pending review · ${programFilter}`}
-					actions={
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-9"
-							onClick={handleRefresh}
-						>
-							<RefreshCw className="mr-1.5 size-3.5" />
-							Retry
-						</Button>
-					}
-				/>
+				<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
+					<div className="min-w-0 space-y-1">
+						<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+							Inbound
+						</h1>
+						<p className="text-sm text-muted-foreground">
+							Pending review · {programFilter}
+						</p>
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
+						onClick={handleRefresh}
+					>
+						<RefreshCw className="size-3.5" />
+						Retry
+					</Button>
+				</div>
 				<p className="text-sm text-destructive">
 					Could not load inbound vendor files.
 					{queueQuery.error instanceof Error
@@ -620,19 +742,24 @@ export function InboundVendorFilePage() {
 		);
 	}
 
+	const ageTotal = Math.max(
+		analytics.under24 + analytics.day1to3 + analytics.over3d,
+		1
+	);
+
 	return (
 		<div className="space-y-4">
-			<ClaimPageHeader
-				title="Inbound Vendor File"
-				description={
-					<span className="inline-flex flex-wrap items-center gap-x-1">
-						<span>
-							Pending review + MFC-rejected (vendor correction) ·{" "}
-							{programFilter}
-						</span>
+			{/* Header — match outbound CMS EDGE Reporting rhythm */}
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
+				<div className="min-w-0 space-y-1">
+					<h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+						Inbound
+					</h1>
+					<p className="text-sm text-muted-foreground">
+						Pending review + MFC-rejected · {programFilter}
 						{openExceptionCount > 0 && !isMockEnabled() ? (
 							<>
-								<span>·</span>
+								{" · "}
 								<Link
 									href="/admin/claim-encounter/exceptions"
 									className="font-medium text-amber-800 underline-offset-2 hover:underline"
@@ -641,389 +768,393 @@ export function InboundVendorFilePage() {
 								</Link>
 							</>
 						) : null}
-					</span>
-				}
-				actions={
-					<div className="flex flex-wrap gap-1.5">
-						<Button asChild variant="outline" size="sm" className="h-9">
-							<Link href="/admin/claim-encounter/outbound">View outbound</Link>
-						</Button>
-						{!isMockEnabled() ? (
-							<Button
-								variant="outline"
-								size="sm"
-								className="h-9"
-								disabled={exportMutation.isPending}
-								onClick={() => void handleExportCsv()}
-							>
-								<Download className="mr-1.5 size-3.5" />
-								{exportMutation.isPending ? "Exporting…" : "Export CSV"}
-							</Button>
-						) : null}
-						{!isMockEnabled() ? (
-							<Button
-								variant="outline"
-								size="sm"
-								className="h-9"
-								onClick={handleSeedDemo}
-								disabled={seedMutation.isPending}
-							>
-								{seedMutation.isPending ? "Seeding…" : "Seed demo"}
-							</Button>
-						) : null}
+					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-2">
+					<Button
+						asChild
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"bg-primary text-primary-foreground shadow-none hover:bg-primary/90"
+						)}
+					>
+						<Link href="/admin/claim-encounter/outbound">
+							<FileOutput className="size-3.5" />
+							Outbound
+						</Link>
+					</Button>
+					{!isMockEnabled() ? (
 						<Button
 							variant="outline"
 							size="sm"
-							className="h-9"
-							onClick={handleRefresh}
-							disabled={refreshing || queueQuery.isFetching}
+							className={cn(
+								toolbarBtn,
+								"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+							)}
+							disabled={exportMutation.isPending}
+							onClick={() => void handleExportCsv()}
 						>
-							<RefreshCw
-								className={cn(
-									"mr-1.5 size-3.5",
-									(refreshing || queueQuery.isFetching) && "animate-spin"
-								)}
-							/>
-							Refresh
+							<Download className="size-3.5" />
+							{exportMutation.isPending ? "Exporting…" : "Export CSV"}
 						</Button>
-					</div>
-				}
-			/>
-
-			<ClaimKpiGrid items={kpis} />
-
-			{!isMockEnabled() && (monitoring || ediCompletion) ? (
-				<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
-						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-							Intake stages
-						</p>
-						<p className="mt-0.5 text-sm font-semibold tabular-nums">
-							{Array.isArray(monitoring?.inbound_file_stages)
-								? (
-										monitoring.inbound_file_stages as { count?: number }[]
-									).reduce((s, r) => s + Number(r.count ?? 0), 0)
-								: "—"}
-						</p>
-						<p className="text-[11px] text-muted-foreground">
-							From GET /monitoring/
-						</p>
-					</div>
-					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
-						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-							Active intake jobs
-						</p>
-						<p className="mt-0.5 text-sm font-semibold tabular-nums">
-							{Array.isArray(monitoring?.active_jobs)
-								? (monitoring.active_jobs as unknown[]).length
-								: "—"}
-						</p>
-						<p className="text-[11px] text-muted-foreground">
-							{Array.isArray(monitoring?.recent_runs)
-								? `${(monitoring.recent_runs as unknown[]).length} recent runs`
-								: "No recent runs"}
-						</p>
-					</div>
-					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
-						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-							EDI types tracked
-						</p>
-						<p className="mt-0.5 text-sm font-semibold tabular-nums">
-							{Array.isArray(ediCompletion?.by_type)
-								? (ediCompletion.by_type as unknown[]).length
-								: "—"}
-						</p>
-						<p className="text-[11px] text-muted-foreground">
-							GET /intake/completion/edi/
-						</p>
-					</div>
-					<div className="rounded-md border border-border/50 bg-card/70 px-3 py-2">
-						<p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-							EDI completion (top)
-						</p>
-						<p className="mt-0.5 truncate text-sm font-semibold">
-							{Array.isArray(ediCompletion?.by_type) &&
-							(
-								ediCompletion.by_type as {
-									detected_type?: string;
-									completion_percent?: number;
-								}[]
-							).length > 0
-								? (() => {
-										const top = (
-											ediCompletion.by_type as {
-												detected_type?: string;
-												completion_percent?: number;
-											}[]
-										)[0]!;
-										return `${top.detected_type ?? "—"} · ${
-											top.completion_percent != null
-												? `${Math.round(Number(top.completion_percent))}%`
-												: "—"
-										}`;
-									})()
-								: "—"}
-						</p>
-						<p className="text-[11px] text-muted-foreground">
-							First by_type row
-						</p>
-					</div>
+					) : null}
+					{!isMockEnabled() ? (
+						<Button
+							variant="outline"
+							size="sm"
+							className={cn(
+								toolbarBtn,
+								"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+							)}
+							onClick={handleSeedDemo}
+							disabled={seedMutation.isPending}
+						>
+							{seedMutation.isPending ? "Seeding…" : "Seed demo"}
+						</Button>
+					) : null}
+					<Button
+						variant="outline"
+						size="sm"
+						className={cn(
+							toolbarBtn,
+							"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
+						onClick={handleRefresh}
+						disabled={refreshing || queueQuery.isFetching}
+					>
+						<RefreshCw
+							className={cn(
+								"size-3.5",
+								(refreshing || queueQuery.isFetching) && "animate-spin"
+							)}
+						/>
+						Refresh
+					</Button>
 				</div>
-			) : null}
-
-			{/* Review queue — directly under stats */}
-			<div className="flex flex-wrap gap-1.5">
-				{[
-					{
-						id: "all" as const,
-						label: "All inbound",
-						count: statusCounts.all,
-					},
-					{
-						id: "pending" as const,
-						label: "Pending",
-						count: statusCounts.pending,
-					},
-					{
-						id: "rejected" as const,
-						label: "Rejected",
-						count: statusCounts.rejected,
-					},
-				].map((chip) => (
-					<button
-						key={chip.id}
-						type="button"
-						onClick={() => {
-							setStatusFilter(chip.id);
-							setPage(1);
-						}}
-						className={cn(
-							"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-							statusFilter === chip.id
-								? "border-primary/40 bg-primary/10 text-primary"
-								: "border-border/60 bg-card/70 text-muted-foreground hover:bg-muted/40"
-						)}
-					>
-						{chip.label}
-						<span className="tabular-nums opacity-80">{chip.count}</span>
-					</button>
-				))}
-				<span className="mx-1 h-4 w-px bg-border/70" />
-				{(
-					[
-						{
-							id: "all",
-							label: "Any age",
-							count: analytics.under24 + analytics.day1to3 + analytics.over3d,
-						},
-						{
-							id: "fresh",
-							label: "< 24h",
-							count: analytics.under24,
-						},
-						{
-							id: "aging",
-							label: "1–3 days",
-							count: analytics.day1to3,
-						},
-						{
-							id: "sla",
-							label: "≥ 3 days",
-							count: analytics.over3d,
-						},
-					] as const
-				).map((chip) => (
-					<button
-						key={chip.id}
-						type="button"
-						onClick={() => {
-							setWaitBucket(chip.id);
-							setPage(1);
-						}}
-						className={cn(
-							"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-							waitBucket === chip.id
-								? "border-primary/40 bg-primary/10 text-primary"
-								: "border-border/60 bg-card/70 text-muted-foreground hover:bg-muted/40"
-						)}
-					>
-						{chip.label}
-						<span className="tabular-nums opacity-80">{chip.count}</span>
-					</button>
-				))}
 			</div>
 
-			<ClaimFilterBar
-				search={search}
-				onSearchChange={(v) => {
-					setSearch(v);
-					setPage(1);
-				}}
-				searchPlaceholder="File ID, name, vendor, claim type…"
-				hasActiveFilters={hasActiveFilters}
-				onClear={clearFilters}
-			>
-				<FilterField label="Vendor">
-					<Select
-						value={vendor}
-						onValueChange={(v) => {
-							setVendor(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[160px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All vendors</SelectItem>
-							{vendors.map((v) => (
-								<SelectItem key={v} value={v}>
-									{v}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</FilterField>
-				<FilterField label="Claim type">
-					<Select
-						value={fileType}
-						onValueChange={(v) => {
-							setFileType(v);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[160px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All types</SelectItem>
-							{fileTypes.map((t) => (
-								<SelectItem key={t} value={t}>
-									{t}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</FilterField>
-				<FilterField label="Sort">
-					<Select
-						value={`${sortKey}:${sortDir}`}
-						onValueChange={(v) => {
-							const [k, d] = v.split(":") as [SortKey, "asc" | "desc"];
-							setSortKey(k);
-							setSortDir(d);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="h-9 w-[180px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="wait:desc">Wait (longest)</SelectItem>
-							<SelectItem value="wait:asc">Wait (shortest)</SelectItem>
-							<SelectItem value="receivedAt:desc">Received (newest)</SelectItem>
-							<SelectItem value="receivedAt:asc">Received (oldest)</SelectItem>
-							<SelectItem value="records:desc">Claims (high→low)</SelectItem>
-							<SelectItem value="records:asc">Claims (low→high)</SelectItem>
-							<SelectItem value="vendor:asc">Vendor A–Z</SelectItem>
-						</SelectContent>
-					</Select>
-				</FilterField>
-			</ClaimFilterBar>
-
-			<Card className="gap-1 bg-card/70 py-2">
-				<CardHeader className="px-3 pb-0.5 pt-0">
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<div>
-							<CardTitle className="text-sm font-medium">
-								Review queue
-							</CardTitle>
-							<p className="text-[11px] text-muted-foreground">
-								{rows.length} matching · pending await MFC review; rejected stay
-								inbound for vendor correction
-							</p>
-						</div>
-						<div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-							<ClipboardList className="size-3.5" />
-							<span className="tabular-nums">
-								{formatCount(rows.reduce((s, f) => s + f.records, 0))} claims in
-								view
-							</span>
-						</div>
-					</div>
-				</CardHeader>
-				<CardContent className="px-0 pb-0">
-					<div className="overflow-x-auto border-t border-border/50">
-						<Table>
-							<TableHeader>
-								<TableRow className="hover:bg-transparent">
-									<TableHead className="pl-3 sm:pl-4">
-										<SortHead
-											label="File"
-											active={sortKey === "receivedAt"}
-											onClick={() => toggleSort("receivedAt")}
-										/>
-									</TableHead>
-									<TableHead>
-										<SortHead
-											label="Vendor"
-											active={sortKey === "vendor"}
-											onClick={() => toggleSort("vendor")}
-										/>
-									</TableHead>
-									<TableHead>Type</TableHead>
-									<TableHead className="text-right">
-										<SortHead
-											label="Claims"
-											active={sortKey === "records"}
-											onClick={() => toggleSort("records")}
-											className="ml-auto"
-										/>
-									</TableHead>
-									<TableHead>Received</TableHead>
-									<TableHead>
-										<SortHead
-											label="Wait"
-											active={sortKey === "wait"}
-											onClick={() => toggleSort("wait")}
-										/>
-									</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead className="pr-3 sm:pr-4">Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{pageRows.map((row) => (
-									<InboundRow key={row.id} row={row} />
-								))}
-								{pageRows.length === 0 && (
-									<TableRow>
-										<TableCell
-											colSpan={8}
-											className="h-24 text-center text-muted-foreground"
-										>
-											{inboundQueue.length === 0 && !isMockEnabled() ? (
-												<span>
-													No claim vendor files in core yet. Click{" "}
-													<button
-														type="button"
-														className="font-medium text-primary underline-offset-2 hover:underline"
-														onClick={handleSeedDemo}
-														disabled={seedMutation.isPending}
-													>
-														Seed demo
-													</button>{" "}
-													to load the review queue.
-												</span>
-											) : (
-												"No inbound files match the current filters."
-											)}
-										</TableCell>
-									</TableRow>
+			{/* KPI grid — outbound reporting pattern */}
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				{inboundKpis.map((kpi) => {
+					const Icon = kpi.icon;
+					return (
+						<button
+							key={kpi.id}
+							type="button"
+							onClick={kpi.onClick}
+							className={cn(
+								"group relative overflow-hidden rounded-sm border bg-card p-4 text-left transition-all duration-200 ease-out",
+								STAT_SHADOW,
+								STAT_SHADOW_HOVER,
+								"hover:-translate-y-px hover:border-border",
+								kpi.active
+									? cn("border-transparent ring-1", kpi.ring)
+									: "border-border/70"
+							)}
+						>
+							<span
+								aria-hidden
+								className={cn(
+									"absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b",
+									kpi.accent
 								)}
-							</TableBody>
-						</Table>
+							/>
+							<div className="flex items-start justify-between gap-3 pl-1.5">
+								<div className="min-w-0">
+									<p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+										{kpi.label}
+									</p>
+									<p
+										className={cn(
+											"mt-1.5 text-2xl font-semibold tracking-tight tabular-nums",
+											kpi.valueTone
+										)}
+									>
+										{typeof kpi.value === "number"
+											? kpi.value.toLocaleString()
+											: kpi.value}
+									</p>
+									<p className="mt-1.5 text-xs text-muted-foreground">
+										{kpi.hint}
+									</p>
+								</div>
+								<span
+									className={cn(
+										"flex size-9 shrink-0 items-center justify-center rounded-sm ring-1 ring-inset ring-black/5 transition-transform duration-200 group-hover:scale-105 dark:ring-white/10",
+										kpi.iconTone
+									)}
+								>
+									<Icon className="size-[18px]" aria-hidden />
+								</span>
+							</div>
+						</button>
+					);
+				})}
+			</div>
+
+			{/* Filters — outbound reporting-style panel */}
+			<section className={cn(PANEL, "px-3 py-2.5 sm:px-3")}>
+				<div className="flex flex-col gap-2.5">
+					<div className="relative">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							value={search}
+							onChange={(e) => {
+								setSearch(e.target.value);
+								setPage(1);
+							}}
+							placeholder="Search file ID, name, vendor, claim type…"
+							className="h-8 rounded-sm border-border bg-background pl-8 text-xs shadow-none focus-visible:ring-primary/15"
+						/>
+						{search ? (
+							<button
+								type="button"
+								aria-label="Clear search"
+								className="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+								onClick={() => {
+									setSearch("");
+									setPage(1);
+								}}
+							>
+								<X className="size-3.5" />
+							</button>
+						) : null}
 					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<Select
+							value={statusFilter}
+							onValueChange={(v) => {
+								setStatusFilter(v as "all" | "pending" | "rejected");
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={selectField}>
+								<SelectValue placeholder="Status" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">
+									All status ({statusCounts.all})
+								</SelectItem>
+								<SelectItem value="pending">
+									Pending ({statusCounts.pending})
+								</SelectItem>
+								<SelectItem value="rejected">
+									Rejected ({statusCounts.rejected})
+								</SelectItem>
+							</SelectContent>
+						</Select>
+						<Select
+							value={waitBucket}
+							onValueChange={(v) => {
+								setWaitBucket(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[8rem]")}>
+								<SelectValue placeholder="Age" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Any age</SelectItem>
+								<SelectItem value="fresh">
+									&lt; 24h ({analytics.under24})
+								</SelectItem>
+								<SelectItem value="aging">
+									1–3 days ({analytics.day1to3})
+								</SelectItem>
+								<SelectItem value="sla">
+									≥ 3 days ({analytics.over3d})
+								</SelectItem>
+							</SelectContent>
+						</Select>
+						<Select
+							value={vendor}
+							onValueChange={(v) => {
+								setVendor(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[8.5rem]")}>
+								<SelectValue placeholder="Vendor" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All vendors</SelectItem>
+								{vendors.map((v) => (
+									<SelectItem key={v} value={v}>
+										{v}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={fileType}
+							onValueChange={(v) => {
+								setFileType(v);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[8rem]")}>
+								<SelectValue placeholder="Type" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All types</SelectItem>
+								{fileTypes.map((t) => (
+									<SelectItem key={t} value={t}>
+										{t}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={`${sortKey}:${sortDir}`}
+							onValueChange={(v) => {
+								const [k, d] = v.split(":") as [SortKey, "asc" | "desc"];
+								setSortKey(k);
+								setSortDir(d);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className={cn(selectField, "min-w-[10rem]")}>
+								<SelectValue placeholder="Sort" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="wait:desc">Wait (longest)</SelectItem>
+								<SelectItem value="wait:asc">Wait (shortest)</SelectItem>
+								<SelectItem value="receivedAt:desc">Newest received</SelectItem>
+								<SelectItem value="receivedAt:asc">Oldest received</SelectItem>
+								<SelectItem value="records:desc">Most claims</SelectItem>
+								<SelectItem value="records:asc">Fewest claims</SelectItem>
+								<SelectItem value="vendor:asc">Vendor A–Z</SelectItem>
+							</SelectContent>
+						</Select>
+						{hasActiveFilters ? (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-8 px-2.5 text-xs text-muted-foreground"
+								onClick={clearFilters}
+							>
+								Clear
+							</Button>
+						) : null}
+					</div>
+				</div>
+			</section>
+
+			{/* Table — CMS EDGE reporting layout */}
+			<section className={cn(PANEL, "overflow-hidden")}>
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
+					<p className="text-sm font-semibold text-foreground">
+						Review queue{" "}
+						<span className="font-normal text-muted-foreground">
+							({rows.length})
+						</span>
+					</p>
+					<span className="text-xs tabular-nums text-muted-foreground">
+						{formatCount(rows.reduce((s, f) => s + f.records, 0))} claims
+					</span>
+				</div>
+
+				<CmsEdgeTableScroll>
+					<Table
+						containerClassName={CMS_EDGE_TABLE_CONTAINER}
+						className="w-full min-w-[1080px] text-xs"
+					>
+						<TableHeader>
+							<TableRow className="border-b border-border/50 bg-muted/30 hover:bg-muted/30">
+								<TableHead className={cn(th, "w-12 pl-4 text-center")}>
+									#
+								</TableHead>
+								<TableHead className={th}>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1"
+										onClick={() => toggleSort("receivedAt")}
+									>
+										File ID
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={th}>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1"
+										onClick={() => toggleSort("vendor")}
+									>
+										Vendor
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={th}>Type</TableHead>
+								<TableHead className={cn(th, "text-right")}>
+									<button
+										type="button"
+										className="ml-auto inline-flex items-center gap-1"
+										onClick={() => toggleSort("records")}
+									>
+										Claims
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={th}>Received</TableHead>
+								<TableHead className={th}>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1"
+										onClick={() => toggleSort("wait")}
+									>
+										Wait
+										<ArrowUpDown className="size-3 opacity-60" />
+									</button>
+								</TableHead>
+								<TableHead className={th}>Status</TableHead>
+								<TableHead className={cn(th, "pr-4 text-right")}>
+									Action
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{pageRows.length === 0 ? (
+								<TableRow className="hover:bg-transparent">
+									<TableCell
+										colSpan={9}
+										className="px-4 py-12 text-center text-sm text-muted-foreground"
+									>
+										{inboundQueue.length === 0 && !isMockEnabled() ? (
+											<span>
+												No claim vendor files in core yet. Click{" "}
+												<button
+													type="button"
+													className="font-medium text-primary underline-offset-2 hover:underline"
+													onClick={handleSeedDemo}
+													disabled={seedMutation.isPending}
+												>
+													Seed demo
+												</button>{" "}
+												to load the review queue.
+											</span>
+										) : hasActiveFilters ? (
+											"No inbound files match your filters."
+										) : (
+											"No inbound files for this program."
+										)}
+									</TableCell>
+								</TableRow>
+							) : (
+								pageRows.map((row, index) => (
+									<InboundRow
+										key={row.id}
+										row={row}
+										index={(safePage - 1) * pageSize + index + 1}
+									/>
+								))
+							)}
+						</TableBody>
+					</Table>
+				</CmsEdgeTableScroll>
+
+				<div className="border-t border-border/50">
 					<ClaimTablePagination
 						total={rows.length}
 						page={safePage}
@@ -1036,263 +1167,248 @@ export function InboundVendorFilePage() {
 						}}
 						noun="files"
 					/>
-				</CardContent>
-			</Card>
+				</div>
+			</section>
 
-			{/* Analytics — below review queue */}
-			<div className="grid gap-3 lg:grid-cols-3">
-				<ClaimSectionCard
+			{/* Analytics — outbound CmsEdgeSectionPanel pattern */}
+			<div className="grid gap-3 lg:grid-cols-3 lg:items-stretch">
+				<CmsEdgeSectionPanel
 					title="Queue age mix"
-					description="Where pending (not yet reviewed) files sit relative to the 48h SLA"
-					className="lg:col-span-1"
+					subtitle="Pending files vs 72h SLA"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<div className="h-[180px]">
-						<ResponsiveContainer width="100%" height="100%">
-							<PieChart>
-								<Pie
-									data={analytics.ageBuckets}
-									dataKey="files"
-									nameKey="name"
-									innerRadius={48}
-									outerRadius={72}
-									paddingAngle={2}
-								>
-									{analytics.ageBuckets.map((b) => (
-										<Cell key={b.name} fill={b.fill} />
-									))}
-								</Pie>
-								<Tooltip
-									formatter={(value: number, name: string) => [
-										`${value} files`,
-										name,
-									]}
-								/>
-							</PieChart>
-						</ResponsiveContainer>
-					</div>
-					<div className="mt-1 space-y-1.5">
-						{analytics.ageBuckets.map((b) => (
-							<button
-								key={b.name}
-								type="button"
-								className={cn(
-									"flex w-full items-center justify-between rounded-md px-2 py-1 text-xs hover:bg-muted/50",
-									waitBucket !== "all" &&
-										((waitBucket === "fresh" && b.name.startsWith("<")) ||
-											(waitBucket === "aging" && b.name.includes("1–3")) ||
-											(waitBucket === "sla" && b.name.includes("3 days"))) &&
-										"bg-muted/60"
-								)}
-								onClick={() => {
-									const next = b.name.startsWith("<")
-										? "fresh"
-										: b.name.includes("1–3")
-											? "aging"
-											: "sla";
-									setWaitBucket((cur) => (cur === next ? "all" : next));
-									setPage(1);
-								}}
-							>
-								<span className="flex items-center gap-2">
-									<span
-										className="size-2 rounded-full"
-										style={{ background: b.fill }}
+					{analytics.ageBuckets.every((b) => b.files === 0) ? (
+						<div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+							No pending files in scope
+						</div>
+					) : (
+						<div className="flex flex-1 flex-col justify-center gap-4">
+							<div className="flex items-center gap-3">
+								<div className="relative h-[112px] w-[112px] shrink-0">
+									<ResponsiveContainer width="100%" height="100%">
+										<PieChart>
+											<Pie
+												data={analytics.ageBuckets}
+												dataKey="files"
+												nameKey="name"
+												innerRadius="58%"
+												outerRadius="88%"
+												paddingAngle={2}
+												stroke="none"
+												isAnimationActive={false}
+											>
+												{analytics.ageBuckets.map((b) => (
+													<Cell key={b.name} fill={b.fill} />
+												))}
+											</Pie>
+											<Tooltip content={<InboundChartTooltip />} />
+										</PieChart>
+									</ResponsiveContainer>
+									<div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-center">
+										<p className="text-lg font-bold tabular-nums leading-none text-foreground">
+											{analytics.under24 + analytics.day1to3 + analytics.over3d}
+										</p>
+										<p className="mt-0.5 text-[9px] leading-tight text-muted-foreground">
+											Pending
+										</p>
+									</div>
+								</div>
+								<div className="min-w-0 flex-1 space-y-1.5">
+									{analytics.ageBuckets.map((b) => {
+										const next = b.name.startsWith("<")
+											? "fresh"
+											: b.name.includes("1–3")
+												? "aging"
+												: "sla";
+										const active = waitBucket === next;
+										return (
+											<button
+												key={b.name}
+												type="button"
+												onClick={() => {
+													setWaitBucket((cur) => (cur === next ? "all" : next));
+													setPage(1);
+												}}
+												className={cn(
+													"flex w-full items-center justify-between gap-2 rounded-sm border px-2 py-1.5 text-left text-xs transition",
+													active
+														? "border-primary/30 bg-primary/5"
+														: "border-border/60 hover:bg-muted/40"
+												)}
+											>
+												<span className="flex min-w-0 items-center gap-1.5 font-medium">
+													<span
+														className="size-2 shrink-0 rounded-full"
+														style={{ backgroundColor: b.fill }}
+													/>
+													<span className="truncate">{b.name}</span>
+												</span>
+												<span className="shrink-0 tabular-nums text-muted-foreground">
+													{b.files}
+													<span className="ml-1 text-[10px]">
+														({pct(b.files, ageTotal)}%)
+													</span>
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+							<div className="space-y-1.5 border-t border-border/40 pt-3">
+								<div className="flex items-center justify-between text-[10px]">
+									<span className="text-muted-foreground">
+										Outbound accept rate
+									</span>
+									<span className="font-semibold tabular-nums text-foreground">
+										{outboundAvailable ? `${analytics.acceptRate}%` : "—"}
+									</span>
+								</div>
+								<div className="h-1.5 overflow-hidden rounded-full bg-muted">
+									<div
+										className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all"
+										style={{
+											width: `${outboundAvailable ? analytics.acceptRate : 0}%`,
+										}}
 									/>
-									{b.name}
-								</span>
-								<span className="tabular-nums font-medium">{b.files}</span>
-							</button>
-						))}
-					</div>
-				</ClaimSectionCard>
+								</div>
+							</div>
+						</div>
+					)}
+				</CmsEdgeSectionPanel>
 
-				<ClaimSectionCard
+				<CmsEdgeSectionPanel
 					title="Vendor backlog"
-					description="Claims waiting by vendor — click a bar filter"
-					className="lg:col-span-1"
+					subtitle="Files waiting by vendor"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<div className="h-[200px]">
-						<ResponsiveContainer width="100%" height="100%">
-							<BarChart
-								data={analytics.byVendor.slice(0, 6)}
-								layout="vertical"
-								margin={{ left: 4, right: 8, top: 4, bottom: 4 }}
-							>
-								<CartesianGrid strokeDasharray="3 3" horizontal={false} />
-								<XAxis type="number" hide />
-								<YAxis
-									type="category"
-									dataKey="name"
-									width={78}
-									tick={{ fontSize: 11 }}
-								/>
-								<Tooltip formatter={(value: number) => [value, "Files"]} />
-								<Bar
-									dataKey="files"
-									radius={[0, 4, 4, 0]}
-									cursor="pointer"
-									onClick={(data) => {
-										const name = (data as { name?: string })?.name;
-										if (!name) return;
-										setVendor((cur) => (cur === name ? "all" : name));
-										setPage(1);
-									}}
-								>
-									{analytics.byVendor.slice(0, 6).map((v) => (
-										<Cell
-											key={v.name}
-											fill={vendor === v.name ? "#13446c" : "#13446c99"}
-										/>
-									))}
-								</Bar>
-							</BarChart>
-						</ResponsiveContainer>
-					</div>
-				</ClaimSectionCard>
+					{analytics.byVendor.length === 0 ? (
+						<p className="flex flex-1 items-center justify-center text-center text-xs text-muted-foreground">
+							Queue is empty.
+						</p>
+					) : (
+						<ul className="flex flex-1 flex-col justify-evenly gap-1.5">
+							{analytics.byVendor.slice(0, 5).map((v) => {
+								const share = pct(v.files, analytics.maxVendorClaims);
+								const active = vendor === v.name;
+								return (
+									<li key={v.name} className="min-h-0">
+										<button
+											type="button"
+											onClick={() => {
+												setVendor((cur) => (cur === v.name ? "all" : v.name));
+												setPage(1);
+											}}
+											className={cn(
+												"flex h-full w-full flex-col justify-center rounded-sm border px-2 py-2 text-left transition",
+												active
+													? "border-primary/30 bg-primary/5"
+													: "border-transparent hover:bg-muted/40"
+											)}
+										>
+											<div className="mb-1 flex items-center justify-between gap-2 text-xs">
+												<span className="truncate font-medium">{v.name}</span>
+												<span className="shrink-0 tabular-nums text-muted-foreground">
+													{v.files}{" "}
+													<span className="text-[10px]">({share}%)</span>
+												</span>
+											</div>
+											<div className="h-1.5 overflow-hidden rounded-full bg-muted">
+												<div
+													className="h-full rounded-full bg-sky-500 transition-all"
+													style={{
+														width: `${Math.max(v.files > 0 ? 4 : 0, share)}%`,
+													}}
+												/>
+											</div>
+										</button>
+									</li>
+								);
+							})}
+						</ul>
+					)}
+				</CmsEdgeSectionPanel>
 
-				<ClaimSectionCard
+				<CmsEdgeSectionPanel
 					title="Needs attention"
-					description="Prioritize review on aging and high-volume files"
-					className="lg:col-span-1"
+					subtitle="Prioritize aging and high-volume files"
+					className="flex h-full flex-col"
+					bodyClassName="flex flex-1 flex-col p-4"
 				>
-					<div className="space-y-2.5">
+					<ul className="flex flex-1 flex-col justify-evenly gap-1.5">
 						{analytics.oldest ? (
-							<AttentionRow
-								icon={Hourglass}
-								tone="text-amber-700 bg-amber-500/10"
-								title="Oldest waiting"
-								meta={`${analytics.oldest.vendor} · ${formatWaitLabel(hoursSince(analytics.oldest.receivedAt))}`}
-								detail={analytics.oldest.fileId}
-								href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.oldest.fileId)}/review`}
-							/>
+							<li className="min-h-0">
+								<AttentionRow
+									icon={Hourglass}
+									tone="text-amber-700 bg-amber-500/10"
+									title="Oldest waiting"
+									meta={`${analytics.oldest.vendor} · ${formatWaitLabel(hoursSince(analytics.oldest.receivedAt))}`}
+									detail={analytics.oldest.fileId}
+									href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.oldest.fileId)}/review`}
+								/>
+							</li>
 						) : null}
 						{analytics.largest ? (
-							<AttentionRow
-								icon={ScrollText}
-								tone="text-sky-700 bg-sky-500/10"
-								title="Largest file"
-								meta={`${formatCount(analytics.largest.records)} claims · ${analytics.largest.vendor}`}
-								detail={analytics.largest.fileId}
-								href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.largest.fileId)}/review`}
-							/>
+							<li className="min-h-0">
+								<AttentionRow
+									icon={ScrollText}
+									tone="text-sky-700 bg-sky-500/10"
+									title="Largest file"
+									meta={`${formatCount(analytics.largest.records)} claims · ${analytics.largest.vendor}`}
+									detail={analytics.largest.fileId}
+									href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.largest.fileId)}/review`}
+								/>
+							</li>
 						) : null}
 						{analytics.slaRisk[0] ? (
-							<AttentionRow
-								icon={AlertTriangle}
-								tone="text-red-700 bg-red-500/10"
-								title="SLA breach"
-								meta={`${analytics.slaRisk.length} file(s) past ${SLA_HOURS}h`}
-								detail={analytics.slaRisk[0].fileId}
-								href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.slaRisk[0].fileId)}/review`}
-							/>
-						) : (
-							<div className="rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-primary">
-								No files past the {SLA_HOURS}h review SLA.
-							</div>
-						)}
-						<div className="rounded-md border border-border/50 bg-background/50 px-2.5 py-2">
-							<div className="flex items-center justify-between text-xs">
-								<span className="text-muted-foreground">
-									Outbound accept rate
-								</span>
-								<span className="font-semibold tabular-nums">
-									{outboundAvailable ? `${analytics.acceptRate}%` : "—"}
-								</span>
-							</div>
-							{outboundAvailable ? (
-								<Progress
-									value={analytics.acceptRate}
-									className="mt-1.5 h-1.5"
+							<li className="min-h-0">
+								<AttentionRow
+									icon={AlertTriangle}
+									tone="text-rose-700 bg-rose-500/10"
+									title="SLA breach"
+									meta={`${analytics.slaRisk.length} file(s) past ${SLA_HOURS}h`}
+									detail={analytics.slaRisk[0].fileId}
+									href={`/admin/claim-encounter/files/${encodeURIComponent(analytics.slaRisk[0].fileId)}/review`}
 								/>
-							) : (
-								<p className="mt-1.5 text-[11px] text-muted-foreground">
-									Outbound packages not in core yet
-								</p>
-							)}
-						</div>
-					</div>
-				</ClaimSectionCard>
+							</li>
+						) : (
+							<li className="rounded-sm border border-emerald-200/80 bg-emerald-50 px-2 py-2 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+								No files past the {SLA_HOURS}h review SLA.
+							</li>
+						)}
+					</ul>
+				</CmsEdgeSectionPanel>
 			</div>
 
-			<div className="grid gap-3 md:grid-cols-3">
-				<ClaimSectionCard
-					title="Review workflow"
-					description="How inbound files move through MFC"
-				>
-					<ol className="space-y-2 text-xs text-muted-foreground">
-						<li className="flex gap-2">
-							<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-								1
-							</span>
-							Open a file, inspect 837 claim loops in the EDI reader
-						</li>
-						<li className="flex gap-2">
-							<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-								2
-							</span>
-							Accept clean claims or reject with catalog reason codes
-						</li>
-						<li className="flex gap-2">
-							<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-								3
-							</span>
-							Accepted packages go outbound; full MFC rejects stay inbound for
-							vendor rework
-						</li>
-					</ol>
-				</ClaimSectionCard>
-				<ClaimSectionCard title="Vendor share of queue">
-					<div className="space-y-2">
-						{analytics.byVendor.slice(0, 5).map((v) => (
-							<button
-								key={v.name}
-								type="button"
-								className="w-full text-left"
-								onClick={() => {
-									setVendor(v.name);
-									setPage(1);
-								}}
-							>
-								<MetricBar
-									label={v.name}
-									value={v.files}
-									max={analytics.maxVendorClaims}
-									suffix="files"
-									tone={vendor === v.name ? "bg-primary" : "bg-primary/50"}
-								/>
-							</button>
-						))}
-						{analytics.byVendor.length === 0 ? (
-							<p className="text-xs text-muted-foreground">Queue is empty.</p>
-						) : null}
-					</div>
-				</ClaimSectionCard>
-				<ClaimSectionCard
+			<div className="grid gap-3 lg:grid-cols-2">
+				<CmsEdgeSectionPanel
 					title="Program snapshot"
-					description={`${programFilter} inbound volume`}
+					subtitle={`${programFilter} inbound volume`}
+					bodyClassName="p-4"
 				>
 					<div className="grid grid-cols-2 gap-2">
-						<div className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2">
-							<p className="text-[10px] uppercase text-muted-foreground">
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
 								Inbound files
 							</p>
-							<p className="text-lg font-semibold tabular-nums">
+							<p className="mt-1 text-lg font-semibold tabular-nums">
 								{formatCount(analytics.totalFiles)}
 							</p>
 						</div>
-						<div className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2">
-							<p className="text-[10px] uppercase text-muted-foreground">
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
 								Pending claims
 							</p>
-							<p className="text-lg font-semibold tabular-nums">
+							<p className="mt-1 text-lg font-semibold tabular-nums">
 								{formatCount(analytics.claimsPending)}
 							</p>
 						</div>
-						<div className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2">
-							<p className="text-[10px] uppercase text-muted-foreground">
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
 								Avg claims / file
 							</p>
-							<p className="text-lg font-semibold tabular-nums">
+							<p className="mt-1 text-lg font-semibold tabular-nums">
 								{pending.length
 									? formatCount(
 											Math.round(analytics.claimsPending / pending.length)
@@ -1300,11 +1416,11 @@ export function InboundVendorFilePage() {
 									: "0"}
 							</p>
 						</div>
-						<div className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2">
-							<p className="text-[10px] uppercase text-muted-foreground">
+						<div className="rounded-sm border border-border/60 bg-muted/20 px-2.5 py-2">
+							<p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
 								File types
 							</p>
-							<p className="text-lg font-semibold tabular-nums">
+							<p className="mt-1 text-lg font-semibold tabular-nums">
 								{formatCount(fileTypes.length)}
 							</p>
 						</div>
@@ -1313,43 +1429,149 @@ export function InboundVendorFilePage() {
 						asChild
 						variant="outline"
 						size="sm"
-						className="mt-3 h-8 w-full text-xs"
+						className={cn(
+							toolbarBtn,
+							"mt-3 w-full border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+						)}
 					>
 						<Link href="/admin/claim-encounter/acceptance-analytics">
-							<FileSearch className="mr-1.5 size-3.5" />
+							<FileSearch className="size-3.5" />
 							Open acceptance analytics
 						</Link>
 					</Button>
-				</ClaimSectionCard>
+				</CmsEdgeSectionPanel>
+
+				<CmsEdgeSectionPanel
+					title="Vendor claim volume"
+					subtitle="Files in queue by vendor"
+					bodyClassName="px-2 pb-3 pt-2"
+				>
+					{analytics.byVendor.length === 0 ? (
+						<p className="py-8 text-center text-xs text-muted-foreground">
+							No vendor volume in scope.
+						</p>
+					) : (
+						<div className="h-[220px]">
+							<ResponsiveContainer width="100%" height="100%">
+								<BarChart
+									layout="vertical"
+									data={analytics.byVendor.slice(0, 6).map((v) => ({
+										...v,
+										short:
+											v.name.length > 14 ? `${v.name.slice(0, 12)}…` : v.name,
+									}))}
+									margin={{ left: 4, right: 16, top: 4, bottom: 4 }}
+									barCategoryGap={10}
+								>
+									<CartesianGrid
+										strokeDasharray="3 3"
+										horizontal={false}
+										stroke="hsl(var(--border))"
+										strokeOpacity={0.55}
+									/>
+									<XAxis
+										type="number"
+										allowDecimals={false}
+										tick={{
+											fontSize: 10,
+											fill: "hsl(var(--muted-foreground))",
+										}}
+										axisLine={false}
+										tickLine={false}
+									/>
+									<YAxis
+										type="category"
+										dataKey="short"
+										width={96}
+										tick={{
+											fontSize: 11,
+											fill: "hsl(var(--muted-foreground))",
+										}}
+										axisLine={false}
+										tickLine={false}
+									/>
+									<Tooltip
+										cursor={{ fill: "hsl(var(--muted))", opacity: 0.35 }}
+										content={<InboundChartTooltip />}
+									/>
+									<Bar
+										dataKey="files"
+										name="Files"
+										fill="#0284c7"
+										radius={[0, 4, 4, 0]}
+										barSize={14}
+										cursor="pointer"
+										onClick={(data) => {
+											const name = (data as { name?: string })?.name;
+											if (!name) return;
+											setVendor((cur) => (cur === name ? "all" : name));
+											setPage(1);
+										}}
+									>
+										{analytics.byVendor.slice(0, 6).map((v) => (
+											<Cell
+												key={v.name}
+												fill={vendor === v.name ? "#0369a1" : "#0284c7"}
+											/>
+										))}
+									</Bar>
+								</BarChart>
+							</ResponsiveContainer>
+						</div>
+					)}
+				</CmsEdgeSectionPanel>
 			</div>
 		</div>
 	);
 }
 
-function SortHead({
-	label,
+function InboundChartTooltip({
 	active,
-	onClick,
-	className,
+	payload,
+	label,
 }: {
-	label: string;
-	active: boolean;
-	onClick: () => void;
-	className?: string;
+	active?: boolean;
+	payload?: Array<{
+		name?: string;
+		value?: number | string;
+		color?: string;
+		payload?: { name?: string };
+	}>;
+	label?: string | number;
 }) {
+	if (!active || !payload?.length) return null;
+	const title =
+		typeof label === "string" || typeof label === "number"
+			? String(label)
+			: (payload[0]?.payload?.name ?? "");
+
 	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className={cn(
-				"inline-flex items-center gap-1 text-xs font-medium hover:text-foreground",
-				active ? "text-foreground" : "text-muted-foreground",
-				className
-			)}
-		>
-			{label}
-			<ArrowUpDown className="size-3 opacity-60" />
-		</button>
+		<div className="rounded-sm border border-border/70 bg-card px-2.5 py-1.5 text-xs shadow-md">
+			{title ? (
+				<p className="mb-1 font-medium text-foreground">{title}</p>
+			) : null}
+			<ul className="space-y-0.5">
+				{payload.map((entry) => (
+					<li
+						key={`${entry.name}-${entry.value}`}
+						className="flex items-center justify-between gap-4 tabular-nums text-muted-foreground"
+					>
+						<span className="inline-flex items-center gap-1.5">
+							<span
+								className="size-1.5 rounded-full"
+								style={{ backgroundColor: entry.color }}
+							/>
+							{entry.name}
+						</span>
+						<span className="font-medium text-foreground">
+							{typeof entry.value === "number"
+								? entry.value.toLocaleString()
+								: entry.value}
+						</span>
+					</li>
+				))}
+			</ul>
+		</div>
 	);
 }
 
@@ -1361,7 +1583,7 @@ function AttentionRow({
 	detail,
 	href,
 }: {
-	icon: typeof Hourglass;
+	icon: LucideIcon;
 	tone: string;
 	title: string;
 	meta: string;
@@ -1371,18 +1593,20 @@ function AttentionRow({
 	return (
 		<Link
 			href={href}
-			className="flex items-start gap-2 rounded-md border border-border/50 bg-background/40 px-2.5 py-2 transition-colors hover:bg-muted/40"
+			className="flex h-full w-full items-start gap-2 rounded-sm border border-border/60 px-2 py-2 transition hover:bg-muted/40"
 		>
 			<span
 				className={cn(
-					"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
+					"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm ring-1 ring-inset ring-black/5 dark:ring-white/10",
 					tone
 				)}
 			>
 				<Icon className="size-3.5" />
 			</span>
 			<span className="min-w-0 flex-1">
-				<span className="block text-xs font-medium">{title}</span>
+				<span className="block text-xs font-medium text-foreground">
+					{title}
+				</span>
 				<span className="block text-[11px] text-muted-foreground">{meta}</span>
 				<span className="mt-0.5 block truncate font-mono text-[10px] text-foreground/80">
 					{detail}
@@ -1392,83 +1616,93 @@ function AttentionRow({
 	);
 }
 
-function InboundRow({ row }: { row: ClaimVendorFile }) {
+function InboundRow({ row, index }: { row: ClaimVendorFile; index: number }) {
+	const router = useRouter();
 	const wait = hoursSince(row.receivedAt);
-	const sla = wait >= SLA_HOURS;
-	const aging = wait >= 24 && wait < SLA_HOURS;
+	const reviewHref = `/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}/review`;
+	const detailHref = `/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}`;
 
 	return (
-		<TableRow className="hover:bg-muted/30">
-			<TableCell className="pl-3 sm:pl-4">
-				<div className="min-w-0">
-					<p className="font-mono text-xs font-medium">{row.fileId}</p>
-					<p className="truncate text-[11px] text-muted-foreground">
+		<TableRow
+			className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/25"
+			onClick={() => {
+				router.push(row.reviewStatus === "pending" ? reviewHref : detailHref);
+			}}
+		>
+			<TableCell
+				className={cn(
+					td,
+					"w-12 pl-4 text-center tabular-nums text-muted-foreground"
+				)}
+			>
+				{index}
+			</TableCell>
+			<TableCell className={td}>
+				<div className="min-w-0 space-y-0.5">
+					<div className="flex flex-wrap items-center gap-1.5">
+						<span className="font-mono text-[11px] font-medium text-primary">
+							{row.fileId}
+						</span>
+						<TxBadge label="837" />
+						<span className="text-[10px] text-muted-foreground">
+							{row.program}
+						</span>
+					</div>
+					<p className="max-w-[260px] truncate text-[11px] text-muted-foreground">
 						{row.fileName}
 					</p>
 				</div>
 			</TableCell>
-			<TableCell className="text-sm">{row.vendor}</TableCell>
-			<TableCell>
-				<div className="flex flex-col gap-0.5">
-					<span className="w-fit rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-						837
-					</span>
-					<span className="text-[10px] text-muted-foreground">
-						{row.fileTypeLabel}
-					</span>
-				</div>
+			<TableCell className={cn(td, "font-medium")}>{row.vendor}</TableCell>
+			<TableCell className={td}>
+				<span className="text-[11px] text-muted-foreground">
+					{row.fileTypeLabel}
+				</span>
 			</TableCell>
-			<TableCell className="text-right text-sm tabular-nums">
+			<TableCell className={cn(td, "text-right font-medium tabular-nums")}>
 				{formatCount(row.records)}
 			</TableCell>
-			<TableCell className="text-xs tabular-nums text-muted-foreground">
+			<TableCell className={cn(td, "tabular-nums text-muted-foreground")}>
 				{row.receivedAt}
 			</TableCell>
-			<TableCell>
-				<span
-					className={cn(
-						"rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
-						sla
-							? "bg-red-100 text-red-800"
-							: aging
-								? "bg-amber-100 text-amber-900"
-								: "bg-sky-100 text-sky-900"
-					)}
-				>
-					{formatWaitLabel(wait)}
-				</span>
+			<TableCell className={td}>
+				<WaitPill wait={wait} />
 			</TableCell>
-			<TableCell>
-				<span
-					className={cn(
-						"rounded-full px-2 py-0.5 text-[10px] font-medium",
-						row.reviewStatus === "rejected"
-							? "bg-red-100 text-red-800"
-							: "bg-amber-100 text-amber-900"
-					)}
-				>
-					{row.reviewStatus === "rejected" ? "MFC rejected" : "Pending review"}
-				</span>
+			<TableCell className={td}>
+				<ReviewStatusPill status={row.reviewStatus} />
 			</TableCell>
-			<TableCell className="pr-3 sm:pr-4">
-				<div className="flex flex-wrap gap-1">
-					{row.reviewStatus === "pending" ? (
-						<Button asChild size="sm" className="h-7 text-xs">
-							<Link
-								href={`/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}/review`}
-							>
-								Review
-							</Link>
-						</Button>
-					) : null}
-					<Button asChild variant="outline" size="sm" className="h-7 text-xs">
-						<Link
-							href={`/admin/claim-encounter/files/${encodeURIComponent(row.fileId)}`}
+			<TableCell
+				className={cn(td, "pr-4 text-right")}
+				onClick={(e) => e.stopPropagation()}
+			>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="size-7 text-muted-foreground hover:text-foreground"
+							aria-label={`Actions for ${row.fileId}`}
 						>
-							{row.reviewStatus === "rejected" ? "View" : "Open EDI"}
-						</Link>
-					</Button>
-				</div>
+							<MoreHorizontal className="size-3.5" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-44">
+						{row.reviewStatus === "pending" ? (
+							<DropdownMenuItem asChild>
+								<Link href={reviewHref}>
+									<Eye className="mr-2 size-3.5" />
+									Review
+								</Link>
+							</DropdownMenuItem>
+						) : null}
+						<DropdownMenuItem asChild>
+							<Link href={detailHref}>
+								<ExternalLink className="mr-2 size-3.5" />
+								{row.reviewStatus === "rejected" ? "View" : "Open EDI"}
+							</Link>
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</TableCell>
 		</TableRow>
 	);
