@@ -3,7 +3,7 @@
  * Seed deployed vendor-core (Django) from frontend mock fixtures.
  *
  * Live API style (verified against api.vm.tillahealth.com):
- *   POST /api/v1/<resource>/create/   + GET /api/v1/<resource>/list/
+ *   POST /api/v1/<resource>/   + GET /api/v1/<resource>/
  *   Intake jobs / inbound files keep REST roots.
  *
  * Usage:
@@ -180,7 +180,7 @@ async function ensureRoutingRules(token) {
 				is_active: true,
 			};
 			if (rule.edi_type) payload.edi_type = rule.edi_type;
-			await request("POST", "/api/v1/routing-rules/create/", {
+			await request("POST", "/api/v1/routing-rules/", {
 				token,
 				json: payload,
 			});
@@ -227,7 +227,7 @@ async function main() {
 
 	await ensureRoutingRules(token);
 
-	const existingVendors = await listAll(token, "/api/v1/vendors/list/");
+	const existingVendors = await listAll(token, "/api/v1/vendors/");
 	const byCode = new Map(existingVendors.map((v) => [vendorKey(v), v]));
 
 	const created = {
@@ -253,7 +253,7 @@ async function main() {
 			vendor = { id: `dry-${mock.code}`, vendor_code: mock.code };
 		} else {
 			try {
-				vendor = await request("POST", "/api/v1/vendors/create/", {
+				vendor = await request("POST", "/api/v1/vendors/", {
 					token,
 					json: {
 						vendor_code: mock.code,
@@ -284,7 +284,7 @@ async function main() {
 		const accountCount = Math.min(mock.linkedAccounts || 4, MAX_ACCOUNTS);
 		const existingAccounts = await listAll(
 			token,
-			`/api/v1/accounts/list/?vendor_id=${vendorId}`
+			`/api/v1/accounts/?vendor_id=${vendorId}`
 		).catch(() => []);
 		const accountCodes = new Set(existingAccounts.map((a) => accountKey(a)));
 
@@ -297,7 +297,7 @@ async function main() {
 				continue;
 			}
 			try {
-				await request("POST", "/api/v1/accounts/create/", {
+				await request("POST", "/api/v1/accounts/", {
 					token,
 					json: {
 						vendor_id: vendorId,
@@ -321,14 +321,14 @@ async function main() {
 		let credentialId = null;
 		const existingCreds = await listAll(
 			token,
-			"/api/v1/credentials/list/"
+			"/api/v1/credentials/"
 		).catch(() => []);
 		const existingCred = existingCreds.find((c) => c.secret_ref === secretRef);
 		if (existingCred) {
 			credentialId = existingCred.id;
 		} else if (!DRY_RUN) {
 			try {
-				const cred = await request("POST", "/api/v1/credentials/create/", {
+				const cred = await request("POST", "/api/v1/credentials/", {
 					token,
 					json: {
 						name: `${mock.name} SFTP password`,
@@ -348,7 +348,7 @@ async function main() {
 		const connName = `${short} - SFTP Connection`;
 		const existingConns = await listAll(
 			token,
-			`/api/v1/connections/list/?vendor_id=${vendorId}`
+			`/api/v1/connections/?vendor_id=${vendorId}`
 		).catch(() => []);
 		let connection = existingConns.find((c) => c.name === connName);
 
@@ -375,7 +375,7 @@ async function main() {
 			};
 			if (credentialId) payload.password_credential_id = credentialId;
 			try {
-				connection = await request("POST", "/api/v1/connections/create/", {
+				connection = await request("POST", "/api/v1/connections/", {
 					token,
 					json: payload,
 				});
@@ -390,7 +390,7 @@ async function main() {
 		let manual = existingConns.find((c) => c.name === manualName);
 		if (!manual && !DRY_RUN && mock.status !== "inactive") {
 			try {
-				manual = await request("POST", "/api/v1/connections/create/", {
+				manual = await request("POST", "/api/v1/connections/", {
 					token,
 					json: {
 						name: manualName,

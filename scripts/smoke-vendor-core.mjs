@@ -177,14 +177,86 @@ if (USER && PASS) {
 			return `HTTP ${res.status}, count=${count}`;
 		});
 		await check("validation-results requires auth", async () => {
-			const { res } = await get("/api/v1/validation-results/list/");
+			const { res } = await get("/api/v1/validation-results/");
 			if (res.status !== 401) {
 				throw new Error(`expected 401, got ${res.status}`);
 			}
 			return "401 without token";
 		});
 		await check("validation-results with token", async () => {
-			const { res, body } = await get("/api/v1/validation-results/list/", auth);
+			const { res, body } = await get("/api/v1/validation-results/", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("vendors list with token", async () => {
+			const { res, body } = await get("/api/v1/vendors/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("errors list with token", async () => {
+			const { res, body } = await get("/api/v1/errors/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("audit list with token", async () => {
+			const { res, body } = await get("/api/v1/audit/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("member-coverages with token", async () => {
+			const { res, body } = await get("/api/v1/member-coverages/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("providers with token", async () => {
+			const { res, body } = await get("/api/v1/providers/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("claim-lines with token", async () => {
+			const { res, body } = await get("/api/v1/claim-lines/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("users with token", async () => {
+			const { res, body } = await get("/api/v1/users/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("notifications with token", async () => {
+			const { res, body } = await get("/api/v1/notifications/?limit=5", auth);
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
+			}
+			const count = body?.result?.count ?? body?.count ?? "?";
+			return `HTTP ${res.status}, count=${count}`;
+		});
+		await check("contracts with token", async () => {
+			const { res, body } = await get("/api/v1/contracts/?limit=5", auth);
 			if (!res.ok) {
 				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
 			}

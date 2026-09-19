@@ -91,13 +91,9 @@ async function main() {
 		process.exit(1);
 	}
 
-	const listed = await request(
-		"GET",
-		"/api/v1/member-coverages/list/?limit=1",
-		{
-			token,
-		}
-	);
+	const listed = await request("GET", "/api/v1/member-coverages/?limit=1", {
+		token,
+	});
 	const count = listed?.count ?? listed?.results?.length ?? 0;
 	console.log(`Existing coverages: ${count}`);
 	if (count > 0) {
@@ -117,7 +113,7 @@ async function main() {
 	}
 
 	// Fallback: create eligibility file + coverages one-by-one
-	const vendors = await request("GET", "/api/v1/vendors/list/?limit=1", {
+	const vendors = await request("GET", "/api/v1/vendors/?limit=1", {
 		token,
 	});
 	const vendor = vendors?.results?.[0];
@@ -128,7 +124,7 @@ async function main() {
 
 	let eligibility;
 	try {
-		eligibility = await request("POST", "/api/v1/eligibility-files/create/", {
+		eligibility = await request("POST", "/api/v1/eligibility-files/", {
 			token,
 			json: {
 				vendor_id: vendor.id,
@@ -163,7 +159,7 @@ async function main() {
 	let created = 0;
 	for (let i = 0; i < names.length; i++) {
 		const [first, last] = names[i];
-		await request("POST", "/api/v1/member-coverages/create/", {
+		await request("POST", "/api/v1/member-coverages/", {
 			token,
 			json: {
 				eligibility_file_id: eligibility.id,

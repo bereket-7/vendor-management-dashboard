@@ -1,50 +1,29 @@
-import { contractDtoToModel } from "@/features/admin/features/contracts/feature/mappers/contractCoreMappers";
 import { apiClient } from "@/lib/api/client";
-import {
-	buildAcceptPath,
-	createVendorInvite,
-	saveVendorInviteFromServer,
-} from "@/lib/auth/vendor-invites";
-import {
-	isMockEnabled,
-	isNestApiEnabled,
-	withMockOrRemote,
-} from "@/lib/mock-mode";
-import { vendorCoreApi } from "@/lib/vendor-core/api";
+import { isMockEnabled, isNestApiEnabled, withMockOrRemote } from "@/lib/mock-mode";
 import {
 	VendorCoreApiError,
 	getStoredAccessToken,
 	isVendorCoreLive,
 } from "@/lib/vendor-core/client";
-import type {
-	VendorCategoryDto,
-	VendorTeamMemberDto,
-} from "@/lib/vendor-core/types";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 
-import {
-	approvalDtoToModel,
-	approvalUiStatusToDecision,
-	bidDtoToModel,
-	certificateDtoToModel,
-	documentDtoToModel,
-	documentModelToCreateInput,
-	documentModelToUpdateInput,
-	invoiceDtoToModel,
-	invoiceModelToCreateInput,
-	invoiceModelToUpdateInput,
-	notificationDtoToModel,
-	onboardingDtoToModel,
-	onboardingStatusToApi,
-	purchaseOrderDtoToModel,
-	purchaseOrderModelToCreateInput,
-	purchaseOrderModelToUpdateInput,
-	rfxDtoToModel,
-	rfxModelToCreateInput,
-	rfxModelToUpdateInput,
-	scorecardDtoToModel,
-} from "./map-procurement-core";
 import { vendorDtoToModel } from "./map-vendor-core";
 import { CURRENT_VENDOR_ID, vmsStore } from "./mock-store";
+import {
+	mapDjangoApproval,
+	mapDjangoBid,
+	mapDjangoCategory,
+	mapDjangoCertificate,
+	mapDjangoContract,
+	mapDjangoDocument,
+	mapDjangoInvoice,
+	mapDjangoNotification,
+	mapDjangoOnboarding,
+	mapDjangoPurchaseOrder,
+	mapDjangoRfx,
+	mapDjangoScorecard,
+	mapDjangoTeamMember,
+} from "./mappers";
 import type {
 	ActivityEventModel,
 	ApprovalRequestModel,
@@ -126,45 +105,6 @@ async function getVendorFromVendorCore(id: string): Promise<VendorModel> {
 	return vendorDtoToModel(dto);
 }
 
-async function vendorNameMap(): Promise<Map<string, string>> {
-	try {
-		const page = await vendorCoreApi.listVendors();
-		return new Map(
-			(page.results ?? []).map((v) => [v.id, v.legal_name || v.name || ""])
-		);
-	} catch {
-		return new Map();
-	}
-}
-
-function mapTeamMember(row: VendorTeamMemberDto): VendorTeamMember {
-	const role = row.role as VendorTeamMember["role"];
-	const allowed: VendorTeamMember["role"][] = [
-		"vendor_admin",
-		"vendor_bidder",
-		"vendor_finance",
-		"vendor_viewer",
-	];
-	return {
-		id: row.id,
-		name: row.name,
-		email: row.email,
-		role: allowed.includes(role) ? role : "vendor_viewer",
-		isActive: row.is_active,
-	};
-}
-
-function mapCategory(row: VendorCategoryDto): VendorCategoryModel {
-	return {
-		id: row.id,
-		name: row.name,
-		code: row.code,
-		description: row.description ?? null,
-		parentId: row.parent_id,
-		vendorCount: 0,
-	};
-}
-
 export const vmsApi = {
 	async listVendors() {
 		if (isMockEnabled()) return mockDelay(vmsStore.listVendors());
@@ -185,17 +125,11 @@ export const vmsApi = {
 		throw new Error("Vendor API unavailable");
 	},
 	async createVendor(
-		input: Parameters<typeof vmsStore.createVendor>[0] & {
-			vendorCode?: string;
-			standardPaymentTermsDays?: number;
-			defaultCurrency?: string;
-			riskScore?: number;
-		}
+		input: Parameters<typeof vmsStore.createVendor>[0]
 	): Promise<VendorModel> {
 		if (isMockEnabled()) return mockDelay(vmsStore.createVendor(input));
 		if (isVendorCoreLive()) {
 			const code =
-				input.vendorCode?.trim() ||
 				input.tags?.[0]?.trim() ||
 				`VND-${Date.now().toString().slice(-8)}`;
 			const dto = await vendorCoreApi.createVendor({
@@ -215,15 +149,12 @@ export const vmsApi = {
 								  input.status === "suspended"
 								? input.status
 								: "active",
-				description: input.description ?? undefined,
-				website: input.website ?? undefined,
-				tax_id: input.taxId ?? undefined,
-				risk_level: input.riskLevel,
-				risk_score: input.riskScore ?? undefined,
-				tags: input.tags ?? [],
-				standard_payment_terms_days:
-					input.standardPaymentTermsDays ?? undefined,
-				default_currency: input.defaultCurrency ?? undefined,
+				metadata: {
+					...(input.categories?.length
+						? { vendor_type: input.categories[0] }
+						: {}),
+					...(input.description ? { description: input.description } : {}),
+				},
 			});
 			return vendorDtoToModel(dto);
 		}
@@ -303,32 +234,9 @@ export const vmsApi = {
 		legalName: string;
 		email: string;
 		categories: string[];
-		note?: string;
-	}): Promise<{
-		vendor: VendorModel;
-		invite: {
-			token: string;
-			expiresAt: string;
-			acceptPath: string;
-			emailDelivery: "link_only";
-		};
-	}> {
-		const contactName = data.email.split("@")[0] ?? data.email;
-		const contacts = [
-			{
-				id: `c-${Date.now()}`,
-				name: contactName,
-				email: data.email,
-				phone: null,
-				role: "Primary",
-				isPrimary: true,
-			},
-		];
-
-		let vendor: VendorModel;
-
+	}) {
 		if (isMockEnabled()) {
-			vendor = await mockDelay(
+			return mockDelay(
 				vmsStore.createVendor({
 					legalName: data.legalName,
 					tradeName: null,
@@ -339,260 +247,631 @@ export const vmsApi = {
 					city: "",
 					taxId: null,
 					website: null,
-					description: data.note?.trim() || null,
+					description: null,
 					riskLevel: "medium",
-					contacts,
+					contacts: [
+						{
+							id: `c-${Date.now()}`,
+							name: data.email.split("@")[0] ?? data.email,
+							email: data.email,
+							phone: null,
+							role: "Primary",
+							isPrimary: true,
+						},
+					],
 				})
 			);
-		} else if (isVendorCoreLive()) {
-			const inviteDto = await vendorCoreApi.inviteVendor({
+		}
+		if (isVendorCoreLive()) {
+			const dto = await vendorCoreApi.inviteVendor({
 				legal_name: data.legalName,
 				email: data.email,
 				categories: data.categories,
 			});
-			if (!inviteDto.vendor_id) {
-				throw new Error("Vendor invite did not return a vendor id.");
-			}
-			const dto = await vendorCoreApi.getVendor(inviteDto.vendor_id);
-			vendor = vendorDtoToModel(dto);
-			const persisted = saveVendorInviteFromServer({
-				token: inviteDto.token,
-				vendorId: inviteDto.vendor_id,
-				legalName: inviteDto.legal_name,
-				email: inviteDto.email,
-				categories: inviteDto.categories,
-				expiresAt: inviteDto.expires_at,
-				note: data.note,
-				createdAt: inviteDto.created_at,
-			});
-			return {
-				vendor,
-				invite: {
-					token: persisted.token,
-					expiresAt: persisted.expiresAt,
-					acceptPath: buildAcceptPath(persisted.token),
-					emailDelivery: "link_only",
-				},
-			};
-		} else if (isNestApiEnabled()) {
-			vendor = await apiClient<VendorModel>(vmsPaths.invite, {
+			return vendorDtoToModel(dto);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel>(vmsPaths.invite, {
 				method: "POST",
 				body: JSON.stringify(data),
 			});
-		} else {
-			throw new Error("Vendor invite unavailable");
 		}
-
-		const invite = createVendorInvite({
-			vendorId: vendor.id,
-			legalName: vendor.legalName,
-			email: data.email,
-			categories: data.categories,
-			note: data.note,
-		});
-
-		return {
-			vendor,
-			invite: {
-				token: invite.token,
-				expiresAt: invite.expiresAt,
-				acceptPath: buildAcceptPath(invite.token),
-				emailDelivery: "link_only",
-			},
-		};
+		throw new Error("Vendor invite unavailable");
 	},
 	async listCategories() {
 		if (isMockEnabled()) return mockDelay(vmsStore.listCategories());
 		if (isVendorCoreLive()) {
-			const page = await vendorCoreApi.listVendorCategories();
-			return (page.results ?? []).map(mapCategory);
+			const page = await vendorCoreApi.listCategories();
+			return (page.results ?? []).map((row) =>
+				mapDjangoCategory(row as Parameters<typeof mapDjangoCategory>[0])
+			);
 		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listCategories()),
-			() =>
-				apiClient<VendorCategoryModel[] | { results?: VendorCategoryModel[] }>(
-					vmsPaths.categories
-				).then(unwrapList)
-		);
+		if (isNestApiEnabled()) {
+			return apiClient<VendorCategoryModel[] | { results?: VendorCategoryModel[] }>(
+				vmsPaths.categories
+			).then(unwrapList);
+		}
+		return [];
 	},
 	async listOnboarding() {
+		if (isMockEnabled()) return mockDelay(vmsStore.listOnboarding());
 		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const page = await vendorCoreApi.listOnboardingCases({ limit: 100 });
-			return (page.results ?? []).map((row) =>
-				onboardingDtoToModel(row, names)
-			);
+			const page = await vendorCoreApi.listOnboarding();
+			return (page.results ?? []).map(mapDjangoOnboarding);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<OnboardingCaseModel[] | { results?: OnboardingCaseModel[] }>(
+				vmsPaths.onboarding
+			).then(unwrapList);
 		}
 		return [];
 	},
 	async getOnboarding(id: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.getOnboarding(id));
 		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			return onboardingDtoToModel(
-				await vendorCoreApi.getOnboardingCase(id),
-				names
-			);
+			return mapDjangoOnboarding(await vendorCoreApi.getOnboarding(id));
 		}
-		return null;
+		if (isNestApiEnabled()) {
+			return apiClient<OnboardingCaseModel>(vmsPaths.onboardingDetail(id));
+		}
+		throw new Error("Onboarding API unavailable");
 	},
 	async updateOnboarding(id: string, patch: Partial<OnboardingCaseModel>) {
-		if (!isVendorCoreLive()) {
-			throw new Error("Onboarding updates require the live API.");
-		}
-		const names = await vendorNameMap();
-		if (patch.status === "submitted") {
-			return onboardingDtoToModel(
-				await vendorCoreApi.submitOnboardingCase(id),
-				names
+		if (isMockEnabled()) return mockDelay(vmsStore.updateOnboarding(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.status !== undefined) body.status = patch.status;
+			if (patch.progress !== undefined) body.progress_percent = patch.progress;
+			if (patch.reviewerNote !== undefined)
+				body.rejection_reason = patch.reviewerNote;
+			return mapDjangoOnboarding(
+				await vendorCoreApi.updateOnboarding(id, body)
 			);
 		}
-		if (patch.status === "approved") {
-			return onboardingDtoToModel(
-				await vendorCoreApi.approveOnboardingCase(id),
-				names
-			);
-		}
-		if (patch.status === "rejected") {
-			return onboardingDtoToModel(
-				await vendorCoreApi.rejectOnboardingCase(id, {
-					rejection_reason: patch.reviewerNote ?? "",
-				}),
-				names
-			);
-		}
-		const body: Record<string, unknown> = {};
-		if (patch.status) body.status = onboardingStatusToApi(patch.status);
-		if (patch.progress != null) body.progress_percent = patch.progress;
-		if (patch.reviewerNote != null) body.rejection_reason = patch.reviewerNote;
-		return onboardingDtoToModel(
-			await vendorCoreApi.updateOnboardingCase(id, body),
-			names
-		);
-	},
-	async seedOnboarding(_force = false) {
-		if (!isVendorCoreLive()) {
-			throw new Error("Onboarding seed requires the live API.");
-		}
-		// Use only deployed routes (create + list). Do not depend on /onboarding/seed/.
-		const vendors = (await vendorCoreApi.listVendors()).results ?? [];
-		const existing = await vendorCoreApi.listOnboardingCases({ limit: 100 });
-		const haveVendor = new Set(
-			(existing.results ?? []).map((row) => String(row.vendor_id ?? ""))
-		);
-		// Paginate existing if more than one page
-		let offset = 100;
-		const total = existing.count ?? haveVendor.size;
-		while (haveVendor.size < total) {
-			const page = await vendorCoreApi.listOnboardingCases({
-				limit: 100,
-				offset,
+		if (isNestApiEnabled()) {
+			return apiClient<OnboardingCaseModel>(vmsPaths.onboardingDetail(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
 			});
-			for (const row of page.results ?? []) {
-				haveVendor.add(String(row.vendor_id ?? ""));
-			}
-			if (!(page.results ?? []).length) break;
-			offset += 100;
 		}
-
-		let created = 0;
-		for (const vendor of vendors) {
-			if (haveVendor.has(vendor.id)) continue;
-			try {
-				await vendorCoreApi.createOnboardingCase({ vendor_id: vendor.id });
-				created += 1;
-			} catch (createErr) {
-				if (
-					createErr instanceof VendorCoreApiError &&
-					(createErr.status === 400 || createErr.status === 409)
-				) {
-					continue;
-				}
-				throw createErr;
-			}
-		}
-		return {
-			created,
-			files_written: 0,
-			vendor_count: vendors.length,
-		};
+		throw new Error("Onboarding update unavailable");
 	},
 	async listDocuments(vendorId?: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.listDocuments(vendorId));
 		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const page = await vendorCoreApi.listDocuments({
-				vendor_id: vendorId,
-				limit: 100,
-			});
-			return (page.results ?? []).map((row) =>
-				documentDtoToModel(row as unknown as Record<string, unknown>, names)
+			const page = await vendorCoreApi.listDocuments(
+				vendorId ? { vendor_id: vendorId } : undefined
 			);
+			return (page.results ?? []).map(mapDjangoDocument);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<DocumentModel[] | { results?: DocumentModel[] }>(
+				vmsPaths.documents,
+				vendorId ? { params: { vendorId } } : undefined
+			).then(unwrapList);
 		}
 		return [];
 	},
 	async getDocument(id: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.getDocument(id));
 		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const row = await vendorCoreApi.getDocument(id);
-			return documentDtoToModel(
-				row as unknown as Record<string, unknown>,
-				names
-			);
+			return mapDjangoDocument(await vendorCoreApi.getDocument(id));
 		}
-		return null;
+		if (isNestApiEnabled()) {
+			return apiClient<DocumentModel>(vmsPaths.document(id));
+		}
+		throw new Error("Document API unavailable");
 	},
 	async updateDocument(id: string, patch: Partial<DocumentModel>) {
-		if (!isVendorCoreLive()) {
-			throw new Error("Document updates require the live API.");
+		if (isMockEnabled()) return mockDelay(vmsStore.updateDocument(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.name !== undefined) body.title = patch.name;
+			if (patch.status !== undefined) body.status = patch.status;
+			if (patch.type !== undefined) body.document_type = patch.type;
+			if (patch.expiresAt !== undefined) body.expires_at = patch.expiresAt;
+			return mapDjangoDocument(await vendorCoreApi.updateDocument(id, body));
 		}
-		const names = await vendorNameMap();
-		const row = await vendorCoreApi.updateDocument(
-			id,
-			documentModelToUpdateInput(patch)
-		);
-		return documentDtoToModel(row as unknown as Record<string, unknown>, names);
+		if (isNestApiEnabled()) {
+			return apiClient<DocumentModel>(vmsPaths.document(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			});
+		}
+		throw new Error("Document update unavailable");
 	},
 	async addDocument(doc: Parameters<typeof vmsStore.addDocument>[0]) {
-		if (!isVendorCoreLive()) {
-			throw new Error("Document create requires the live API.");
+		if (isMockEnabled()) return mockDelay(vmsStore.addDocument(doc));
+		if (isVendorCoreLive()) {
+			return mapDjangoDocument(
+				await vendorCoreApi.createDocument({
+					vendor: doc.vendorId,
+					document_type: doc.type,
+					title: doc.name,
+					status: doc.status,
+					expires_at: doc.expiresAt,
+				})
+			);
 		}
-		const names = await vendorNameMap();
-		const row = await vendorCoreApi.createDocument(
-			documentModelToCreateInput({
-				vendorId: doc.vendorId,
-				name: doc.name,
-				type: doc.type,
-				status: doc.status,
-				expiresAt: doc.expiresAt,
-				fileSizeKb: doc.fileSizeKb,
-				checksum: doc.checksum,
-			}) as import("@/lib/vendor-core/types").ProcurementDocumentCreateInput
-		);
-		return documentDtoToModel(row as unknown as Record<string, unknown>, names);
+		if (isNestApiEnabled()) {
+			return apiClient<DocumentModel>(vmsPaths.documents, {
+				method: "POST",
+				body: JSON.stringify(doc),
+			});
+		}
+		throw new Error("Document create unavailable");
 	},
 	async listCertificates() {
-		if (!isVendorCoreLive()) return [];
-		const names = await vendorNameMap();
-		const page = await vendorCoreApi.listCertificates({ limit: 100 });
-		return (page.results ?? []).map((row) => certificateDtoToModel(row, names));
-	},
-	async updateCertificate(
-		id: string,
-		patch: {
-			status?:
-				| "valid"
-				| "revoked"
-				| "expired"
-				| "expiring_soon"
-				| "pending_verification";
+		if (isMockEnabled()) return mockDelay(vmsStore.listCertificates());
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listCertificates();
+			return (page.results ?? []).map(mapDjangoCertificate);
 		}
+		if (isNestApiEnabled()) {
+			return apiClient<CertificateModel[] | { results?: CertificateModel[] }>(
+				vmsPaths.certificates
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async listContracts(vendorId?: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.listContracts(vendorId));
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listContracts(
+				vendorId ? { vendor_id: vendorId } : undefined
+			);
+			return (page.results ?? []).map(mapDjangoContract);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<ContractModel[] | { results?: ContractModel[] }>(
+				vmsPaths.contracts,
+				vendorId ? { params: { vendorId } } : undefined
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async getContract(id: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.getContract(id));
+		if (isVendorCoreLive()) {
+			return mapDjangoContract(await vendorCoreApi.getContract(id));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<ContractModel>(vmsPaths.contract(id));
+		}
+		throw new Error("Contract API unavailable");
+	},
+	async createContract(input: Omit<ContractModel, "id" | "updatedAt">) {
+		if (isMockEnabled()) return mockDelay(vmsStore.createContract(input));
+		if (isVendorCoreLive()) {
+			return mapDjangoContract(
+				await vendorCoreApi.createContract({
+					vendor: input.vendorId,
+					contract_number: input.number,
+					title: input.title,
+					status: input.status,
+					effective_date: input.startDate,
+					expiration_date: input.endDate,
+					total_contract_value: input.value,
+					currency: input.currency,
+				})
+			);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<ContractModel>(vmsPaths.contracts, {
+				method: "POST",
+				body: JSON.stringify(input),
+			});
+		}
+		throw new Error("Contract create unavailable");
+	},
+	async updateContract(id: string, patch: Partial<ContractModel>) {
+		if (isMockEnabled()) return mockDelay(vmsStore.updateContract(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.title !== undefined) body.title = patch.title;
+			if (patch.status !== undefined) body.status = patch.status;
+			if (patch.number !== undefined) body.contract_number = patch.number;
+			if (patch.value !== undefined) body.total_contract_value = patch.value;
+			if (patch.currency !== undefined) body.currency = patch.currency;
+			if (patch.startDate !== undefined) body.effective_date = patch.startDate;
+			if (patch.endDate !== undefined) body.expiration_date = patch.endDate;
+			return mapDjangoContract(await vendorCoreApi.updateContract(id, body));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<ContractModel>(vmsPaths.contract(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			});
+		}
+		throw new Error("Contract update unavailable");
+	},
+	async listRfx() {
+		if (isMockEnabled()) return mockDelay(vmsStore.listRfx());
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listRfx();
+			return (page.results ?? []).map(mapDjangoRfx);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<RfxModel[] | { results?: RfxModel[] }>(vmsPaths.rfx).then(
+				unwrapList
+			);
+		}
+		return [];
+	},
+	async getRfx(id: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.getRfx(id));
+		if (isVendorCoreLive()) {
+			return mapDjangoRfx(await vendorCoreApi.getRfx(id));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<RfxModel>(vmsPaths.rfxDetail(id));
+		}
+		throw new Error("RFX API unavailable");
+	},
+	async createRfx(input: Omit<RfxModel, "id" | "updatedAt" | "bidCount">) {
+		if (isMockEnabled()) return mockDelay(vmsStore.createRfx(input));
+		if (isVendorCoreLive()) {
+			return mapDjangoRfx(
+				await vendorCoreApi.createRfx({
+					reference_number: input.number,
+					title: input.title,
+					rfx_type: input.type.toLowerCase(),
+					status: input.status,
+					description: input.description,
+					bid_submission_deadline: input.closesAt,
+				})
+			);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<RfxModel>(vmsPaths.rfx, {
+				method: "POST",
+				body: JSON.stringify(input),
+			});
+		}
+		throw new Error("RFX create unavailable");
+	},
+	async updateRfx(id: string, patch: Partial<RfxModel>) {
+		if (isMockEnabled()) return mockDelay(vmsStore.updateRfx(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.title !== undefined) body.title = patch.title;
+			if (patch.status !== undefined) body.status = patch.status;
+			if (patch.description !== undefined) body.description = patch.description;
+			if (patch.closesAt !== undefined)
+				body.bid_submission_deadline = patch.closesAt;
+			if (patch.number !== undefined) body.reference_number = patch.number;
+			if (patch.type !== undefined) body.rfx_type = patch.type.toLowerCase();
+			return mapDjangoRfx(await vendorCoreApi.updateRfx(id, body));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<RfxModel>(vmsPaths.rfxDetail(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			});
+		}
+		throw new Error("RFX update unavailable");
+	},
+	async listBids(rfxId?: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.listBids(rfxId));
+		if (isVendorCoreLive()) {
+			if (!rfxId) return [];
+			const page = await vendorCoreApi.listRfxBids(rfxId);
+			return (page.results ?? []).map((row) => mapDjangoBid(row, rfxId));
+		}
+		if (isNestApiEnabled()) {
+			return rfxId
+				? apiClient<BidModel[] | { results?: BidModel[] }>(
+						vmsPaths.rfxBids(rfxId)
+					).then(unwrapList)
+				: apiClient<BidModel[] | { results?: BidModel[] }>(vmsPaths.bids).then(
+						unwrapList
+					);
+		}
+		return [];
+	},
+	async submitBid(input: Omit<BidModel, "id" | "submittedAt" | "status">) {
+		if (isMockEnabled()) return mockDelay(vmsStore.submitBid(input));
+		if (isVendorCoreLive()) {
+			return mapDjangoBid(
+				await vendorCoreApi.createRfxBid(input.rfxId, {
+					vendor: input.vendorId,
+					amount: input.amount,
+					currency: input.currency,
+					notes: input.notes,
+				}),
+				input.rfxId
+			);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<BidModel>(vmsPaths.rfxBids(input.rfxId), {
+				method: "POST",
+				body: JSON.stringify(input),
+			});
+		}
+		throw new Error("Bid submit unavailable");
+	},
+	async listPurchaseOrders(vendorId?: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.listPurchaseOrders(vendorId));
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listPurchaseOrders(
+				vendorId ? { vendor_id: vendorId } : undefined
+			);
+			return (page.results ?? []).map(mapDjangoPurchaseOrder);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<PurchaseOrderModel[] | { results?: PurchaseOrderModel[] }>(
+				vmsPaths.purchaseOrders,
+				{ params: vendorId ? { vendorId } : undefined }
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async getPurchaseOrder(id: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.getPurchaseOrder(id));
+		if (isVendorCoreLive()) {
+			return mapDjangoPurchaseOrder(await vendorCoreApi.getPurchaseOrder(id));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrder(id));
+		}
+		throw new Error("Purchase order API unavailable");
+	},
+	async createPurchaseOrder(
+		input: Omit<PurchaseOrderModel, "id" | "updatedAt" | "acknowledgedAt">
 	) {
-		if (!isVendorCoreLive()) {
-			throw new Error("Certificate updates require the live API.");
+		if (isMockEnabled()) return mockDelay(vmsStore.createPurchaseOrder(input));
+		if (isVendorCoreLive()) {
+			return mapDjangoPurchaseOrder(
+				await vendorCoreApi.createPurchaseOrder({
+					vendor: input.vendorId,
+					po_number: input.number,
+					status: input.status,
+					currency: input.currency,
+					total_amount: input.total,
+					contract: input.contractId,
+					rfx: input.rfxId,
+				})
+			);
 		}
-		const names = await vendorNameMap();
-		const row = await vendorCoreApi.updateCertificate(id, patch);
-		return certificateDtoToModel(row, names);
+		if (isNestApiEnabled()) {
+			return apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrders, {
+				method: "POST",
+				body: JSON.stringify(input),
+			});
+		}
+		throw new Error("Purchase order create unavailable");
 	},
+	async updatePurchaseOrder(id: string, patch: Partial<PurchaseOrderModel>) {
+		if (isMockEnabled())
+			return mockDelay(vmsStore.updatePurchaseOrder(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.status !== undefined) body.status = patch.status;
+			if (patch.total !== undefined) body.total_amount = patch.total;
+			if (patch.currency !== undefined) body.currency = patch.currency;
+			if (patch.number !== undefined) body.po_number = patch.number;
+			return mapDjangoPurchaseOrder(
+				await vendorCoreApi.updatePurchaseOrder(id, body)
+			);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrder(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			});
+		}
+		throw new Error("Purchase order update unavailable");
+	},
+	async listInvoices(vendorId?: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.listInvoices(vendorId));
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listInvoices(
+				vendorId ? { vendor_id: vendorId } : undefined
+			);
+			return (page.results ?? []).map(mapDjangoInvoice);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<InvoiceModel[] | { results?: InvoiceModel[] }>(
+				vmsPaths.invoices,
+				vendorId ? { params: { vendorId } } : undefined
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async getInvoice(id: string) {
+		if (isMockEnabled()) return mockDelay(vmsStore.getInvoice(id));
+		if (isVendorCoreLive()) {
+			return mapDjangoInvoice(await vendorCoreApi.getInvoice(id));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<InvoiceModel>(vmsPaths.invoice(id));
+		}
+		throw new Error("Invoice API unavailable");
+	},
+	async createInvoice(input: Omit<InvoiceModel, "id" | "updatedAt">) {
+		if (isMockEnabled()) return mockDelay(vmsStore.createInvoice(input));
+		if (isVendorCoreLive()) {
+			return mapDjangoInvoice(
+				await vendorCoreApi.createInvoice({
+					vendor: input.vendorId,
+					invoice_number: input.number,
+					status: input.status,
+					amount: input.amount,
+					currency: input.currency,
+					purchase_order: input.poId,
+					due_date: input.dueDate,
+				})
+			);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<InvoiceModel>(vmsPaths.invoices, {
+				method: "POST",
+				body: JSON.stringify(input),
+			});
+		}
+		throw new Error("Invoice create unavailable");
+	},
+	async updateInvoice(id: string, patch: Partial<InvoiceModel>) {
+		if (isMockEnabled()) return mockDelay(vmsStore.updateInvoice(id, patch));
+		if (isVendorCoreLive()) {
+			const body: Record<string, unknown> = {};
+			if (patch.status !== undefined) body.status = patch.status;
+			if (patch.amount !== undefined) body.amount = patch.amount;
+			if (patch.currency !== undefined) body.currency = patch.currency;
+			if (patch.number !== undefined) body.invoice_number = patch.number;
+			if (patch.dueDate !== undefined) body.due_date = patch.dueDate;
+			return mapDjangoInvoice(await vendorCoreApi.updateInvoice(id, body));
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<InvoiceModel>(vmsPaths.invoice(id), {
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			});
+		}
+		throw new Error("Invoice update unavailable");
+	},
+	async listApprovals() {
+		if (isMockEnabled()) return mockDelay(vmsStore.listApprovals());
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listApprovals();
+			return (page.results ?? []).map(mapDjangoApproval);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<
+				ApprovalRequestModel[] | { results?: ApprovalRequestModel[] }
+			>(vmsPaths.approvals).then(unwrapList);
+		}
+		return [];
+	},
+	async updateApproval(
+		id: string,
+		status: "approved" | "rejected" | "changes_requested" | "pending"
+	) {
+		if (isMockEnabled()) return mockDelay(vmsStore.updateApproval(id, status));
+		if (isVendorCoreLive()) {
+			return mapDjangoApproval(
+				await vendorCoreApi.updateApproval(id, { status })
+			);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<ApprovalRequestModel>(vmsPaths.approval(id), {
+				method: "PATCH",
+				body: JSON.stringify({ status }),
+			});
+		}
+		throw new Error("Approval update unavailable");
+	},
+	async listScorecards() {
+		if (isMockEnabled()) return mockDelay(vmsStore.listScorecards());
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listScorecards();
+			return (page.results ?? []).map(mapDjangoScorecard);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<ScorecardModel[] | { results?: ScorecardModel[] }>(
+				vmsPaths.scorecards
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async listActivities(vendorId?: string) {
+		return withMockOrRemote(
+			() => mockDelay(vmsStore.listActivities(vendorId)),
+			() =>
+				apiClient<ActivityEventModel[] | { results?: ActivityEventModel[] }>(
+					vmsPaths.activities,
+					{
+						params: vendorId ? { vendorId } : undefined,
+					}
+				).then(unwrapList)
+		);
+	},
+	async listNotifications() {
+		if (isMockEnabled()) return mockDelay(vmsStore.listNotifications());
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listNotifications();
+			return (page.results ?? []).map(mapDjangoNotification);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<NotificationModel[] | { results?: NotificationModel[] }>(
+				vmsPaths.notifications
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async markNotificationRead(id: string) {
+		if (isMockEnabled()) {
+			vmsStore.markNotificationRead(id);
+			return mockDelay(true);
+		}
+		if (isVendorCoreLive()) {
+			await vendorCoreApi.markNotificationRead(id);
+			return true;
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<boolean>(vmsPaths.notificationRead(id), {
+				method: "POST",
+			});
+		}
+		return false;
+	},
+	async listTeam() {
+		if (isMockEnabled()) return mockDelay(vmsStore.listTeam());
+		if (isVendorCoreLive()) {
+			const page = await vendorCoreApi.listVendorTeam();
+			return (page.results ?? []).map(mapDjangoTeamMember);
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<VendorTeamMember[] | { results?: VendorTeamMember[] }>(
+				vmsPaths.team
+			).then(unwrapList);
+		}
+		return [];
+	},
+	async getCurrentVendor() {
+		if (isMockEnabled()) return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
+		if (isVendorCoreLive()) {
+			const raw = await vendorCoreApi.getVendorMe();
+			const legalName = String(raw.legal_name ?? raw.name ?? "");
+			const code = String(raw.vendor_code ?? "");
+			return vendorDtoToModel({
+				id: String(raw.id ?? ""),
+				vendor_code: code,
+				legal_name: legalName,
+				trade_name: raw.trade_name != null ? String(raw.trade_name) : null,
+				status: String(raw.status ?? "prospect"),
+				country: raw.country != null ? String(raw.country) : null,
+				city: raw.city != null ? String(raw.city) : null,
+				metadata:
+					raw.metadata && typeof raw.metadata === "object"
+						? (raw.metadata as Record<string, unknown>)
+						: {},
+				code,
+				name: legalName,
+			});
+		}
+		if (isNestApiEnabled()) {
+			return apiClient<VendorModel>(vmsPaths.me);
+		}
+		throw new Error("Current vendor API unavailable");
+	},
+	currentVendorId: CURRENT_VENDOR_ID,
+	/** Whether this client is serving mock fixtures. */
+	get isMock() {
+		return isMockEnabled();
+	},
+	async awardRfx(id: string, bidId: string) {
+		if (!isVendorCoreLive()) {
+			throw new Error("Awarding an RFX requires the live API.");
+		}
+		return mapDjangoRfx(
+			(await vendorCoreApi.awardRfx(id, { bid_id: bidId })) as Record<
+				string,
+				unknown
+			>
+		);
+	},
+
 	async seedCertificates() {
 		if (!isVendorCoreLive()) {
 			throw new Error("Certificate seed requires the live API.");
@@ -684,351 +963,7 @@ export const vmsApi = {
 		}
 		return { created, vendor_count: vendors.length };
 	},
-	async listContracts(vendorId?: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.listContracts(vendorId));
-		if (isVendorCoreLive()) {
-			const page = await vendorCoreApi.listContracts({
-				vendor_id: vendorId,
-				limit: 100,
-			});
-			return (page.results ?? []).map(contractDtoToModel);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listContracts(vendorId)),
-			() =>
-				apiClient<ContractModel[] | { results?: ContractModel[] }>(
-					vmsPaths.contracts,
-					vendorId ? { params: { vendorId } } : undefined
-				).then(unwrapList)
-		);
-	},
-	async getContract(id: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.getContract(id));
-		if (isVendorCoreLive())
-			return contractDtoToModel(await vendorCoreApi.getContract(id));
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.getContract(id)),
-			() => apiClient<ContractModel>(vmsPaths.contract(id))
-		);
-	},
-	async createContract(input: Omit<ContractModel, "id" | "updatedAt">) {
-		if (isMockEnabled()) return mockDelay(vmsStore.createContract(input));
-		if (isVendorCoreLive()) {
-			const dto = await vendorCoreApi.createContract({
-				vendor_id: input.vendorId,
-				contract_number: input.number,
-				title: input.title,
-				contract_type: input.contractType ?? "msa",
-				status: input.status,
-				effective_date: input.startDate,
-				expiration_date: input.endDate,
-				total_contract_value: input.value,
-				currency: input.currency,
-			});
-			return contractDtoToModel(dto);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.createContract(input)),
-			() =>
-				apiClient<ContractModel>(vmsPaths.contracts, {
-					method: "POST",
-					body: JSON.stringify(input),
-				})
-		);
-	},
-	async updateContract(id: string, patch: Partial<ContractModel>) {
-		if (isMockEnabled()) return mockDelay(vmsStore.updateContract(id, patch));
-		if (isVendorCoreLive()) {
-			const dto = await vendorCoreApi.updateContract(id, {
-				title: patch.title,
-				status: patch.status,
-				effective_date: patch.startDate,
-				expiration_date: patch.endDate,
-				total_contract_value: patch.value,
-				currency: patch.currency,
-				contract_number: patch.number,
-			});
-			return contractDtoToModel(dto);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.updateContract(id, patch)),
-			() =>
-				apiClient<ContractModel>(vmsPaths.contract(id), {
-					method: "PATCH",
-					body: JSON.stringify(patch),
-				})
-		);
-	},
-	async listRfx() {
-		if (isMockEnabled()) return mockDelay(vmsStore.listRfx());
-		if (isVendorCoreLive()) {
-			const page = await vendorCoreApi.listRfx({ limit: 100 });
-			return (page.results ?? []).map((row) => rfxDtoToModel(row));
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listRfx()),
-			() =>
-				apiClient<RfxModel[] | { results?: RfxModel[] }>(vmsPaths.rfx).then(
-					unwrapList
-				)
-		);
-	},
-	async getRfx(id: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.getRfx(id));
-		if (isVendorCoreLive()) {
-			const row = await vendorCoreApi.getRfx(id);
-			const bids = await vendorCoreApi.listRfxBids(id, { limit: 100 });
-			return rfxDtoToModel(row, bids.results?.length ?? 0);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.getRfx(id)),
-			() => apiClient<RfxModel>(vmsPaths.rfxDetail(id))
-		);
-	},
-	async createRfx(input: Omit<RfxModel, "id" | "updatedAt" | "bidCount">) {
-		if (isMockEnabled()) return mockDelay(vmsStore.createRfx(input));
-		if (isVendorCoreLive()) {
-			return rfxDtoToModel(
-				await vendorCoreApi.createRfx(rfxModelToCreateInput(input))
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.createRfx(input)),
-			() =>
-				apiClient<RfxModel>(vmsPaths.rfx, {
-					method: "POST",
-					body: JSON.stringify(input),
-				})
-		);
-	},
-	async awardRfx(id: string, bidId: string) {
-		if (!isVendorCoreLive()) {
-			throw new Error("Awarding an RFX requires the live API.");
-		}
-		return rfxDtoToModel(await vendorCoreApi.awardRfx(id, { bid_id: bidId }));
-	},
-	async updateRfx(id: string, patch: Partial<RfxModel>) {
-		if (isMockEnabled()) return mockDelay(vmsStore.updateRfx(id, patch));
-		if (isVendorCoreLive()) {
-			if (patch.status === "published") {
-				return rfxDtoToModel(await vendorCoreApi.publishRfx(id));
-			}
-			return rfxDtoToModel(
-				await vendorCoreApi.updateRfx(id, rfxModelToUpdateInput(patch))
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.updateRfx(id, patch)),
-			() =>
-				apiClient<RfxModel>(vmsPaths.rfxDetail(id), {
-					method: "PATCH",
-					body: JSON.stringify(patch),
-				})
-		);
-	},
-	async listBids(rfxId?: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.listBids(rfxId));
-		if (isVendorCoreLive()) {
-			if (!rfxId) return [];
-			const names = await vendorNameMap();
-			const rfx = await vendorCoreApi.getRfx(rfxId);
-			const page = await vendorCoreApi.listRfxBids(rfxId, { limit: 100 });
-			return (page.results ?? []).map((row) => {
-				const bid = bidDtoToModel(row, String(rfx.title ?? ""));
-				bid.vendorName = names.get(bid.vendorId) || bid.vendorName;
-				return bid;
-			});
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listBids(rfxId)),
-			() =>
-				rfxId
-					? apiClient<BidModel[] | { results?: BidModel[] }>(
-							vmsPaths.rfxBids(rfxId)
-						).then(unwrapList)
-					: apiClient<BidModel[] | { results?: BidModel[] }>(
-							vmsPaths.bids
-						).then(unwrapList)
-		);
-	},
-	async submitBid(input: Omit<BidModel, "id" | "submittedAt" | "status">) {
-		if (isMockEnabled()) return mockDelay(vmsStore.submitBid(input));
-		if (isVendorCoreLive()) {
-			const row = await vendorCoreApi.createRfxBid(input.rfxId, {
-				vendor_id: input.vendorId,
-				total_amount: input.amount,
-				currency: input.currency,
-				status: "submitted",
-			});
-			return bidDtoToModel(row, input.rfxTitle);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.submitBid(input)),
-			() =>
-				apiClient<BidModel>(vmsPaths.rfxBids(input.rfxId), {
-					method: "POST",
-					body: JSON.stringify(input),
-				})
-		);
-	},
-	async listPurchaseOrders(vendorId?: string) {
-		if (isMockEnabled())
-			return mockDelay(vmsStore.listPurchaseOrders(vendorId));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const page = await vendorCoreApi.listPurchaseOrders({
-				vendor_id: vendorId,
-				limit: 100,
-			});
-			return (page.results ?? []).map((row) =>
-				purchaseOrderDtoToModel(row, names)
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listPurchaseOrders(vendorId)),
-			() =>
-				apiClient<PurchaseOrderModel[] | { results?: PurchaseOrderModel[] }>(
-					vmsPaths.purchaseOrders,
-					{ params: vendorId ? { vendorId } : undefined }
-				).then(unwrapList)
-		);
-	},
-	async getPurchaseOrder(id: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.getPurchaseOrder(id));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			return purchaseOrderDtoToModel(
-				await vendorCoreApi.getPurchaseOrder(id),
-				names
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.getPurchaseOrder(id)),
-			() => apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrder(id))
-		);
-	},
-	async createPurchaseOrder(
-		input: Omit<PurchaseOrderModel, "id" | "updatedAt" | "acknowledgedAt">
-	) {
-		if (isMockEnabled()) return mockDelay(vmsStore.createPurchaseOrder(input));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			return purchaseOrderDtoToModel(
-				await vendorCoreApi.createPurchaseOrder(
-					purchaseOrderModelToCreateInput(input)
-				),
-				names
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.createPurchaseOrder(input)),
-			() =>
-				apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrders, {
-					method: "POST",
-					body: JSON.stringify(input),
-				})
-		);
-	},
-	async updatePurchaseOrder(id: string, patch: Partial<PurchaseOrderModel>) {
-		if (isMockEnabled())
-			return mockDelay(vmsStore.updatePurchaseOrder(id, patch));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			if (patch.status === "acknowledged") {
-				return purchaseOrderDtoToModel(
-					await vendorCoreApi.acknowledgePurchaseOrder(id),
-					names
-				);
-			}
-			if (patch.status === "received") {
-				return purchaseOrderDtoToModel(
-					await vendorCoreApi.receivePurchaseOrder(id),
-					names
-				);
-			}
-			return purchaseOrderDtoToModel(
-				await vendorCoreApi.updatePurchaseOrder(
-					id,
-					purchaseOrderModelToUpdateInput(patch)
-				),
-				names
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.updatePurchaseOrder(id, patch)),
-			() =>
-				apiClient<PurchaseOrderModel>(vmsPaths.purchaseOrder(id), {
-					method: "PATCH",
-					body: JSON.stringify(patch),
-				})
-		);
-	},
-	async listInvoices(vendorId?: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.listInvoices(vendorId));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const [page, pos] = await Promise.all([
-				vendorCoreApi.listInvoices({ vendor_id: vendorId, limit: 100 }),
-				vendorCoreApi.listPurchaseOrders({ limit: 100 }),
-			]);
-			const poNumbers = new Map(
-				(pos.results ?? []).map((row) => [
-					String(row.id ?? ""),
-					String(row.po_number ?? ""),
-				])
-			);
-			return (page.results ?? []).map((row) =>
-				invoiceDtoToModel(row, names, poNumbers)
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listInvoices(vendorId)),
-			() =>
-				apiClient<InvoiceModel[] | { results?: InvoiceModel[] }>(
-					vmsPaths.invoices,
-					vendorId ? { params: { vendorId } } : undefined
-				).then(unwrapList)
-		);
-	},
-	async getInvoice(id: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.getInvoice(id));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const [row, pos] = await Promise.all([
-				vendorCoreApi.getInvoice(id),
-				vendorCoreApi.listPurchaseOrders({ limit: 100 }),
-			]);
-			const poNumbers = new Map(
-				(pos.results ?? []).map((item) => [
-					String(item.id ?? ""),
-					String(item.po_number ?? ""),
-				])
-			);
-			return invoiceDtoToModel(row, names, poNumbers);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.getInvoice(id)),
-			() => apiClient<InvoiceModel>(vmsPaths.invoice(id))
-		);
-	},
-	async createInvoice(input: Omit<InvoiceModel, "id" | "updatedAt">) {
-		if (isMockEnabled()) return mockDelay(vmsStore.createInvoice(input));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			return invoiceDtoToModel(
-				await vendorCoreApi.createInvoice(invoiceModelToCreateInput(input)),
-				names
-			);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.createInvoice(input)),
-			() =>
-				apiClient<InvoiceModel>(vmsPaths.invoices, {
-					method: "POST",
-					body: JSON.stringify(input),
-				})
-		);
-	},
+
 	async seedInvoices() {
 		if (!isVendorCoreLive()) {
 			throw new Error("Invoice seed requires the live API.");
@@ -1121,162 +1056,71 @@ export const vmsApi = {
 		}
 		return { created, vendor_count: vendors.length };
 	},
-	async updateInvoice(id: string, patch: Partial<InvoiceModel>) {
-		if (isMockEnabled()) return mockDelay(vmsStore.updateInvoice(id, patch));
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			if (patch.status === "matched") {
-				return invoiceDtoToModel(await vendorCoreApi.matchInvoice(id), names);
-			}
-			if (patch.status === "disputed") {
-				return invoiceDtoToModel(await vendorCoreApi.disputeInvoice(id), names);
-			}
-			if (patch.status === "approved") {
-				return invoiceDtoToModel(await vendorCoreApi.approveInvoice(id), names);
-			}
-			return invoiceDtoToModel(
-				await vendorCoreApi.updateInvoice(id, invoiceModelToUpdateInput(patch)),
-				names
-			);
+
+	async seedOnboarding(_force = false) {
+		if (!isVendorCoreLive()) {
+			throw new Error("Onboarding seed requires the live API.");
 		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.updateInvoice(id, patch)),
-			() =>
-				apiClient<InvoiceModel>(vmsPaths.invoice(id), {
-					method: "PATCH",
-					body: JSON.stringify(patch),
-				})
+		// Use only deployed routes (create + list). Do not depend on /onboarding/seed/.
+		const vendors = (await vendorCoreApi.listVendors()).results ?? [];
+		const existing = await vendorCoreApi.listOnboardingCases({ limit: 100 });
+		const haveVendor = new Set(
+			(existing.results ?? []).map((row) => String(row.vendor_id ?? ""))
 		);
-	},
-	async listApprovals() {
-		if (isMockEnabled()) return mockDelay(vmsStore.listApprovals());
-		if (isVendorCoreLive()) {
-			const page = await vendorCoreApi.listApprovals({ limit: 100 });
-			return (page.results ?? []).map(approvalDtoToModel);
+		// Paginate existing if more than one page
+		let offset = 100;
+		const total = existing.count ?? haveVendor.size;
+		while (haveVendor.size < total) {
+			const page = await vendorCoreApi.listOnboardingCases({
+				limit: 100,
+				offset,
+			});
+			for (const row of page.results ?? []) {
+				haveVendor.add(String(row.vendor_id ?? ""));
+			}
+			if (!(page.results ?? []).length) break;
+			offset += 100;
 		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listApprovals()),
-			() =>
-				apiClient<
-					ApprovalRequestModel[] | { results?: ApprovalRequestModel[] }
-				>(vmsPaths.approvals).then(unwrapList)
-		);
+
+		let created = 0;
+		for (const vendor of vendors) {
+			if (haveVendor.has(vendor.id)) continue;
+			try {
+				await vendorCoreApi.createOnboardingCase({ vendor_id: vendor.id });
+				created += 1;
+			} catch (createErr) {
+				if (
+					createErr instanceof VendorCoreApiError &&
+					(createErr.status === 400 || createErr.status === 409)
+				) {
+					continue;
+				}
+				throw createErr;
+			}
+		}
+		return {
+			created,
+			files_written: 0,
+			vendor_count: vendors.length,
+		};
 	},
-	async updateApproval(
+
+	async updateCertificate(
 		id: string,
-		status: "approved" | "rejected" | "changes_requested" | "pending"
+		patch: {
+			status?:
+				| "valid"
+				| "revoked"
+				| "expired"
+				| "expiring_soon"
+				| "pending_verification";
+		}
 	) {
-		if (isMockEnabled()) return mockDelay(vmsStore.updateApproval(id, status));
-		if (isVendorCoreLive()) {
-			const decision = approvalUiStatusToDecision(status);
-			if (decision) {
-				return approvalDtoToModel(
-					await vendorCoreApi.decideApproval(id, { decision })
-				);
-			}
-			return approvalDtoToModel(
-				await vendorCoreApi.updateApproval(id, { status: "pending" })
-			);
+		if (!isVendorCoreLive()) {
+			throw new Error("Certificate updates require the live API.");
 		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.updateApproval(id, status)),
-			() =>
-				apiClient<ApprovalRequestModel>(vmsPaths.approval(id), {
-					method: "PATCH",
-					body: JSON.stringify({ status }),
-				})
-		);
+		const row = await vendorCoreApi.updateCertificate(id, patch);
+		return mapDjangoCertificate(row as Record<string, unknown>);
 	},
-	async listScorecards() {
-		if (isMockEnabled()) return mockDelay(vmsStore.listScorecards());
-		if (isVendorCoreLive()) {
-			const names = await vendorNameMap();
-			const page = await vendorCoreApi.listScorecards({ limit: 100 });
-			return (page.results ?? []).map((row) => scorecardDtoToModel(row, names));
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listScorecards()),
-			() =>
-				apiClient<ScorecardModel[] | { results?: ScorecardModel[] }>(
-					vmsPaths.scorecards
-				).then(unwrapList)
-		);
-	},
-	async listActivities(vendorId?: string) {
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listActivities(vendorId)),
-			() =>
-				apiClient<ActivityEventModel[] | { results?: ActivityEventModel[] }>(
-					vmsPaths.activities,
-					{
-						params: vendorId ? { vendorId } : undefined,
-					}
-				).then(unwrapList)
-		);
-	},
-	async listNotifications() {
-		if (isMockEnabled()) return mockDelay(vmsStore.listNotifications());
-		if (isVendorCoreLive()) {
-			const page = await vendorCoreApi.listNotifications({ limit: 100 });
-			return (page.results ?? []).map(notificationDtoToModel);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listNotifications()),
-			() =>
-				apiClient<NotificationModel[] | { results?: NotificationModel[] }>(
-					vmsPaths.notifications
-				).then(unwrapList)
-		);
-	},
-	async markNotificationRead(id: string) {
-		if (isMockEnabled()) {
-			vmsStore.markNotificationRead(id);
-			return mockDelay(true);
-		}
-		if (isVendorCoreLive()) {
-			await vendorCoreApi.markNotificationRead(id);
-			return true;
-		}
-		return withMockOrRemote(
-			() => {
-				vmsStore.markNotificationRead(id);
-				return mockDelay(true);
-			},
-			() =>
-				apiClient<boolean>(vmsPaths.notificationRead(id), {
-					method: "POST",
-				})
-		);
-	},
-	async listTeam() {
-		if (isMockEnabled()) return mockDelay(vmsStore.listTeam());
-		if (isVendorCoreLive()) {
-			const rows = await vendorCoreApi.listVendorTeam();
-			return rows.map(mapTeamMember);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.listTeam()),
-			() =>
-				apiClient<VendorTeamMember[] | { results?: VendorTeamMember[] }>(
-					vmsPaths.team
-				).then(unwrapList)
-		);
-	},
-	async getCurrentVendor() {
-		if (isMockEnabled())
-			return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
-		if (isVendorCoreLive()) {
-			const dto = await vendorCoreApi.getVendorMe();
-			return vendorDtoToModel(dto);
-		}
-		return withMockOrRemote(
-			() => mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID)),
-			() => apiClient<VendorModel>(vmsPaths.me)
-		);
-	},
-	currentVendorId: CURRENT_VENDOR_ID,
-	/** Whether this client is serving mock fixtures. */
-	get isMock() {
-		return isMockEnabled();
-	},
+
 };

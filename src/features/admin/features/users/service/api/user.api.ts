@@ -11,10 +11,9 @@ import {
 	isVendorCoreLive,
 } from "@/lib/vendor-core/client";
 
-import type { ApiUserDto, ApiUserListResponseDto } from "../../dto/user.dto";
+import type { ApiUserDto } from "../../dto/user.dto";
 import type { UserModel } from "../../types/user.types";
 import { toUserModelList } from "../mappers/user.mapper";
-import { userEndpoints } from "./user.endpoints";
 import { MOCK_USERS } from "./user.mock";
 
 async function listFromVendorCore(): Promise<UserModel[]> {

@@ -1,3 +1,3 @@
 export const settingEndpoints = {
-	list: () => "/api/admin/settings/",
+	list: () => "/api/v1/settings/",
 } as const;

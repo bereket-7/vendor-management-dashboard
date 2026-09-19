@@ -104,9 +104,7 @@ async function main() {
 	}
 	console.log("✓ authenticated");
 
-	const vendors = await request("GET", "/api/v1/vendors/list/?limit=1", {
-		token,
-	});
+	const vendors = await request("GET", "/api/v1/vendors/?limit=1", { token });
 	const vendorCount = vendors?.count ?? vendors?.results?.length ?? 0;
 	if (!vendorCount) {
 		console.error(
@@ -133,19 +131,15 @@ async function main() {
 		throw err;
 	}
 
-	const providers = await request("GET", "/api/v1/providers/list/?limit=5", {
+	const providers = await request("GET", "/api/v1/providers/?limit=5", {
 		token,
 	});
 	const providerCount = providers?.count ?? providers?.results?.length ?? 0;
 	console.log(`Providers now: ${providerCount}`);
 
-	const rosters = await request(
-		"GET",
-		"/api/v1/provider-rosters/list/?limit=5",
-		{
-			token,
-		}
-	);
+	const rosters = await request("GET", "/api/v1/provider-rosters/?limit=5", {
+		token,
+	});
 	const rosterCount = rosters?.count ?? rosters?.results?.length ?? 0;
 	console.log(`Provider rosters now: ${rosterCount}`);
 

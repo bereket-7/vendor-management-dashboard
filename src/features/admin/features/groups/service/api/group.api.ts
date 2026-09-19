@@ -1,11 +1,7 @@
+import { isMockEnabled, isNestApiEnabled, isLiveIntegrationEnabled } from "@/lib/mock-mode";
 import { apiClient } from "@/lib/api/client";
-import { isMockEnabled, isNestApiEnabled } from "@/lib/mock-mode";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
-import type {
-	IdentityGroupCreateInput,
-	IdentityGroupDto,
-	IdentityGroupUpdateInput,
-} from "@/lib/vendor-core/types";
+import type { IdentityGroupCreateInput, IdentityGroupDto } from "@/lib/vendor-core/types";
 
 import type {
 	ApiGroupListResponseDto,
@@ -15,8 +11,9 @@ import type {
 } from "../../dto/group.dto";
 import type { GroupModel } from "../../types/group.types";
 import { toGroupModel, toGroupModelList } from "../mappers/group.mapper";
-import { groupEndpoints } from "./group.endpoints";
 import { MOCK_GROUPS } from "./group.mock";
+import { groupEndpoints } from "./group.endpoints";
+
 
 function coreDtoToApiDto(dto: IdentityGroupDto): ApiIdentityGroupDto {
 	return {
@@ -34,113 +31,123 @@ function coreDtoToApiDto(dto: IdentityGroupDto): ApiIdentityGroupDto {
 	};
 }
 
-async function fetchNestList(): Promise<ApiIdentityGroupDto[]> {
-	const res = await apiClient<ApiGroupListResponseDto | ApiIdentityGroupDto[]>(
-		groupEndpoints.list()
-	);
-	return Array.isArray(res) ? res : (res.results ?? []);
-}
-
-async function fetchRemoteList(): Promise<ApiIdentityGroupDto[]> {
-	if (isNestApiEnabled()) {
-		return fetchNestList();
-	}
-	const page = await vendorCoreApi.listAllIdentityGroups();
-	return (page.results ?? []).map(coreDtoToApiDto);
-}
-
-async function fetchRemoteDetail(id: string): Promise<ApiIdentityGroupDto> {
-	if (isNestApiEnabled()) {
-		return apiClient<ApiIdentityGroupDto>(groupEndpoints.detail(id));
-	}
-	return coreDtoToApiDto(await vendorCoreApi.getIdentityGroup(id));
-}
-
-async function createRemote(
-	payload: GroupCreateDto
-): Promise<ApiIdentityGroupDto> {
-	if (isNestApiEnabled()) {
-		return apiClient<ApiIdentityGroupDto>(groupEndpoints.create(), {
-			method: "POST",
-			body: JSON.stringify(payload),
-		});
-	}
-	return coreDtoToApiDto(
-		await vendorCoreApi.createIdentityGroup(payload as IdentityGroupCreateInput)
-	);
-}
-
-async function updateRemote(
-	id: string,
-	payload: GroupUpdateDto
-): Promise<ApiIdentityGroupDto> {
-	if (isNestApiEnabled()) {
-		return apiClient<ApiIdentityGroupDto>(groupEndpoints.update(id), {
-			method: "PATCH",
-			body: JSON.stringify(payload),
-		});
-	}
-	return coreDtoToApiDto(
-		await vendorCoreApi.updateIdentityGroup(
-			id,
-			payload as IdentityGroupUpdateInput
-		)
-	);
-}
-
-async function removeRemote(id: string): Promise<void> {
-	if (isNestApiEnabled()) {
-		await apiClient<void>(groupEndpoints.delete(id), { method: "DELETE" });
-		return;
-	}
-	await vendorCoreApi.deleteIdentityGroup(id);
+async function listFromVendorCore(): Promise<ApiIdentityGroupDto[]> {
+	const page = await vendorCoreApi.listIdentityGroups();
+	return (page.results ?? []) as ApiIdentityGroupDto[];
 }
 
 export const groupApi = {
 	async list(): Promise<GroupModel[]> {
-		const dtos = isMockEnabled() ? MOCK_GROUPS : await fetchRemoteList();
-		return toGroupModelList(dtos);
+		if (isMockEnabled()) return toGroupModelList(MOCK_GROUPS);
+		if (isLiveIntegrationEnabled()) {
+			return toGroupModelList(await listFromVendorCore());
+		}
+		if (isNestApiEnabled()) {
+			const res = await apiClient<
+				ApiGroupListResponseDto | ApiIdentityGroupDto[]
+			>(groupEndpoints.list());
+			return toGroupModelList(Array.isArray(res) ? res : (res.results ?? []));
+		}
+		return [];
 	},
 
 	async getById(id: string): Promise<GroupModel | null> {
-		const dto = isMockEnabled()
-			? (MOCK_GROUPS.find((g) => String(g.id) === id) ?? null)
-			: await fetchRemoteDetail(id).catch(() => null);
-		if (!dto) return null;
-		return toGroupModel(dto);
+		if (isMockEnabled()) {
+			const dto = MOCK_GROUPS.find((g) => String(g.id) === id) ?? null;
+			return dto ? toGroupModel(dto) : null;
+		}
+		if (isLiveIntegrationEnabled()) {
+			const dto = (await vendorCoreApi.getIdentityGroup(
+				id
+			)) as ApiIdentityGroupDto;
+			return toGroupModel(dto);
+		}
+		if (isNestApiEnabled()) {
+			const dto = await apiClient<ApiIdentityGroupDto>(
+				groupEndpoints.detail(id)
+			);
+			return toGroupModel(dto);
+		}
+		return null;
 	},
 
 	async create(payload: GroupCreateDto): Promise<GroupModel> {
-		const dto = isMockEnabled()
-			? ({
-					...payload,
-					id: `grp-${Date.now()}`,
-					sync_status: "pending",
-					updated_at: new Date().toISOString(),
-					is_active: true,
-				} satisfies ApiIdentityGroupDto)
-			: await createRemote(payload);
-		const model = toGroupModel(dto);
-		if (!model) throw new Error("Invalid create response");
-		return model;
+		if (isMockEnabled()) {
+			const dto = {
+				...payload,
+				id: `grp-${Date.now()}`,
+				sync_status: "pending",
+				updated_at: new Date().toISOString(),
+				is_active: true,
+			};
+			const model = toGroupModel(dto);
+			if (!model) throw new Error("Invalid create response");
+			return model;
+		}
+		if (isLiveIntegrationEnabled()) {
+			const dto = (await vendorCoreApi.createIdentityGroup(
+				payload as unknown as Record<string, unknown>
+			)) as ApiIdentityGroupDto;
+			const model = toGroupModel(dto);
+			if (!model) throw new Error("Invalid create response");
+			return model;
+		}
+		if (isNestApiEnabled()) {
+			const dto = await apiClient<ApiIdentityGroupDto>(groupEndpoints.create(), {
+				method: "POST",
+				body: JSON.stringify(payload),
+			});
+			const model = toGroupModel(dto);
+			if (!model) throw new Error("Invalid create response");
+			return model;
+		}
+		throw new Error("Identity groups API unavailable");
 	},
 
 	async update(id: string, payload: GroupUpdateDto): Promise<GroupModel> {
-		const dto = isMockEnabled()
-			? {
-					...(MOCK_GROUPS.find((g) => String(g.id) === id) ?? {}),
-					...payload,
-					id,
+		if (isMockEnabled()) {
+			const existing = MOCK_GROUPS.find((g) => String(g.id) === id);
+			const model = toGroupModel({ ...existing, ...payload, id });
+			if (!model) throw new Error("Invalid update response");
+			return model;
+		}
+		if (isLiveIntegrationEnabled()) {
+			const dto = (await vendorCoreApi.updateIdentityGroup(
+				id,
+				payload as unknown as Record<string, unknown>
+			)) as ApiIdentityGroupDto;
+			const model = toGroupModel(dto);
+			if (!model) throw new Error("Invalid update response");
+			return model;
+		}
+		if (isNestApiEnabled()) {
+			const dto = await apiClient<ApiIdentityGroupDto>(
+				groupEndpoints.update(id),
+				{
+					method: "PATCH",
+					body: JSON.stringify(payload),
 				}
-			: await updateRemote(id, payload);
-		const model = toGroupModel(dto as ApiIdentityGroupDto);
-		if (!model) throw new Error("Invalid update response");
-		return model;
+			);
+			const model = toGroupModel(dto);
+			if (!model) throw new Error("Invalid update response");
+			return model;
+		}
+		throw new Error("Identity groups API unavailable");
 	},
 
 	async remove(id: string): Promise<void> {
 		if (isMockEnabled()) return;
-		await removeRemote(id);
+		if (isLiveIntegrationEnabled()) {
+			await vendorCoreApi.deleteIdentityGroup(id);
+			return;
+		}
+		if (isNestApiEnabled()) {
+			await apiClient<void>(groupEndpoints.delete(id), {
+				method: "DELETE",
+			});
+			return;
+		}
+		throw new Error("Identity groups API unavailable");
 	},
 
 	async addMembers(

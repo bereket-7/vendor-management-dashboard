@@ -90,6 +90,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "vendors-list",
 		section: "integration_file_operations",
 		module: "vendor_management",
+		prototype: true,
 	},
 	// Operations
 	{
@@ -119,6 +120,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "operations",
 		module: "vendor_management",
+		prototype: true,
 	},
 	{
 		title: "Risk Scoring",
@@ -133,6 +135,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "operations",
 		module: "vendor_management",
+		prototype: true,
 	},
 	{
 		title: "Automations",
@@ -140,6 +143,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "operations",
 		module: "vendor_management",
+		prototype: true,
 	},
 	// Administration
 	{
@@ -155,6 +159,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "reports-view",
 		section: "administration",
 		module: "vendor_management",
+		prototype: true,
 	},
 	{
 		title: "Export Center",
@@ -169,6 +174,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "reports-view",
 		section: "administration",
 		module: "vendor_management",
+		prototype: true,
 	},
 	{
 		title: "Master Data Entry",
@@ -176,6 +182,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "reports-view",
 		section: "administration",
 		module: "vendor_management",
+		prototype: true,
 	},
 	{
 		title: "Error Correction",
@@ -183,6 +190,7 @@ const vendorManagementNav: SidebarNavItem[] = [
 		permission: "file-management-view",
 		section: "administration",
 		module: "vendor_management",
+		prototype: true,
 	},
 	{
 		title: "Settings",
@@ -254,6 +262,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "file-management-view",
 		section: "claim_encounter",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Responses",
@@ -288,6 +297,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "vendors-list",
 		section: "claim_encounter",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "File Management",
@@ -296,13 +306,14 @@ const claimEncounterNav: SidebarNavItem[] = [
 		section: "claim_encounter",
 		module: "claim_encounter",
 	},
-	// Regulatory & Compliance
+	// Regulatory & Compliance (UI prototypes — no Django APIs yet)
 	{
 		title: "CMS EDGE",
 		href: "/admin/claim-encounter/regulatory/cms-edge",
 		permission: "dashboard-view",
 		section: "regulatory_compliance",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "CMS EDGE Reporting",
@@ -310,6 +321,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "regulatory_compliance",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Medicare & Medicaid Reporting",
@@ -317,6 +329,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "regulatory_compliance",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Risk Adjustment",
@@ -324,6 +337,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "regulatory_compliance",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Quality Performance",
@@ -347,19 +361,29 @@ const claimEncounterNav: SidebarNavItem[] = [
 		],
 	},
 	{
+		title: "Audit Management",
+		href: "/admin/claim-encounter/regulatory/audit-management",
+		permission: "dashboard-view",
+		section: "regulatory_compliance",
+		module: "claim_encounter",
+		prototype: true,
+	},
+	{
 		title: "Compliance Calendar",
 		href: "/admin/claim-encounter/regulatory/compliance-calendar",
 		permission: "dashboard-view",
 		section: "regulatory_compliance",
 		module: "claim_encounter",
+		prototype: true,
 	},
-	// Program Monitoring
+	// Program Monitoring (UI prototypes — no Django APIs yet)
 	{
 		title: "ESRD / Dialysis",
 		href: "/admin/claim-encounter/program-monitoring/esrd-dialysis",
 		permission: "dashboard-view",
 		section: "program_monitoring",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "DME",
@@ -367,6 +391,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "program_monitoring",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Home Health",
@@ -374,6 +399,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "program_monitoring",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Hospice",
@@ -381,6 +407,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "program_monitoring",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "LTSS",
@@ -388,6 +415,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "program_monitoring",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Behavioral Health",
@@ -395,6 +423,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "program_monitoring",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	// Operations
 	{
@@ -424,6 +453,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "dashboard-view",
 		section: "operations",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	// Administration
 	{
@@ -439,6 +469,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "reports-view",
 		section: "administration",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Edge Server Data",
@@ -446,6 +477,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "reports-view",
 		section: "administration",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Master Data Entry",
@@ -453,6 +485,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "reports-view",
 		section: "administration",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Error Correction",
@@ -460,6 +493,7 @@ const claimEncounterNav: SidebarNavItem[] = [
 		permission: "file-management-view",
 		section: "administration",
 		module: "claim_encounter",
+		prototype: true,
 	},
 	{
 		title: "Support",

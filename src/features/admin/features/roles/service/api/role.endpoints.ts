@@ -1,3 +1,3 @@
 export const roleEndpoints = {
-	list: () => "/api/admin/roles/",
+	list: () => "/api/v1/roles/",
 } as const;

@@ -145,9 +145,7 @@ async function main() {
 		}
 	}
 
-	const errors = await request("GET", "/api/v1/errors/list/?limit=5", {
-		token,
-	});
+	const errors = await request("GET", "/api/v1/errors/?limit=5", { token });
 	const errorCount = errors?.count ?? errors?.results?.length ?? 0;
 	console.log(`Error records now: ${errorCount}`);
 

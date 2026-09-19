@@ -1,4 +1,9 @@
-import { vendorCoreFetch, vendorCoreFetchBlob } from "@/lib/vendor-core/client";
+import {
+	getStoredAccessToken,
+	getVendorCoreBaseUrl,
+	vendorCoreFetch,
+	vendorCoreFetchBlob,
+} from "@/lib/vendor-core/client";
 import type {
 	AccountCreateInput,
 	AccountDto,
@@ -183,8 +188,8 @@ import {
  * - Intake jobs, inbound files, uploads, monitoring: REST-style roots
  */
 export const vendorCoreEndpoints = {
-	vendorsList: "/api/v1/vendors/list/",
-	vendorsCreate: "/api/v1/vendors/create/",
+	vendorsList: "/api/v1/vendors/",
+	vendorsCreate: "/api/v1/vendors/",
 	vendorsInvite: "/api/v1/vendors/invite/",
 	vendorsMe: "/api/v1/vendors/me/",
 	vendorsTeam: "/api/v1/vendors/team/",
@@ -192,102 +197,103 @@ export const vendorCoreEndpoints = {
 	vendorIntegrationProfile: (id: string) =>
 		`/api/v1/vendors/${id}/integration-profile/`,
 	vendorIntegrationProfileUpdate: (id: string) =>
-		`/api/v1/vendors/${id}/integration-profile/update/`,
-	accountsList: "/api/v1/accounts/list/",
-	accountsCreate: "/api/v1/accounts/create/",
+		`/api/v1/vendors/${id}/integration-profile/`,
+	accountsList: "/api/v1/accounts/",
+	accountsCreate: "/api/v1/accounts/",
 	account: (id: string) => `/api/v1/accounts/${id}/`,
-	accountUpdate: (id: string) => `/api/v1/accounts/${id}/update/`,
-	accountDelete: (id: string) => `/api/v1/accounts/${id}/delete/`,
+	accountUpdate: (id: string) => `/api/v1/accounts/${id}/`,
+	accountDelete: (id: string) => `/api/v1/accounts/${id}/`,
 	accountRestore: (id: string) => `/api/v1/accounts/${id}/restore/`,
 	accountHardDelete: (id: string) => `/api/v1/accounts/${id}/hard-delete/`,
-	accountOpsSummaryList: "/api/v1/accounts/ops-summary/list/",
-	categoriesList: "/api/v1/categories/list/",
-	vendorCategoryAssignmentsList: "/api/v1/vendor-category-assignments/list/",
+	accountOpsSummaryList: "/api/v1/accounts/ops-summary/",
+	categories: "/api/v1/vendor-categories/",
+	categoriesList: "/api/v1/categories/",
+	vendorCategoryAssignmentsList: "/api/v1/vendor-category-assignments/",
 	vendorCategoryAssignmentsCreate:
-		"/api/v1/vendor-category-assignments/create/",
-	contractsList: "/api/v1/contracts/list/",
-	contractsCreate: "/api/v1/contracts/create/",
+		"/api/v1/vendor-category-assignments/",
+	contractsList: "/api/v1/contracts/",
+	contractsCreate: "/api/v1/contracts/",
 	contract: (id: string) => `/api/v1/contracts/${id}/`,
-	contractUpdate: (id: string) => `/api/v1/contracts/${id}/update/`,
-	documentsList: "/api/v1/documents/list/",
-	documentsCreate: "/api/v1/documents/create/",
+	contractUpdate: (id: string) => `/api/v1/contracts/${id}/`,
+	documentsList: "/api/v1/documents/",
+	documentsCreate: "/api/v1/documents/",
 	document: (id: string) => `/api/v1/documents/${id}/`,
-	documentUpdate: (id: string) => `/api/v1/documents/${id}/update/`,
+	documentUpdate: (id: string) => `/api/v1/documents/${id}/`,
 	documentDownload: (id: string) => `/api/v1/documents/${id}/download/`,
-	onboardingList: "/api/v1/onboarding/list/",
-	onboardingCreate: "/api/v1/onboarding/create/",
+	onboardingList: "/api/v1/onboarding/",
+	onboardingCreate: "/api/v1/onboarding/",
 	onboardingSeed: "/api/v1/onboarding/seed/",
 	onboarding: (id: string) => `/api/v1/onboarding/${id}/`,
-	onboardingUpdate: (id: string) => `/api/v1/onboarding/${id}/update/`,
+	onboardingUpdate: (id: string) => `/api/v1/onboarding/${id}/`,
 	onboardingSubmit: (id: string) => `/api/v1/onboarding/${id}/submit/`,
 	onboardingApprove: (id: string) => `/api/v1/onboarding/${id}/approve/`,
 	onboardingReject: (id: string) => `/api/v1/onboarding/${id}/reject/`,
-	certificatesList: "/api/v1/certificates/list/",
-	certificatesCreate: "/api/v1/certificates/create/",
-	certificateUpdate: (id: string) => `/api/v1/certificates/${id}/update/`,
-	rfxList: "/api/v1/rfx/list/",
-	rfxCreate: "/api/v1/rfx/create/",
+	certificatesList: "/api/v1/certificates/",
+	certificatesCreate: "/api/v1/certificates/",
+	certificateUpdate: (id: string) => `/api/v1/certificates/${id}/`,
+	rfxList: "/api/v1/rfx/",
+	rfxCreate: "/api/v1/rfx/",
 	rfx: (id: string) => `/api/v1/rfx/${id}/`,
-	rfxUpdate: (id: string) => `/api/v1/rfx/${id}/update/`,
+	rfxUpdate: (id: string) => `/api/v1/rfx/${id}/`,
 	rfxPublish: (id: string) => `/api/v1/rfx/${id}/publish/`,
 	rfxAward: (id: string) => `/api/v1/rfx/${id}/award/`,
 	rfxBidsList: (id: string) => `/api/v1/rfx/${id}/bids/list/`,
 	rfxBidsCreate: (id: string) => `/api/v1/rfx/${id}/bids/create/`,
-	purchaseOrdersList: "/api/v1/purchase-orders/list/",
-	purchaseOrdersCreate: "/api/v1/purchase-orders/create/",
+	purchaseOrdersList: "/api/v1/purchase-orders/",
+	purchaseOrdersCreate: "/api/v1/purchase-orders/",
 	purchaseOrder: (id: string) => `/api/v1/purchase-orders/${id}/`,
-	purchaseOrderUpdate: (id: string) => `/api/v1/purchase-orders/${id}/update/`,
+	purchaseOrderUpdate: (id: string) => `/api/v1/purchase-orders/${id}/`,
 	purchaseOrderAcknowledge: (id: string) =>
 		`/api/v1/purchase-orders/${id}/acknowledge/`,
 	purchaseOrderReceive: (id: string) =>
 		`/api/v1/purchase-orders/${id}/receive/`,
-	invoicesList: "/api/v1/invoices/list/",
-	invoicesCreate: "/api/v1/invoices/create/",
+	invoicesList: "/api/v1/invoices/",
+	invoicesCreate: "/api/v1/invoices/",
 	invoice: (id: string) => `/api/v1/invoices/${id}/`,
-	invoiceUpdate: (id: string) => `/api/v1/invoices/${id}/update/`,
+	invoiceUpdate: (id: string) => `/api/v1/invoices/${id}/`,
 	invoiceMatch: (id: string) => `/api/v1/invoices/${id}/match/`,
 	invoiceDispute: (id: string) => `/api/v1/invoices/${id}/dispute/`,
 	invoiceApprove: (id: string) => `/api/v1/invoices/${id}/approve/`,
-	approvalsList: "/api/v1/approvals/list/",
+	approvalsList: "/api/v1/approvals/",
 	approval: (id: string) => `/api/v1/approvals/${id}/`,
-	approvalUpdate: (id: string) => `/api/v1/approvals/${id}/update/`,
+	approvalUpdate: (id: string) => `/api/v1/approvals/${id}/`,
 	approvalDecide: (id: string) => `/api/v1/approvals/${id}/decide/`,
-	scorecardsList: "/api/v1/scorecards/list/",
-	scorecardsCreate: "/api/v1/scorecards/create/",
+	scorecardsList: "/api/v1/scorecards/",
+	scorecardsCreate: "/api/v1/scorecards/",
 	scorecard: (id: string) => `/api/v1/scorecards/${id}/`,
-	notificationsList: "/api/v1/notifications/list/",
+	notificationsList: "/api/v1/notifications/",
 	notificationMarkRead: (id: string) =>
 		`/api/v1/notifications/${id}/mark-read/`,
-	vendorContactsList: "/api/v1/vendor-contacts/list/",
-	vendorContactsCreate: "/api/v1/vendor-contacts/create/",
+	vendorContactsList: "/api/v1/vendor-contacts/",
+	vendorContactsCreate: "/api/v1/vendor-contacts/",
 	vendorContact: (id: string) => `/api/v1/vendor-contacts/${id}/`,
-	vendorContactUpdate: (id: string) => `/api/v1/vendor-contacts/${id}/update/`,
-	vendorContactDelete: (id: string) => `/api/v1/vendor-contacts/${id}/delete/`,
+	vendorContactUpdate: (id: string) => `/api/v1/vendor-contacts/${id}/`,
+	vendorContactDelete: (id: string) => `/api/v1/vendor-contacts/${id}/`,
 	vendorContactRestore: (id: string) =>
 		`/api/v1/vendor-contacts/${id}/restore/`,
 	vendorContactHardDelete: (id: string) =>
 		`/api/v1/vendor-contacts/${id}/hard-delete/`,
-	vendorNotesList: "/api/v1/vendor-notes/list/",
-	vendorNotesCreate: "/api/v1/vendor-notes/create/",
+	vendorNotesList: "/api/v1/vendor-notes/",
+	vendorNotesCreate: "/api/v1/vendor-notes/",
 	vendorNote: (id: string) => `/api/v1/vendor-notes/${id}/`,
-	vendorNoteUpdate: (id: string) => `/api/v1/vendor-notes/${id}/update/`,
-	vendorNoteDelete: (id: string) => `/api/v1/vendor-notes/${id}/delete/`,
+	vendorNoteUpdate: (id: string) => `/api/v1/vendor-notes/${id}/`,
+	vendorNoteDelete: (id: string) => `/api/v1/vendor-notes/${id}/`,
 	vendorNoteRestore: (id: string) => `/api/v1/vendor-notes/${id}/restore/`,
 	vendorNoteHardDelete: (id: string) =>
 		`/api/v1/vendor-notes/${id}/hard-delete/`,
-	credentialsList: "/api/v1/credentials/list/",
-	credentialsCreate: "/api/v1/credentials/create/",
+	credentialsList: "/api/v1/credentials/",
+	credentialsCreate: "/api/v1/credentials/",
 	credential: (id: string) => `/api/v1/credentials/${id}/`,
-	credentialUpdate: (id: string) => `/api/v1/credentials/${id}/update/`,
-	credentialDelete: (id: string) => `/api/v1/credentials/${id}/delete/`,
+	credentialUpdate: (id: string) => `/api/v1/credentials/${id}/`,
+	credentialDelete: (id: string) => `/api/v1/credentials/${id}/`,
 	credentialRestore: (id: string) => `/api/v1/credentials/${id}/restore/`,
 	credentialHardDelete: (id: string) =>
 		`/api/v1/credentials/${id}/hard-delete/`,
-	connectionsList: "/api/v1/connections/list/",
-	connectionsCreate: "/api/v1/connections/create/",
+	connectionsList: "/api/v1/connections/",
+	connectionsCreate: "/api/v1/connections/",
 	connection: (id: string) => `/api/v1/connections/${id}/`,
-	connectionUpdate: (id: string) => `/api/v1/connections/${id}/update/`,
-	connectionDelete: (id: string) => `/api/v1/connections/${id}/delete/`,
+	connectionUpdate: (id: string) => `/api/v1/connections/${id}/`,
+	connectionDelete: (id: string) => `/api/v1/connections/${id}/`,
 	connectionRestore: (id: string) => `/api/v1/connections/${id}/restore/`,
 	connectionHardDelete: (id: string) =>
 		`/api/v1/connections/${id}/hard-delete/`,
@@ -298,19 +304,19 @@ export const vendorCoreEndpoints = {
 	intakeJobDisable: (id: string) => `/api/v1/intake-jobs/${id}/disable/`,
 	intakeCompletionSftp: "/api/v1/intake/completion/sftp/",
 	intakeCompletionEdi: "/api/v1/intake/completion/edi/",
-	intakeJobRunsList: "/api/v1/intake-job-runs/list/",
-	memberCoveragesList: "/api/v1/member-coverages/list/",
-	memberCoveragesCreate: "/api/v1/member-coverages/create/",
+	intakeJobRunsList: "/api/v1/intake-job-runs/",
+	memberCoveragesList: "/api/v1/member-coverages/",
+	memberCoveragesCreate: "/api/v1/member-coverages/",
 	memberCoveragesSeed: "/api/v1/member-coverages/seed/",
-	membersList: "/api/v1/members/list/",
+	membersList: "/api/v1/members/",
 	membersStats: "/api/v1/members/stats/",
 	membersFacets: "/api/v1/members/facets/",
 	membersListExportCsv: "/api/v1/members/list/export/csv/",
-	membersCreate: "/api/v1/members/create/",
+	membersCreate: "/api/v1/members/",
 	membersSeed: "/api/v1/members/seed/",
 	member: (id: string) => `/api/v1/members/${id}/`,
-	memberUpdate: (id: string) => `/api/v1/members/${id}/update/`,
-	memberDelete: (id: string) => `/api/v1/members/${id}/delete/`,
+	memberUpdate: (id: string) => `/api/v1/members/${id}/`,
+	memberDelete: (id: string) => `/api/v1/members/${id}/`,
 	memberHardDelete: (id: string) => `/api/v1/members/${id}/hard-delete/`,
 	memberRestore: (id: string) => `/api/v1/members/${id}/restore/`,
 	memberDetailExportCsv: (id: string) => `/api/v1/members/${id}/export/csv/`,
@@ -335,9 +341,9 @@ export const vendorCoreEndpoints = {
 	memberExceptionsCreate: (id: string) =>
 		`/api/v1/members/${id}/exceptions/create/`,
 	memberExceptionUpdate: (id: string, exceptionId: string) =>
-		`/api/v1/members/${id}/exceptions/${exceptionId}/update/`,
+		`/api/v1/members/${id}/exceptions/${exceptionId}/`,
 	memberExceptionDelete: (id: string, exceptionId: string) =>
-		`/api/v1/members/${id}/exceptions/${exceptionId}/delete/`,
+		`/api/v1/members/${id}/exceptions/${exceptionId}/`,
 	memberAccumulatorsList: (id: string) =>
 		`/api/v1/members/${id}/accumulators/list/`,
 	memberAccumulatorsSummary: (id: string) =>
@@ -345,36 +351,36 @@ export const vendorCoreEndpoints = {
 	memberAccumulatorsCreate: (id: string) =>
 		`/api/v1/members/${id}/accumulators/create/`,
 	memberAccumulatorUpdate: (id: string, accumulatorId: string) =>
-		`/api/v1/members/${id}/accumulators/${accumulatorId}/update/`,
+		`/api/v1/members/${id}/accumulators/${accumulatorId}/`,
 	memberAccumulatorDelete: (id: string, accumulatorId: string) =>
-		`/api/v1/members/${id}/accumulators/${accumulatorId}/delete/`,
-	accumulatorFilesList: "/api/v1/accumulator-files/list/",
+		`/api/v1/members/${id}/accumulators/${accumulatorId}/`,
+	accumulatorFilesList: "/api/v1/accumulator-files/",
 	accumulatorFile: (id: string) => `/api/v1/accumulator-files/${id}/`,
-	accumulatorRowsList: "/api/v1/accumulator-rows/list/",
-	accumulatorRowsCreate: "/api/v1/accumulator-rows/create/",
+	accumulatorRowsList: "/api/v1/accumulator-rows/",
+	accumulatorRowsCreate: "/api/v1/accumulator-rows/",
 	accumulatorRow: (id: string) => `/api/v1/accumulator-rows/${id}/`,
 	accumulatorRowUpdate: (id: string) =>
-		`/api/v1/accumulator-rows/${id}/update/`,
+		`/api/v1/accumulator-rows/${id}/`,
 	accumulatorRowDelete: (id: string) =>
-		`/api/v1/accumulator-rows/${id}/delete/`,
-	pharmacyClaimFilesList: "/api/v1/pharmacy-claim-files/list/",
+		`/api/v1/accumulator-rows/${id}/`,
+	pharmacyClaimFilesList: "/api/v1/pharmacy-claim-files/",
 	pharmacyClaimFile: (id: string) => `/api/v1/pharmacy-claim-files/${id}/`,
-	pharmacyClaimRowsList: "/api/v1/pharmacy-claim-rows/list/",
-	pharmacyClaimRowsCreate: "/api/v1/pharmacy-claim-rows/create/",
+	pharmacyClaimRowsList: "/api/v1/pharmacy-claim-rows/",
+	pharmacyClaimRowsCreate: "/api/v1/pharmacy-claim-rows/",
 	pharmacyClaimRowsSeed: "/api/v1/pharmacy-claim-rows/seed/",
 	pharmacyClaimRow: (id: string) => `/api/v1/pharmacy-claim-rows/${id}/`,
 	pharmacyClaimRowUpdate: (id: string) =>
-		`/api/v1/pharmacy-claim-rows/${id}/update/`,
+		`/api/v1/pharmacy-claim-rows/${id}/`,
 	pharmacyClaimRowDelete: (id: string) =>
-		`/api/v1/pharmacy-claim-rows/${id}/delete/`,
+		`/api/v1/pharmacy-claim-rows/${id}/`,
 	pharmacyClaimRowVoid: (id: string) =>
 		`/api/v1/pharmacy-claim-rows/${id}/void/`,
 	memberClaimsList: (id: string) => `/api/v1/members/${id}/claims/list/`,
 	memberClaimsCreate: (id: string) => `/api/v1/members/${id}/claims/create/`,
 	memberClaimUpdate: (id: string, claimId: string) =>
-		`/api/v1/members/${id}/claims/${claimId}/update/`,
+		`/api/v1/members/${id}/claims/${claimId}/`,
 	memberClaimDelete: (id: string, claimId: string) =>
-		`/api/v1/members/${id}/claims/${claimId}/delete/`,
+		`/api/v1/members/${id}/claims/${claimId}/`,
 	memberChangeEventsList: (id: string) =>
 		`/api/v1/members/${id}/change-events/list/`,
 	memberFamilyLinksList: (id: string) =>
@@ -386,26 +392,26 @@ export const vendorCoreEndpoints = {
 	memberFamilyLink: (id: string, linkId: string) =>
 		`/api/v1/members/${id}/family-links/${linkId}/`,
 	memberFamilyLinkUpdate: (id: string, linkId: string) =>
-		`/api/v1/members/${id}/family-links/${linkId}/update/`,
+		`/api/v1/members/${id}/family-links/${linkId}/`,
 	memberFamilyLinkDelete: (id: string, linkId: string) =>
-		`/api/v1/members/${id}/family-links/${linkId}/delete/`,
+		`/api/v1/members/${id}/family-links/${linkId}/`,
 	memberFamilyLinkTransfer: (id: string, linkId: string) =>
 		`/api/v1/members/${id}/family-links/${linkId}/transfer/`,
-	providersList: "/api/v1/providers/list/",
-	providersCreate: "/api/v1/providers/create/",
+	providersList: "/api/v1/providers/",
+	providersCreate: "/api/v1/providers/",
 	providersStats: "/api/v1/providers/stats/",
 	providersFacets: "/api/v1/providers/facets/",
 	providersListExportCsv: "/api/v1/providers/list/export/csv/",
 	providersSeed: "/api/v1/providers/seed/",
 	provider: (id: string) => `/api/v1/providers/${id}/`,
-	providerUpdate: (id: string) => `/api/v1/providers/${id}/update/`,
-	providerDelete: (id: string) => `/api/v1/providers/${id}/delete/`,
+	providerUpdate: (id: string) => `/api/v1/providers/${id}/`,
+	providerDelete: (id: string) => `/api/v1/providers/${id}/`,
 	providerRestore: (id: string) => `/api/v1/providers/${id}/restore/`,
 	providerHardDelete: (id: string) => `/api/v1/providers/${id}/hard-delete/`,
 	providerStatus: (id: string) => `/api/v1/providers/${id}/status/`,
 	providerProfile: (id: string) => `/api/v1/providers/${id}/profile/`,
 	providerProfileUpdate: (id: string) =>
-		`/api/v1/providers/${id}/profile/update/`,
+		`/api/v1/providers/${id}/profile/`,
 	providerSummary: (id: string) => `/api/v1/providers/${id}/summary/`,
 	providerVendorSourcesList: (id: string) =>
 		`/api/v1/providers/${id}/vendor-sources/list/`,
@@ -416,7 +422,7 @@ export const vendorCoreEndpoints = {
 	providerIdentifiersCreate: (id: string) =>
 		`/api/v1/providers/${id}/identifiers/create/`,
 	providerIdentifierUpdate: (id: string, identifierId: string) =>
-		`/api/v1/providers/${id}/identifiers/${identifierId}/update/`,
+		`/api/v1/providers/${id}/identifiers/${identifierId}/`,
 	providerNetworksList: (id: string) =>
 		`/api/v1/providers/${id}/networks/list/`,
 	providerCredentialsList: (id: string) =>
@@ -432,59 +438,59 @@ export const vendorCoreEndpoints = {
 	providerLocationCreate: (id: string) =>
 		`/api/v1/providers/${id}/locations/create/`,
 	providerLocationUpdate: (id: string, locationId: string) =>
-		`/api/v1/providers/${id}/locations/${locationId}/update/`,
+		`/api/v1/providers/${id}/locations/${locationId}/`,
 	providerLocationDelete: (id: string, locationId: string) =>
-		`/api/v1/providers/${id}/locations/${locationId}/delete/`,
+		`/api/v1/providers/${id}/locations/${locationId}/`,
 	providerIdentifierDelete: (id: string, identifierId: string) =>
-		`/api/v1/providers/${id}/identifiers/${identifierId}/delete/`,
+		`/api/v1/providers/${id}/identifiers/${identifierId}/`,
 	providerNetworkCreate: (id: string) =>
 		`/api/v1/providers/${id}/networks/create/`,
 	providerNetworkUpdate: (id: string, networkId: string) =>
-		`/api/v1/providers/${id}/networks/${networkId}/update/`,
+		`/api/v1/providers/${id}/networks/${networkId}/`,
 	providerNetworkDelete: (id: string, networkId: string) =>
-		`/api/v1/providers/${id}/networks/${networkId}/delete/`,
+		`/api/v1/providers/${id}/networks/${networkId}/`,
 	providerCredentialCreate: (id: string) =>
 		`/api/v1/providers/${id}/credentials/create/`,
 	providerCredentialUpdate: (id: string, credentialId: string) =>
-		`/api/v1/providers/${id}/credentials/${credentialId}/update/`,
+		`/api/v1/providers/${id}/credentials/${credentialId}/`,
 	providerCredentialDelete: (id: string, credentialId: string) =>
-		`/api/v1/providers/${id}/credentials/${credentialId}/delete/`,
+		`/api/v1/providers/${id}/credentials/${credentialId}/`,
 	providerExceptionCreate: (id: string) =>
 		`/api/v1/providers/${id}/exceptions/create/`,
 	providerExceptionUpdate: (id: string, exceptionId: string) =>
-		`/api/v1/providers/${id}/exceptions/${exceptionId}/update/`,
+		`/api/v1/providers/${id}/exceptions/${exceptionId}/`,
 	providerExceptionDelete: (id: string, exceptionId: string) =>
-		`/api/v1/providers/${id}/exceptions/${exceptionId}/delete/`,
+		`/api/v1/providers/${id}/exceptions/${exceptionId}/`,
 	providerRosterProvidersList: (id: string) =>
 		`/api/v1/provider-rosters/${id}/providers/list/`,
-	providerRostersList: "/api/v1/provider-rosters/list/",
-	providerRostersCreate: "/api/v1/provider-rosters/create/",
+	providerRostersList: "/api/v1/provider-rosters/",
+	providerRostersCreate: "/api/v1/provider-rosters/",
 	providerRoster: (id: string) => `/api/v1/provider-rosters/${id}/`,
 	providerRosterUpdate: (id: string) =>
-		`/api/v1/provider-rosters/${id}/update/`,
+		`/api/v1/provider-rosters/${id}/`,
 	providerRosterDelete: (id: string) =>
-		`/api/v1/provider-rosters/${id}/delete/`,
+		`/api/v1/provider-rosters/${id}/`,
 	providerRosterRestore: (id: string) =>
 		`/api/v1/provider-rosters/${id}/restore/`,
 	providerRosterHardDelete: (id: string) =>
 		`/api/v1/provider-rosters/${id}/hard-delete/`,
 	providerRosterRecount: (id: string) =>
 		`/api/v1/provider-rosters/${id}/recount/`,
-	migrationCasesList: "/api/v1/migration-cases/list/",
-	migrationCasesCreate: "/api/v1/migration-cases/create/",
+	migrationCasesList: "/api/v1/migration-cases/",
+	migrationCasesCreate: "/api/v1/migration-cases/",
 	migrationCasesBulkStatus: "/api/v1/migration-cases/bulk-status/",
 	migrationCase: (id: string) => `/api/v1/migration-cases/${id}/`,
-	migrationCaseUpdate: (id: string) => `/api/v1/migration-cases/${id}/update/`,
-	migrationCaseDelete: (id: string) => `/api/v1/migration-cases/${id}/delete/`,
+	migrationCaseUpdate: (id: string) => `/api/v1/migration-cases/${id}/`,
+	migrationCaseDelete: (id: string) => `/api/v1/migration-cases/${id}/`,
 	migrationCaseRestore: (id: string) =>
 		`/api/v1/migration-cases/${id}/restore/`,
 	migrationCaseHardDelete: (id: string) =>
 		`/api/v1/migration-cases/${id}/hard-delete/`,
 	migrationCaseAssign: (id: string) => `/api/v1/migration-cases/${id}/assign/`,
 	migrationCaseSftpProgressUpdate: (id: string) =>
-		`/api/v1/migration-cases/${id}/sftp-progress/update/`,
+		`/api/v1/migration-cases/${id}/sftp-progress/`,
 	migrationCaseEdiProgressUpdate: (id: string) =>
-		`/api/v1/migration-cases/${id}/edi-progress/update/`,
+		`/api/v1/migration-cases/${id}/edi-progress/`,
 	migrationCaseEscalation: (id: string) =>
 		`/api/v1/migration-cases/${id}/escalation/`,
 	migrationCaseStatus: (id: string) => `/api/v1/migration-cases/${id}/status/`,
@@ -510,7 +516,7 @@ export const vendorCoreEndpoints = {
 	migrationCaseDocument: (caseId: string, docId: string) =>
 		`/api/v1/migration-cases/${caseId}/documents/${docId}/`,
 	migrationCaseDocumentDelete: (caseId: string, docId: string) =>
-		`/api/v1/migration-cases/${caseId}/documents/${docId}/delete/`,
+		`/api/v1/migration-cases/${caseId}/documents/${docId}/`,
 	migrationCaseDocumentRestore: (caseId: string, docId: string) =>
 		`/api/v1/migration-cases/${caseId}/documents/${docId}/restore/`,
 	migrationCaseDocumentHardDelete: (caseId: string, docId: string) =>
@@ -518,18 +524,18 @@ export const vendorCoreEndpoints = {
 	workQueueKpis: "/api/v1/work-queue/kpis/",
 	workQueueProgressSummary: "/api/v1/work-queue/progress-summary/",
 	workQueueAnalystStats: "/api/v1/work-queue/analyst-stats/",
-	workQueueBlockersList: "/api/v1/work-queue/blockers/list/",
+	workQueueBlockersList: "/api/v1/work-queue/blockers/",
 	workQueueImport: "/api/v1/work-queue/import/",
 	workQueueSeed: "/api/v1/work-queue/seed/",
-	claimLinesList: "/api/v1/claim-lines/list/",
-	claimLinesCreate: "/api/v1/claim-lines/create/",
+	claimLinesList: "/api/v1/claim-lines/",
+	claimLinesCreate: "/api/v1/claim-lines/",
 	claimLinesSeed: "/api/v1/claim-lines/seed/",
 	claimLine: (id: string) => `/api/v1/claim-lines/${id}/`,
-	claimLineUpdate: (id: string) => `/api/v1/claim-lines/${id}/update/`,
-	claimLineDelete: (id: string) => `/api/v1/claim-lines/${id}/delete/`,
+	claimLineUpdate: (id: string) => `/api/v1/claim-lines/${id}/`,
+	claimLineDelete: (id: string) => `/api/v1/claim-lines/${id}/`,
 	claimLineHardDelete: (id: string) => `/api/v1/claim-lines/${id}/hard-delete/`,
 	claimLineRestore: (id: string) => `/api/v1/claim-lines/${id}/restore/`,
-	claimVendorFilesList: "/api/v1/claim-vendor-files/list/",
+	claimVendorFilesList: "/api/v1/claim-vendor-files/",
 	claimVendorFilesSeed: "/api/v1/claim-vendor-files/seed/",
 	claimVendorFilesSummary: "/api/v1/claim-vendor-files/summary/",
 	claimVendorFilesExportCsv: "/api/v1/claim-vendor-files/export/csv/",
@@ -541,30 +547,30 @@ export const vendorCoreEndpoints = {
 	claimVendorFileSend: (id: string) => `/api/v1/claim-vendor-files/${id}/send/`,
 	claimVendorFileDownload: (id: string) =>
 		`/api/v1/claim-vendor-files/${id}/download/`,
-	claimResponsesList: "/api/v1/claim-responses/list/",
+	claimResponsesList: "/api/v1/claim-responses/",
 	claimResponse: (id: string) => `/api/v1/claim-responses/${id}/`,
-	claimExceptionsList: "/api/v1/claim-exceptions/list/",
+	claimExceptionsList: "/api/v1/claim-exceptions/",
 	claimException: (id: string) => `/api/v1/claim-exceptions/${id}/`,
 	claimExceptionAssign: (id: string) =>
 		`/api/v1/claim-exceptions/${id}/assign/`,
 	claimExceptionResolve: (id: string) =>
 		`/api/v1/claim-exceptions/${id}/resolve/`,
-	submissionBatchesList: "/api/v1/submission-batches/list/",
+	submissionBatchesList: "/api/v1/submission-batches/",
 	submissionBatch: (id: string) => `/api/v1/submission-batches/${id}/`,
 	submissionBatchGenerateOutbound: (id: string) =>
 		`/api/v1/submission-batches/${id}/generate-outbound/`,
-	claimDiagnosesList: "/api/v1/claim-diagnoses/list/",
+	claimDiagnosesList: "/api/v1/claim-diagnoses/",
 	claimDiagnosis: (id: string) => `/api/v1/claim-diagnoses/${id}/`,
-	remittanceFilesList: "/api/v1/remittance-files/list/",
+	remittanceFilesList: "/api/v1/remittance-files/",
 	remittanceFilesSummary: "/api/v1/remittance-files/summary/",
 	remittanceFile: (id: string) => `/api/v1/remittance-files/${id}/`,
 	remittanceFileExport: (id: string) =>
 		`/api/v1/remittance-files/${id}/export/`,
-	remittanceClaimsList: "/api/v1/remittance-claims/list/",
+	remittanceClaimsList: "/api/v1/remittance-claims/",
 	remittanceClaim: (id: string) => `/api/v1/remittance-claims/${id}/`,
-	remittanceServiceLinesList: "/api/v1/remittance-service-lines/list/",
-	eligibilityFilesList: "/api/v1/eligibility-files/list/",
-	eligibilityFilesCreate: "/api/v1/eligibility-files/create/",
+	remittanceServiceLinesList: "/api/v1/remittance-service-lines/",
+	eligibilityFilesList: "/api/v1/eligibility-files/",
+	eligibilityFilesCreate: "/api/v1/eligibility-files/",
 	inboundFiles: "/api/v1/inbound-files/",
 	inboundFile: (id: string) => `/api/v1/inbound-files/${id}/`,
 	inboundFileEvents: (id: string) => `/api/v1/inbound-files/${id}/events/`,
@@ -572,7 +578,7 @@ export const vendorCoreEndpoints = {
 		`/api/v1/inbound-files/${id}/reprocess/`,
 	inboundFileDownload: (id: string) => `/api/v1/inbound-files/${id}/download/`,
 	inboundFilesSeed: "/api/v1/inbound-files/seed/",
-	claimHeadersList: "/api/v1/claim-headers/list/",
+	claimHeadersList: "/api/v1/claim-headers/",
 	claimHeadersSummary: "/api/v1/claim-headers/summary/",
 	claimHeader: (id: string) => `/api/v1/claim-headers/${id}/`,
 	claimHeaderVoid: (id: string) => `/api/v1/claim-headers/${id}/void/`,
@@ -580,13 +586,13 @@ export const vendorCoreEndpoints = {
 	cmsEdgeSettings: "/api/v1/cms-edge/settings/",
 	cmsEdgeSettingsUpdate: "/api/v1/cms-edge/settings/update/",
 	cmsEdgeSettingsSeed: "/api/v1/cms-edge/settings/seed/",
-	cmsEdgeReportingPeriodsList: "/api/v1/cms-edge/reporting-periods/list/",
+	cmsEdgeReportingPeriodsList: "/api/v1/cms-edge/reporting-periods/",
 	cmsEdgeOverviewStats: "/api/v1/cms-edge/overview/stats/",
 	cmsEdgeOverviewWorkflow: "/api/v1/cms-edge/overview/workflow/",
-	cmsEdgeOverviewActivityList: "/api/v1/cms-edge/overview/activity/list/",
-	cmsEdgeOverviewExceptionsList: "/api/v1/cms-edge/overview/exceptions/list/",
-	cmsEdgeFilePackagesList: "/api/v1/cms-edge/file-packages/list/",
-	cmsEdgeFilePackagesCreate: "/api/v1/cms-edge/file-packages/create/",
+	cmsEdgeOverviewActivityList: "/api/v1/cms-edge/overview/activity/",
+	cmsEdgeOverviewExceptionsList: "/api/v1/cms-edge/overview/exceptions/",
+	cmsEdgeFilePackagesList: "/api/v1/cms-edge/file-packages/",
+	cmsEdgeFilePackagesCreate: "/api/v1/cms-edge/file-packages/",
 	cmsEdgeFilePackage: (id: string) => `/api/v1/cms-edge/file-packages/${id}/`,
 	cmsEdgeFilePackageGenerate: (id: string) =>
 		`/api/v1/cms-edge/file-packages/${id}/generate/`,
@@ -594,33 +600,33 @@ export const vendorCoreEndpoints = {
 		`/api/v1/cms-edge/file-packages/${id}/package/`,
 	cmsEdgeFilePackageSubmit: (id: string) =>
 		`/api/v1/cms-edge/file-packages/${id}/submit/`,
-	cmsEdgeSubmissionsList: "/api/v1/cms-edge/submissions/list/",
-	cmsEdgeCmsResponsesList: "/api/v1/cms-edge/cms-responses/list/",
-	cmsEdgeValidationRunsList: "/api/v1/cms-edge/validation-runs/list/",
-	cmsEdgeAuditRequestsList: "/api/v1/cms-edge/audit-requests/list/",
-	cmsEdgeDocumentsList: "/api/v1/cms-edge/documents/list/",
-	validationResultsList: "/api/v1/validation-results/list/",
+	cmsEdgeSubmissionsList: "/api/v1/cms-edge/submissions/",
+	cmsEdgeCmsResponsesList: "/api/v1/cms-edge/cms-responses/",
+	cmsEdgeValidationRunsList: "/api/v1/cms-edge/validation-runs/",
+	cmsEdgeAuditRequestsList: "/api/v1/cms-edge/audit-requests/",
+	cmsEdgeDocumentsList: "/api/v1/cms-edge/documents/",
+	validationResultsList: "/api/v1/validation-results/",
 	uploads: "/api/v1/intake/uploads/",
 	monitoring: "/api/v1/monitoring/",
-	errorsList: "/api/v1/errors/list/",
+	errorsList: "/api/v1/errors/",
 	error: (id: string) => `/api/v1/errors/${id}/`,
 	errorRetry: (id: string) => `/api/v1/errors/${id}/retry/`,
 	errorResolve: (id: string) => `/api/v1/errors/${id}/resolve/`,
-	routingRulesList: "/api/v1/routing-rules/list/",
-	routingRulesCreate: "/api/v1/routing-rules/create/",
+	routingRulesList: "/api/v1/routing-rules/",
+	routingRulesCreate: "/api/v1/routing-rules/",
 	routingRule: (id: string) => `/api/v1/routing-rules/${id}/`,
-	routingRuleUpdate: (id: string) => `/api/v1/routing-rules/${id}/update/`,
-	routingRuleDelete: (id: string) => `/api/v1/routing-rules/${id}/delete/`,
+	routingRuleUpdate: (id: string) => `/api/v1/routing-rules/${id}/`,
+	routingRuleDelete: (id: string) => `/api/v1/routing-rules/${id}/`,
 	routingRuleRestore: (id: string) => `/api/v1/routing-rules/${id}/restore/`,
 	routingRuleHardDelete: (id: string) =>
 		`/api/v1/routing-rules/${id}/hard-delete/`,
-	auditList: "/api/v1/audit/list/",
+	auditList: "/api/v1/audit/",
 	users: "/api/v1/users/",
-	usersList: "/api/v1/users/list/",
-	usersCreate: "/api/v1/users/create/",
+	usersList: "/api/v1/users/",
+	usersCreate: "/api/v1/users/",
 	user: (id: string) => `/api/v1/users/${id}/`,
-	userUpdate: (id: string) => `/api/v1/users/${id}/update/`,
-	userDelete: (id: string) => `/api/v1/users/${id}/delete/`,
+	userUpdate: (id: string) => `/api/v1/users/${id}/`,
+	userDelete: (id: string) => `/api/v1/users/${id}/`,
 	userRestore: (id: string) => `/api/v1/users/${id}/restore/`,
 	userHardDelete: (id: string) => `/api/v1/users/${id}/hard-delete/`,
 	userPassword: (id: string) => `/api/v1/users/${id}/password/`,
@@ -630,17 +636,17 @@ export const vendorCoreEndpoints = {
 	userLoginEvents: (id: string) => `/api/v1/users/${id}/login-events/`,
 	loginEvents: "/api/v1/users/login-events/",
 	myLoginEvents: "/api/v1/users/me/login-events/",
-	vendorUpdate: (id: string) => `/api/v1/vendors/${id}/update/`,
-	vendorDelete: (id: string) => `/api/v1/vendors/${id}/delete/`,
+	vendorUpdate: (id: string) => `/api/v1/vendors/${id}/`,
+	vendorDelete: (id: string) => `/api/v1/vendors/${id}/`,
 	vendorHardDelete: (id: string) => `/api/v1/vendors/${id}/hard-delete/`,
 	vendorRestore: (id: string) => `/api/v1/vendors/${id}/restore/`,
 	tokenVerify: "/api/v1/authentication/token/verify/",
 	health: "/health/",
-	identityGroupsList: "/api/v1/identity-groups/list/",
-	identityGroupsCreate: "/api/v1/identity-groups/create/",
+	identityGroupsList: "/api/v1/identity-groups/",
+	identityGroupsCreate: "/api/v1/identity-groups/",
 	identityGroup: (id: string) => `/api/v1/identity-groups/${id}/`,
-	identityGroupUpdate: (id: string) => `/api/v1/identity-groups/${id}/update/`,
-	identityGroupDelete: (id: string) => `/api/v1/identity-groups/${id}/delete/`,
+	identityGroupUpdate: (id: string) => `/api/v1/identity-groups/${id}/`,
+	identityGroupDelete: (id: string) => `/api/v1/identity-groups/${id}/`,
 	identityGroupRestore: (id: string) =>
 		`/api/v1/identity-groups/${id}/restore/`,
 	identityGroupMembersAdd: (id: string) =>
@@ -649,20 +655,20 @@ export const vendorCoreEndpoints = {
 		`/api/v1/identity-groups/${id}/members/remove/`,
 	identityGroupMemberLinkUser: (id: string) =>
 		`/api/v1/identity-groups/${id}/members/link-user/`,
-	rolesList: "/api/v1/roles/list/",
-	rolesCreate: "/api/v1/roles/create/",
+	rolesList: "/api/v1/roles/",
+	rolesCreate: "/api/v1/roles/",
 	role: (id: string) => `/api/v1/roles/${id}/`,
-	roleUpdate: (id: string) => `/api/v1/roles/${id}/update/`,
-	roleDelete: (id: string) => `/api/v1/roles/${id}/delete/`,
+	roleUpdate: (id: string) => `/api/v1/roles/${id}/`,
+	roleDelete: (id: string) => `/api/v1/roles/${id}/`,
 	roleRestore: (id: string) => `/api/v1/roles/${id}/restore/`,
 	roleHardDelete: (id: string) => `/api/v1/roles/${id}/hard-delete/`,
 	roleUsersAssign: (id: string) => `/api/v1/roles/${id}/users/assign/`,
 	roleUsersUnassign: (id: string) => `/api/v1/roles/${id}/users/unassign/`,
-	settingsList: "/api/v1/settings/list/",
-	settingsCreate: "/api/v1/settings/create/",
+	settingsList: "/api/v1/settings/",
+	settingsCreate: "/api/v1/settings/",
 	setting: (id: string) => `/api/v1/settings/${id}/`,
-	settingUpdate: (id: string) => `/api/v1/settings/${id}/update/`,
-	settingDelete: (id: string) => `/api/v1/settings/${id}/delete/`,
+	settingUpdate: (id: string) => `/api/v1/settings/${id}/`,
+	settingDelete: (id: string) => `/api/v1/settings/${id}/`,
 	settingRestore: (id: string) => `/api/v1/settings/${id}/restore/`,
 } as const;
 
@@ -2407,6 +2413,14 @@ export const vendorCoreApi = {
 			params: asAttachment ? { download: "1" } : undefined,
 		}),
 
+	listOnboarding: (params?: {
+		status?: string;
+		vendor_id?: string;
+		limit?: number;
+	offset?: number;
+	}) =>
+		vendorCoreApi.listOnboardingCases(params),
+
 	listOnboardingCases: (params?: {
 		status?: string;
 		vendor_id?: string;
@@ -2808,6 +2822,37 @@ export const vendorCoreApi = {
 	listVendorTeam: () =>
 		vendorCoreFetch<VendorTeamMemberDto[]>(vendorCoreEndpoints.vendorsTeam),
 
+	uploadIntake: async (input: {
+		file: File;
+		connection_id?: string;
+		job_id?: string;
+	}) => {
+		const form = new FormData();
+		form.append("file", input.file);
+		if (input.connection_id) form.append("connection_id", input.connection_id);
+		if (input.job_id) form.append("job_id", input.job_id);
+		const token = getStoredAccessToken();
+		const response = await fetch(
+			`${getVendorCoreBaseUrl()}${vendorCoreEndpoints.uploads}`,
+			{
+				method: "POST",
+				headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+				body: form,
+			}
+		);
+		const text = await response.text();
+		const data = text ? JSON.parse(text) : undefined;
+		if (!response.ok) {
+			throw new Error(
+				data?.message ?? data?.detail ?? `Upload failed (${response.status})`
+			);
+		}
+		return (data?.result ?? data) as InboundFileDto;
+	},
+
+	listCategories: async (params?: VendorCategoryListQuery) =>
+		vendorCoreApi.listVendorCategories(params),
+
 	listVendorCategories: async (params?: VendorCategoryListQuery) => {
 		const query: Record<string, string | number | undefined> = {
 			limit: params?.limit,
@@ -3146,6 +3191,9 @@ export const vendorCoreApi = {
 			method: "POST",
 			body: JSON.stringify({ user_ids }),
 		}),
+
+	listSettings: async (params?: AppSettingListQuery) =>
+		vendorCoreApi.listAppSettings(params),
 
 	listAppSettings: async (params?: AppSettingListQuery) =>
 		vendorCoreFetch<PaginatedResult<AppSettingDto>>(
