@@ -87,16 +87,34 @@ export type VendorConfigJob = {
 };
 
 export type VendorSftpConnection = {
+	/** Raw connection id when backed by live API */
+	id?: string | null;
+	connectionName: string;
+	method: string;
+	direction: string;
+	environment: string;
+	lifecycleStatus: string;
 	host: string;
 	port: number;
 	username: string;
+	inboundPath: string;
+	archivePath: string;
+	hostKeyFingerprint: string;
+	landingUser: string;
+	errorPath: string;
+	processingPath: string;
+	passwordCredentialId: string | null;
+	passwordCredentialName: string;
+	privateKeyCredentialId: string | null;
+	privateKeyCredentialName: string;
 	authMethod: string;
 	authKey: string;
 	lastVerified: string;
+	lastError: string;
+	healthStatus: string;
 	remoteDirectory: string;
 	status: "Connected" | "Disconnected";
-	testConnection: "Successful" | "Failed";
-	connectionName: string;
+	testConnection: "Successful" | "Failed" | "Unknown";
 };
 
 export type VendorTrendPoint = {

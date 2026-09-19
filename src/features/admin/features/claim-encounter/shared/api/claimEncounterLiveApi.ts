@@ -22,7 +22,7 @@ export const claimEncounterLiveApi = {
 		direction?: string;
 	}) => {
 		const page = await vendorCoreFetch<PaginatedResult<ClaimVendorFileDto>>(
-			vendorCoreEndpoints.claimVendorFiles,
+			vendorCoreEndpoints.claimVendorFilesList,
 			{ params }
 		);
 		return unwrapPage(page);
@@ -30,12 +30,12 @@ export const claimEncounterLiveApi = {
 
 	getClaimVendorFile: (id: string) =>
 		vendorCoreFetch<ClaimVendorFileDto>(
-			vendorCoreEndpoints.claimVendorFileDetail(id)
+			vendorCoreEndpoints.claimVendorFile(id)
 		),
 
 	listClaimLines: async (params?: { file_id?: string; batch_id?: string }) => {
 		const page = await vendorCoreFetch<PaginatedResult<ClaimLineDto>>(
-			vendorCoreEndpoints.claimLines,
+			vendorCoreEndpoints.claimLinesList,
 			{ params }
 		);
 		return unwrapPage(page);
@@ -43,35 +43,35 @@ export const claimEncounterLiveApi = {
 
 	listClaimResponses: async () => {
 		const page = await vendorCoreFetch<PaginatedResult<ClaimResponseDto>>(
-			vendorCoreEndpoints.claimResponses
+			vendorCoreEndpoints.claimResponsesList
 		);
 		return unwrapPage(page);
 	},
 
 	listClaimExceptions: async () => {
 		const page = await vendorCoreFetch<PaginatedResult<ClaimExceptionDto>>(
-			vendorCoreEndpoints.claimExceptions
+			vendorCoreEndpoints.claimExceptionsList
 		);
 		return unwrapPage(page);
 	},
 
 	listSubmissionBatches: async () => {
 		const page = await vendorCoreFetch<PaginatedResult<SubmissionBatchDto>>(
-			vendorCoreEndpoints.submissionBatches
+			vendorCoreEndpoints.submissionBatchesList
 		);
 		return unwrapPage(page);
 	},
 
 	listMemberCoverages: async () => {
 		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.memberCoverages
+			vendorCoreEndpoints.memberCoveragesList
 		);
 		return unwrapPage(page);
 	},
 
 	listProviders: async () => {
 		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.providers
+			vendorCoreEndpoints.providersList
 		);
 		return unwrapPage(page);
 	},

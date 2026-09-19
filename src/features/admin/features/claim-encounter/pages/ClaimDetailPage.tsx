@@ -84,14 +84,16 @@ import {
 } from "@/features/admin/features/claim-encounter/feature/api/claimEncounterApi";
 import {
 	useClaimHeadersLiveQuery,
+	useRevalidateClaimHeadersMutation,
 	useVendorCoreClaimLines,
 } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { claimHeaderDtosToClaimLines } from "@/features/admin/features/claim-encounter/live-claim-headers";
 import { findClaimLineByClaimId } from "@/features/admin/features/claim-encounter/live-claims";
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import { Link } from "@/i18n/navigation";
-import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
+import type { ClaimHeaderValidateResultDto } from "@/lib/vendor-core/types";
 
 const PANEL = CMS_EDGE_PANEL_CLASS;
 
@@ -1088,16 +1090,27 @@ function OperationsAuditTab({
 	claim,
 	notes,
 	onAddNote,
+	validateResult,
+	headerValidationStatus,
 }: {
 	claim: ClaimDetail;
 	notes: ClaimDetailNote[];
 	onAddNote: () => void;
+	validateResult?: ClaimHeaderValidateResultDto | null;
+	headerValidationStatus?: string | null;
 }) {
 	const [ediTab, setEdiTab] = useState<"837I" | "835">("837I");
 	const [relatedFilter, setRelatedFilter] =
 		useState<(typeof RELATED_FILTERS)[number]>("All");
 	const [notesTab, setNotesTab] = useState<"notes" | "attachments">("notes");
 	const [ediFullscreen, setEdiFullscreen] = useState(false);
+
+	const validationStatus =
+		validateResult?.validation_status ??
+		headerValidationStatus ??
+		null;
+	const exceptions = validateResult?.exceptions ?? [];
+	const showLiveValidation = Boolean(validationStatus || exceptions.length > 0);
 
 	const load837 = useCallback(() => loadEdiFixture("837I"), []);
 	const load835 = useCallback(() => loadEdiFixture("835"), []);
@@ -1151,55 +1164,112 @@ function OperationsAuditTab({
 
 				<Panel
 					title="Validation Results"
-					footer={{
-						label: "View validation details",
-						onClick: () =>
-							toast.message("Validation details", {
-								description: `${claim.validation.passed} of ${claim.validation.total} passed`,
-							}),
-					}}
+					footer={
+						showLiveValidation
+							? {
+									label: "Domain validation (not EDI)",
+									onClick: () =>
+										toast.message("Domain validation", {
+											description:
+												"Re-validate runs required-field, duplicate, and void/replace checks only.",
+										}),
+								}
+							: {
+									label: "View validation details",
+									onClick: () =>
+										toast.message("Validation details", {
+											description: `${claim.validation.passed} of ${claim.validation.total} passed`,
+										}),
+								}
+					}
 				>
-					<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-						{[
-							{
-								label: "Total Validations",
-								value: claim.validation.total,
-								className: "text-foreground",
-							},
-							{
-								label: "Passed",
-								value: claim.validation.passed,
-								className: "text-emerald-700",
-							},
-							{
-								label: "Warnings",
-								value: claim.validation.warnings,
-								className: "text-amber-700",
-							},
-							{
-								label: "Errors",
-								value: claim.validation.errors,
-								className: "text-red-700",
-							},
-						].map((item) => (
-							<div
-								key={item.label}
-								className="rounded-sm border border-border/50 bg-card px-3 py-3"
-							>
+					{showLiveValidation ? (
+						<div className="space-y-3">
+							<div className="flex flex-wrap items-center gap-2">
 								<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-									{item.label}
+									Validation status
 								</p>
-								<p
-									className={cn(
-										"mt-1 text-xl font-semibold tabular-nums",
-										item.className
-									)}
-								>
-									{item.value}
-								</p>
+								{validationStatus ? (
+									<StatusBadge status={validationStatus} />
+								) : null}
+								{validateResult?.is_duplicate ? (
+									<span className="rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900">
+										Duplicate
+									</span>
+								) : null}
 							</div>
-						))}
-					</div>
+							{exceptions.length === 0 ? (
+								<p className="text-xs text-muted-foreground">
+									No open exception rows in this response (status is source of
+									truth).
+								</p>
+							) : (
+								<ul className="max-h-48 space-y-2 overflow-y-auto">
+									{exceptions.map((ex) => (
+										<li
+											key={ex.id}
+											className="rounded-sm border border-border/50 bg-card px-3 py-2 text-xs"
+										>
+											<div className="flex flex-wrap items-center gap-1.5">
+												<span className="font-mono text-[10px] font-semibold text-primary">
+													{ex.code}
+												</span>
+												<span className="text-[10px] uppercase text-muted-foreground">
+													{ex.severity}
+												</span>
+												<span className="text-[10px] text-muted-foreground">
+													{ex.status}
+												</span>
+											</div>
+											<p className="mt-1 text-foreground">{ex.message}</p>
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+					) : (
+						<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+							{[
+								{
+									label: "Total Validations",
+									value: claim.validation.total,
+									className: "text-foreground",
+								},
+								{
+									label: "Passed",
+									value: claim.validation.passed,
+									className: "text-emerald-700",
+								},
+								{
+									label: "Warnings",
+									value: claim.validation.warnings,
+									className: "text-amber-700",
+								},
+								{
+									label: "Errors",
+									value: claim.validation.errors,
+									className: "text-red-700",
+								},
+							].map((item) => (
+								<div
+									key={item.label}
+									className="rounded-sm border border-border/50 bg-card px-3 py-3"
+								>
+									<p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+										{item.label}
+									</p>
+									<p
+										className={cn(
+											"mt-1 text-xl font-semibold tabular-nums",
+											item.className
+										)}
+									>
+										{item.value}
+									</p>
+								</div>
+							))}
+						</div>
+					)}
 				</Panel>
 			</div>
 
@@ -1701,7 +1771,7 @@ function OperationsAuditTab({
 }
 
 export function ClaimDetailPage() {
-	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
+	const useFixtures = isMockEnabled();
 	if (!useFixtures) {
 		return (
 			<VendorCoreGate title="Claim Overview">
@@ -1788,10 +1858,23 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 	const [noteText, setNoteText] = useState("");
 	const [noteSaving, setNoteSaving] = useState(false);
 	const [localNotes, setLocalNotes] = useState<ClaimDetailNote[]>([]);
+	const [validateResult, setValidateResult] =
+		useState<ClaimHeaderValidateResultDto | null>(null);
+	const revalidateMutation = useRevalidateClaimHeadersMutation();
 
 	useEffect(() => {
 		setLocalNotes([]);
+		setValidateResult(null);
 	}, [claimIdParam]);
+
+	const headerUuid = matchedHeaderDto?.id
+		? String(matchedHeaderDto.id)
+		: null;
+	const headerValidationStatus =
+		validateResult?.validation_status ??
+		(matchedHeaderDto?.validation_status
+			? String(matchedHeaderDto.validation_status)
+			: null);
 
 	const displayNotes = useMemo((): ClaimDetailNote[] => {
 		if (!claim) return localNotes;
@@ -1805,6 +1888,41 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 		for (const n of localNotes) byId.set(n.id, n);
 		return Array.from(byId.values());
 	}, [claim, useLive, noteTargetLineDto?.metadata, localNotes]);
+
+	async function handleRevalidate() {
+		if (!useLive) {
+			toast.message("Re-validate needs live mode", {
+				description:
+					"Set NEXT_PUBLIC_USE_MOCK=false, restart pnpm, open a claim from the live Claims list (not showcase CLM724…).",
+			});
+			return;
+		}
+		if (!headerUuid) {
+			toast.message("No claim header linked", {
+				description:
+					"Open a claim that comes from claim-headers (live list), not a fixture row.",
+			});
+			return;
+		}
+		try {
+			const data = await revalidateMutation.mutateAsync([headerUuid]);
+			const row = data.results[0] ?? null;
+			setValidateResult(row);
+			const invalid = data.results.filter(
+				(r) => r.validation_status === "invalid"
+			).length;
+			toast.success(
+				invalid === 0
+					? `Re-validated ${data.validated_count} claim(s) — all clean`
+					: `Re-validated ${data.validated_count} claim(s) — ${invalid} still invalid`
+			);
+			await headersQ.refetch();
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Re-validate failed"
+			);
+		}
+	}
 
 	async function handleSaveNote() {
 		const trimmed = noteText.trim();
@@ -2040,6 +2158,9 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 							<span className="font-mono text-primary">{claim.claimId}</span>
 						</h1>
 						<StatusBadge status={claim.status} />
+						{headerValidationStatus ? (
+							<StatusBadge status={headerValidationStatus} />
+						) : null}
 						{claim.priority !== "Normal" ? (
 							<span
 								className={cn(
@@ -2059,6 +2180,30 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2">
+					{useLive ? (
+						<Button
+							variant="outline"
+							size="sm"
+							className={cn(
+								toolbarBtn,
+								"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+							)}
+							disabled={
+								!headerUuid ||
+								revalidateMutation.isPending ||
+								actionBusy
+							}
+							onClick={() => void handleRevalidate()}
+						>
+							<RefreshCw
+								className={cn(
+									"size-3.5",
+									revalidateMutation.isPending && "animate-spin"
+								)}
+							/>
+							Re-validate
+						</Button>
+					) : null}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button
@@ -2144,6 +2289,30 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 								Claim operations
 							</DropdownMenuLabel>
 							<DropdownMenuGroup>
+								<DropdownMenuItem
+									className={actionItemClass}
+									disabled={
+										actionBusy || revalidateMutation.isPending
+									}
+									onClick={() => void handleRevalidate()}
+								>
+									<span className="flex size-7 items-center justify-center rounded-sm bg-emerald-500/10 text-emerald-800 dark:text-emerald-200">
+										<RefreshCw
+											className={cn(
+												"size-3.5",
+												revalidateMutation.isPending && "animate-spin"
+											)}
+										/>
+									</span>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span>Re-validate</span>
+										<span className="text-[10px] font-normal text-muted-foreground">
+											{useLive
+												? "Domain rules (fields, duplicates, void/replace)"
+												: "Requires live vendor-core (turn mocks off)"}
+										</span>
+									</span>
+								</DropdownMenuItem>
 								<DropdownMenuItem
 									className={actionItemClass}
 									disabled={actionBusy}
@@ -2314,6 +2483,8 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 						claim={claim}
 						notes={displayNotes}
 						onAddNote={() => setNoteOpen(true)}
+						validateResult={validateResult}
+						headerValidationStatus={headerValidationStatus}
 					/>
 				) : null}
 				{tab === "Documents (2)" ? <DocumentsTab claim={claim} /> : null}

@@ -54,8 +54,6 @@ import {
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
 	MEDICAID_DOCUMENT_CATEGORIES,
-	MEDICAID_DOCUMENT_KPIS,
-	MEDICAID_DOCUMENT_LIBRARY,
 	MEDICAID_DOCUMENT_QUICK_ACTIONS,
 	MEDICAID_DOCUMENT_REPORTING_PERIODS_FILTER,
 	MEDICAID_DOCUMENT_STATES_FILTER,
@@ -67,6 +65,7 @@ import {
 	type MedicaidDocumentFileKind,
 	type MedicaidDocumentRow,
 	filterMedicaidDocuments,
+	useMedicaidEncounterDocumentLibraryList,
 } from "@/features/admin/features/claim-encounter/medicaid-encounter/feature/queries/useMedicaidEncounterQuery";
 import { getProgramScale } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
@@ -173,8 +172,35 @@ function DocMetricCard({
 	);
 }
 
-function DocumentsKpiRow({ programType }: { programType?: ProgramType }) {
-	const k = MEDICAID_DOCUMENT_KPIS;
+function deriveDocumentKpis(docs: MedicaidDocumentRow[]) {
+	const countType = (t: string) =>
+		docs.filter((d) => d.documentType === t).length;
+	return {
+		totalDocuments: docs.length,
+		totalDocumentsDelta: 0,
+		submittedFiles: countType("Submitted File"),
+		submittedFilesDelta: 0,
+		responseFiles: countType("Response File"),
+		responseFilesDelta: 0,
+		reports: countType("Validation Report") + countType("Acceptance Report"),
+		reportsDelta: 0,
+		auditDocuments: countType("Audit Document"),
+		auditDocumentsDelta: 0,
+		otherDocuments: countType("Other Document"),
+		otherDocumentsDelta: 0,
+		storageUsedGb: 0,
+		storageTotalGb: 0,
+	};
+}
+
+function DocumentsKpiRow({
+	programType,
+	kpis,
+}: {
+	programType?: ProgramType;
+	kpis: ReturnType<typeof deriveDocumentKpis>;
+}) {
+	const k = kpis;
 
 	return (
 		<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -562,27 +588,38 @@ function QuickActionsPanel() {
 	);
 }
 
-function StorageSummaryPanel() {
-	const k = MEDICAID_DOCUMENT_KPIS;
-	const pct = (k.storageUsedGb / k.storageTotalGb) * 100;
+function StorageSummaryPanel({
+	kpis,
+}: {
+	kpis: ReturnType<typeof deriveDocumentKpis>;
+}) {
+	const k = kpis;
+	const hasStorage = k.storageTotalGb > 0;
+	const pct = hasStorage ? (k.storageUsedGb / k.storageTotalGb) * 100 : 0;
 
 	return (
 		<CmsEdgeSectionPanel title="Storage Summary">
 			<div className="space-y-3 border-t border-border/50 px-4 py-4">
-				<div className="flex items-center justify-between gap-2 text-xs">
-					<span className="font-medium tabular-nums">
-						{k.storageUsedGb.toFixed(1)} GB of {k.storageTotalGb} GB used
-					</span>
-					<span className="text-muted-foreground tabular-nums">
-						({pct.toFixed(1)}%)
-					</span>
-				</div>
-				<div className="h-2.5 overflow-hidden rounded-full bg-muted">
-					<div
-						className="h-full rounded-full bg-primary"
-						style={{ width: `${pct}%` }}
-					/>
-				</div>
+				{hasStorage ? (
+					<>
+						<div className="flex items-center justify-between gap-2 text-xs">
+							<span className="font-medium tabular-nums">
+								{k.storageUsedGb.toFixed(1)} GB of {k.storageTotalGb} GB used
+							</span>
+							<span className="text-muted-foreground tabular-nums">
+								({pct.toFixed(1)}%)
+							</span>
+						</div>
+						<div className="h-2.5 overflow-hidden rounded-full bg-muted">
+							<div
+								className="h-full rounded-full bg-primary"
+								style={{ width: `${pct}%` }}
+							/>
+						</div>
+					</>
+				) : (
+					<p className="text-xs text-muted-foreground">Storage metrics —</p>
+				)}
 				<PanelLink>View Storage Details</PanelLink>
 			</div>
 		</CmsEdgeSectionPanel>
@@ -613,7 +650,7 @@ function DocumentLibraryPanel({
 	return (
 		<CmsEdgeSectionPanel
 			className="flex h-full min-h-0 flex-col"
-			title={`Document Library (${scaleProgramCount(MEDICAID_DOCUMENT_KPIS.totalDocuments, programType).toLocaleString()})`}
+			title={`Document Library (${scaleProgramCount(rows.length, programType).toLocaleString()})`}
 			bodyClassName="flex min-h-0 flex-1 flex-col pb-4"
 			action={
 				<Button
@@ -824,10 +861,11 @@ function DocumentCategoriesRow() {
 }
 
 export function MedicaidEncounterDocumentsTab({
-	programType,
-}: { programType?: ProgramType } = {}) {
+	programType = "medicaid",
+	reportingPeriod,
+}: { programType?: ProgramType; reportingPeriod?: string } = {}) {
 	const [search, setSearch] = useState("");
-	const [period, setPeriod] = useState("q2-2027");
+	const [period, setPeriod] = useState(reportingPeriod ?? "q2-2027");
 	const [documentType, setDocumentType] = useState("All Types");
 	const [state, setState] = useState("All States");
 	const [vendor, setVendor] = useState("All Vendors");
@@ -837,15 +875,21 @@ export function MedicaidEncounterDocumentsTab({
 	);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+	const { documentLibrary, isLoading } = useMedicaidEncounterDocumentLibraryList(
+		programType,
+		period
+	);
+	const docKpis = deriveDocumentKpis(documentLibrary);
+
 	const rows = useMemo(
 		() =>
-			filterMedicaidDocuments(MEDICAID_DOCUMENT_LIBRARY, search, {
+			filterMedicaidDocuments(documentLibrary, search, {
 				documentType,
 				state,
 				vendor,
 				status,
 			}),
-		[search, documentType, state, vendor, status]
+		[documentLibrary, search, documentType, state, vendor, status]
 	);
 
 	const resetFilters = () => {
@@ -872,7 +916,12 @@ export function MedicaidEncounterDocumentsTab({
 
 	return (
 		<div className={DOCS_PAGE_STACK}>
-			<DocumentsKpiRow programType={programType} />
+			{isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading documents…
+				</p>
+			) : null}
+			<DocumentsKpiRow programType={programType} kpis={docKpis} />
 
 			<DocumentFiltersBar
 				search={search}
@@ -912,7 +961,7 @@ export function MedicaidEncounterDocumentsTab({
 							programType={programType}
 						/>
 						<QuickActionsPanel />
-						<StorageSummaryPanel />
+						<StorageSummaryPanel kpis={docKpis} />
 					</div>
 				}
 			/>

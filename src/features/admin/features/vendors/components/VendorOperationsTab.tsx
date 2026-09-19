@@ -72,6 +72,7 @@ type VendorOperationsTabProps = {
 	onToggleJob?: (jobId: string, active: boolean) => Promise<void>;
 	onRunJob?: (jobId: string) => Promise<void>;
 	onReprocessRun?: (runId: string) => Promise<void>;
+	onDownloadRun?: (runId: string) => Promise<void>;
 };
 
 function ActivityStatus({ status }: { status: string }) {
@@ -186,6 +187,7 @@ export function VendorOperationsTab({
 	onToggleJob,
 	onRunJob,
 	onReprocessRun,
+	onDownloadRun,
 }: VendorOperationsTabProps) {
 	const [opsTab, setOpsTab] = useState<OpsTab>("history");
 	const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
@@ -588,6 +590,19 @@ export function VendorOperationsTab({
 																			Processing logs
 																		</Link>
 																	</DropdownMenuItem>
+																	{onDownloadRun ? (
+																		<DropdownMenuItem
+																			onSelect={() => {
+																				void onDownloadRun(run.id).catch(() =>
+																					toast.error(
+																						"Could not download file."
+																					)
+																				);
+																			}}
+																		>
+																			Download file
+																		</DropdownMenuItem>
+																	) : null}
 																	{runBucket(run.status) === "failed" &&
 																	onReprocessRun ? (
 																		<DropdownMenuItem

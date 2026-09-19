@@ -1238,6 +1238,10 @@ export async function replaceClaimHeader(
 	);
 }
 
+export async function revalidateClaimHeaders(claimHeaderIds: string[]) {
+	return vendorCoreApi.revalidateClaimHeaders(claimHeaderIds);
+}
+
 /** Stash-compatible alias of reprocessLinkedInboundFile. */
 export async function reprocessInboundFile(id: string) {
 	return reprocessLinkedInboundFile(id);

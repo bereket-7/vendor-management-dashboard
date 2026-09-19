@@ -26,6 +26,7 @@ import type {
 	ClaimHeaderListDto,
 	ClaimHeaderListQuery,
 	ClaimHeaderSummaryDto,
+	ClaimHeaderValidateResult,
 	ClaimHeaderVoidReplaceInput,
 	ClaimLineDto,
 	CmsEdgeActivityDto,
@@ -45,13 +46,19 @@ import type {
 	CmsEdgeSubmissionDto,
 	CmsEdgeValidationRunDto,
 	CmsEdgeWorkflowDto,
+	ConnectionCompactDto,
+	ConnectionCreateInput,
+	ConnectionDiscoverHostKeyResult,
 	ConnectionDto,
+	ConnectionTestResult,
+	ConnectionUpdateInput,
 	ContractCreateInput,
 	ContractDetailDto,
 	ContractDto,
 	ContractListQuery,
 	ContractUpdateInput,
 	CoreUserDto,
+	CredentialCreateInput,
 	CredentialDto,
 	EligibilityFileDto,
 	ErrorRecordDto,
@@ -208,11 +215,17 @@ export const vendorCoreEndpoints = {
 	accountOpsSummaryList: "/api/v1/accounts/ops-summary/",
 	categories: "/api/v1/vendor-categories/",
 	categoriesList: "/api/v1/categories/",
-	vendorCategoryAssignmentsList: "/api/v1/vendor-category-assignments/",
+	vendorCategoryAssignmentsList: "/api/v1/vendor-category-assignments/list/",
 	vendorCategoryAssignmentsCreate:
-		"/api/v1/vendor-category-assignments/",
-	contractsList: "/api/v1/contracts/",
-	contractsCreate: "/api/v1/contracts/",
+		"/api/v1/vendor-category-assignments/create/",
+	vendorCategoryAssignmentDelete: (id: string) =>
+		`/api/v1/vendor-category-assignments/${id}/delete/`,
+	vendorCategoryAssignmentRestore: (id: string) =>
+		`/api/v1/vendor-category-assignments/${id}/restore/`,
+	vendorCategoryAssignmentHardDelete: (id: string) =>
+		`/api/v1/vendor-category-assignments/${id}/hard-delete/`,
+	contractsList: "/api/v1/contracts/list/",
+	contractsCreate: "/api/v1/contracts/create/",
 	contract: (id: string) => `/api/v1/contracts/${id}/`,
 	contractUpdate: (id: string) => `/api/v1/contracts/${id}/`,
 	documentsList: "/api/v1/documents/",
@@ -228,9 +241,9 @@ export const vendorCoreEndpoints = {
 	onboardingSubmit: (id: string) => `/api/v1/onboarding/${id}/submit/`,
 	onboardingApprove: (id: string) => `/api/v1/onboarding/${id}/approve/`,
 	onboardingReject: (id: string) => `/api/v1/onboarding/${id}/reject/`,
-	certificatesList: "/api/v1/certificates/",
-	certificatesCreate: "/api/v1/certificates/",
-	certificateUpdate: (id: string) => `/api/v1/certificates/${id}/`,
+	certificatesList: "/api/v1/certificates/list/",
+	certificatesCreate: "/api/v1/certificates/create/",
+	certificateUpdate: (id: string) => `/api/v1/certificates/${id}/update/`,
 	rfxList: "/api/v1/rfx/",
 	rfxCreate: "/api/v1/rfx/",
 	rfx: (id: string) => `/api/v1/rfx/${id}/`,
@@ -298,6 +311,9 @@ export const vendorCoreEndpoints = {
 	connectionHardDelete: (id: string) =>
 		`/api/v1/connections/${id}/hard-delete/`,
 	connectionTest: (id: string) => `/api/v1/connections/${id}/test/`,
+	connectionDiscoverHostKey: "/api/v1/connections/discover-host-key/",
+	connectionDiscoverHostKeyById: (id: string) =>
+		`/api/v1/connections/${id}/discover-host-key/`,
 	intakeJobs: "/api/v1/intake-jobs/",
 	intakeJob: (id: string) => `/api/v1/intake-jobs/${id}/`,
 	intakeJobRun: (id: string) => `/api/v1/intake-jobs/${id}/run/`,
@@ -580,6 +596,7 @@ export const vendorCoreEndpoints = {
 	inboundFilesSeed: "/api/v1/inbound-files/seed/",
 	claimHeadersList: "/api/v1/claim-headers/",
 	claimHeadersSummary: "/api/v1/claim-headers/summary/",
+	claimHeadersValidate: "/api/v1/claim-headers/validate/",
 	claimHeader: (id: string) => `/api/v1/claim-headers/${id}/`,
 	claimHeaderVoid: (id: string) => `/api/v1/claim-headers/${id}/void/`,
 	claimHeaderReplace: (id: string) => `/api/v1/claim-headers/${id}/replace/`,
@@ -757,12 +774,7 @@ export const vendorCoreApi = {
 			method: "DELETE",
 		}),
 
-	createCredential: (body: {
-		name: string;
-		kind: string;
-		secret_ref: string;
-		metadata?: Record<string, unknown>;
-	}) =>
+	createCredential: (body: CredentialCreateInput) =>
 		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credentialsCreate, {
 			method: "POST",
 			body: JSON.stringify(body),
@@ -771,7 +783,7 @@ export const vendorCoreApi = {
 	getCredential: (id: string) =>
 		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credential(id)),
 
-	updateCredential: (id: string, body: Record<string, unknown>) =>
+	updateCredential: (id: string, body: Partial<CredentialCreateInput>) =>
 		vendorCoreFetch<CredentialDto>(vendorCoreEndpoints.credentialUpdate(id), {
 			method: "PATCH",
 			body: JSON.stringify(body),
@@ -792,12 +804,13 @@ export const vendorCoreApi = {
 			method: "DELETE",
 		}),
 
-	createConnection: (body: Record<string, unknown>) =>
-		vendorCoreFetch<ConnectionDto>(vendorCoreEndpoints.connectionsCreate, {
-			method: "POST",
-			body: JSON.stringify(body),
-		}).then((c) =>
-			normalizeConnection(c as unknown as Record<string, unknown>)
+	createConnection: (body: ConnectionCreateInput) =>
+		vendorCoreFetch<ConnectionCompactDto>(
+			vendorCoreEndpoints.connectionsCreate,
+			{
+				method: "POST",
+				body: JSON.stringify(body),
+			}
 		),
 
 	getConnection: async (id: string) => {
@@ -1027,17 +1040,39 @@ export const vendorCoreApi = {
 	},
 
 	testConnection: (id: string) =>
-		vendorCoreFetch<Record<string, unknown>>(
+		vendorCoreFetch<ConnectionTestResult>(
 			vendorCoreEndpoints.connectionTest(id),
 			{ method: "POST" }
 		),
 
-	updateConnection: (id: string, body: Record<string, unknown>) =>
-		vendorCoreFetch<ConnectionDto>(vendorCoreEndpoints.connectionUpdate(id), {
-			method: "PATCH",
-			body: JSON.stringify(body),
-		}).then((c) =>
-			normalizeConnection(c as unknown as Record<string, unknown>)
+	discoverHostKey: (body: { host: string; port?: number }) =>
+		vendorCoreFetch<ConnectionDiscoverHostKeyResult>(
+			vendorCoreEndpoints.connectionDiscoverHostKey,
+			{
+				method: "POST",
+				body: JSON.stringify(body),
+			}
+		),
+
+	discoverHostKeyById: (
+		id: string,
+		body?: { host?: string; port?: number; pin?: boolean }
+	) =>
+		vendorCoreFetch<ConnectionDiscoverHostKeyResult>(
+			vendorCoreEndpoints.connectionDiscoverHostKeyById(id),
+			{
+				method: "POST",
+				body: JSON.stringify(body ?? {}),
+			}
+		),
+
+	updateConnection: (id: string, body: ConnectionUpdateInput) =>
+		vendorCoreFetch<ConnectionCompactDto>(
+			vendorCoreEndpoints.connectionUpdate(id),
+			{
+				method: "PATCH",
+				body: JSON.stringify(body),
+			}
 		),
 
 	listIntakeJobs: async (params?: { status?: string; vendor_id?: string }) => {
@@ -1637,9 +1672,9 @@ export const vendorCoreApi = {
 		const result = await vendorCoreFetchBlob(
 			vendorCoreEndpoints.inboundFileDownload(id)
 		);
-		const text = await result.blob.text();
 		return {
-			text,
+			blob: result.blob,
+			text: await result.blob.text(),
 			contentType: result.contentType,
 			filename: result.filename,
 		};
@@ -2897,6 +2932,24 @@ export const vendorCoreApi = {
 		return mapPage(page, (row) => row as VendorCategoryAssignmentDto);
 	},
 
+	deleteVendorCategoryAssignment: (id: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.vendorCategoryAssignmentDelete(id),
+			{ method: "DELETE" }
+		),
+
+	restoreVendorCategoryAssignment: (id: string) =>
+		vendorCoreFetch<VendorCategoryAssignmentDto>(
+			vendorCoreEndpoints.vendorCategoryAssignmentRestore(id),
+			{ method: "POST" }
+		),
+
+	hardDeleteVendorCategoryAssignment: (id: string) =>
+		vendorCoreFetch<void>(
+			vendorCoreEndpoints.vendorCategoryAssignmentHardDelete(id),
+			{ method: "DELETE" }
+		),
+
 	listUsers: async (params?: { search?: string }) => {
 		const results = await listAllPages(async ({ limit, offset }) =>
 			vendorCoreFetch<PaginatedResult<CoreUserDto>>(
@@ -3840,6 +3893,15 @@ export const vendorCoreApi = {
 		vendorCoreFetch<ClaimHeaderDetailDto>(
 			vendorCoreEndpoints.claimHeaderReplace(id),
 			{ method: "POST", body: JSON.stringify(body ?? {}) }
+		),
+
+	revalidateClaimHeaders: (claimHeaderIds: string[]) =>
+		vendorCoreFetch<ClaimHeaderValidateResult>(
+			vendorCoreEndpoints.claimHeadersValidate,
+			{
+				method: "POST",
+				body: JSON.stringify({ claim_header_ids: claimHeaderIds }),
+			}
 		),
 
 	getCmsEdgeSettings: () =>

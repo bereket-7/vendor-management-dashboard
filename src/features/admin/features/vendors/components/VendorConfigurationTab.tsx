@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
 	Bell,
@@ -8,6 +8,7 @@ import {
 	Copy,
 	FolderOpen,
 	KeyRound,
+	Loader2,
 	Lock,
 	MoreHorizontal,
 	Pencil,
@@ -66,8 +67,25 @@ import {
 	type VendorIntegrationProfile,
 	type VendorSftpConnection,
 } from "@/features/admin/features/vendors/vendor-types";
+import {
+	credentialOptionLabel,
+	draftFromSftpConnection,
+	emptyConnectionFormDraft,
+	isLocalSftpHost,
+	portAfterHostChange,
+	type ConnectionFormDraft,
+	validateConnectionDraft,
+} from "@/features/admin/features/vendors/connection-form";
+import {
+	discoverVendorHostKey,
+	discoverVendorHostKeyById,
+} from "@/features/admin/features/vendors/feature/api/vendorsApi";
+import { VendorCategoriesPanel } from "@/features/admin/features/vendors/components/VendorCategoriesPanel";
+import type {
+	CredentialDto,
+	VendorIntegrationProfileUpdateInput,
+} from "@/lib/vendor-core/types";
 import { cn } from "@/lib/utils";
-import type { VendorIntegrationProfileUpdateInput } from "@/lib/vendor-core/types";
 
 const JOB_SUBTABS = [
 	"Jobs",
@@ -106,7 +124,20 @@ type VendorConfigurationTabProps = {
 	onUpdateJob?: (jobId: string, draft: JobDraft) => Promise<void>;
 	onDisableJob?: (jobId: string) => Promise<void>;
 	onTestConnection?: () => Promise<void>;
-	onUpdateConnectionHost?: (host: string) => Promise<void>;
+	onSaveConnection?: (
+		draft: ConnectionFormDraft,
+		mode: "create" | "update"
+	) => Promise<void>;
+	/** Soft-delete the current SFTP connection. */
+	onDeleteConnection?: () => Promise<void>;
+	/** Called after Discover & pin persists fingerprint (refetch detail). */
+	onHostKeyPinned?: () => Promise<void> | void;
+	credentials?: CredentialDto[];
+	onRegisterCredential?: (input: {
+		name: string;
+		kind: "password" | "private_key";
+		secret_ref: string;
+	}) => Promise<CredentialDto>;
 	onSaveIntegrationProfile?: (
 		patch: VendorIntegrationProfileUpdateInput
 	) => Promise<void>;
@@ -143,7 +174,11 @@ export function VendorConfigurationTab({
 	onUpdateJob,
 	onDisableJob,
 	onTestConnection,
-	onUpdateConnectionHost,
+	onSaveConnection,
+	onDeleteConnection,
+	onHostKeyPinned,
+	credentials = [],
+	onRegisterCredential,
 	onSaveIntegrationProfile,
 }: VendorConfigurationTabProps) {
 	const [activeStep, setActiveStep] = useState(1);
@@ -155,8 +190,19 @@ export function VendorConfigurationTab({
 	} | null>(null);
 	const [draft, setDraft] = useState<JobDraft | null>(null);
 	const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
+	const [deleteConnectionOpen, setDeleteConnectionOpen] = useState(false);
 	const [connectionDraftOpen, setConnectionDraftOpen] = useState(false);
-	const [connectionHost, setConnectionHost] = useState("");
+	const [connectionDraft, setConnectionDraft] = useState<ConnectionFormDraft>(
+		() => emptyConnectionFormDraft(vendorName)
+	);
+	const [connectionSaving, setConnectionSaving] = useState(false);
+	const [discoveringHostKey, setDiscoveringHostKey] = useState(false);
+	const [credMiniOpen, setCredMiniOpen] = useState(false);
+	const [credMini, setCredMini] = useState({
+		name: "",
+		kind: "password" as "password" | "private_key",
+		secret_ref: "",
+	});
 	const [profileDraftOpen, setProfileDraftOpen] = useState(false);
 	const [profileDraft, setProfileDraft] = useState({
 		timezone: integration.timezone,
@@ -187,6 +233,15 @@ export function VendorConfigurationTab({
 	]);
 
 	const connected = connection.status === "Connected";
+	const needsAuth =
+		connection.method !== "sftp_hosted" &&
+		connection.authMethod === "Not configured";
+	const needsFingerprint =
+		connection.method !== "sftp_hosted" &&
+		Boolean(connectionId) &&
+		!connection.hostKeyFingerprint?.trim();
+	const localPortHint =
+		isLocalSftpHost(connection.host) && connection.port === 22;
 	const alertsEnabled = Math.max(integration.alertsCount, 3);
 	const fileTypesCount = new Set(jobs.map((j) => j.fileType)).size;
 	const pgpEnabled = (integration.encryption ?? "")
@@ -218,20 +273,65 @@ export function VendorConfigurationTab({
 	];
 
 	const connectionFields = [
+		{ label: "Connection Name", value: connection.connectionName || "—" },
 		{
-			label: "SFTP Host",
-			value: connectionHost || connection.host,
-			icon: Server,
+			label: "Method",
+			value:
+				connection.method === "sftp_hosted"
+					? "SFTP Hosted"
+					: connection.method === "sftp_pull"
+						? "SFTP Pull"
+						: connection.method || "—",
 		},
-		{ label: "Port", value: String(connection.port) },
-		{ label: "Username", value: connection.username },
-		{ label: "Authentication", value: connection.authMethod, icon: KeyRound },
-		{ label: "Authentication Key", value: connection.authKey, icon: KeyRound },
-		{ label: "Last Verified", value: connection.lastVerified },
+		{ label: "Environment", value: connection.environment || "—" },
+		{ label: "Lifecycle", value: connection.lifecycleStatus || "—" },
+		...(connection.method === "sftp_hosted"
+			? [
+					{
+						label: "Landing user",
+						value: connection.landingUser || "—",
+						icon: Server,
+					},
+					{
+						label: "Inbound path",
+						value: connection.inboundPath || "—",
+						icon: FolderOpen,
+					},
+					{ label: "Archive path", value: connection.archivePath || "—" },
+					{ label: "Error path", value: connection.errorPath || "—" },
+					{
+						label: "Processing path",
+						value: connection.processingPath || "—",
+					},
+				]
+			: [
+					{
+						label: "SFTP Host",
+						value: connection.host || "—",
+						icon: Server,
+					},
+					{ label: "Port", value: String(connection.port || "—") },
+					{ label: "Username", value: connection.username || "—" },
+					{
+						label: "Authentication",
+						value: connection.authMethod,
+						icon: KeyRound,
+					},
+					{ label: "Credential", value: connection.authKey, icon: KeyRound },
+					{
+						label: "Host key fingerprint",
+						value: connection.hostKeyFingerprint || "—",
+					},
+					{
+						label: "Remote Directory",
+						value: connection.remoteDirectory || "—",
+						icon: FolderOpen,
+					},
+				]),
+		{ label: "Last Verified", value: connection.lastVerified || "—" },
 		{
-			label: "Remote Directory",
-			value: connection.remoteDirectory,
-			icon: FolderOpen,
+			label: "Health",
+			value: connection.healthStatus || "—",
 		},
 		{
 			label: "Status",
@@ -239,12 +339,19 @@ export function VendorConfigurationTab({
 			tone: connected ? "success" : "danger",
 		},
 		{
-			label: "Test Connection",
+			label: "Last test",
 			value: connection.testConnection,
-			tone: connection.testConnection === "Successful" ? "success" : "danger",
+			tone:
+				connection.testConnection === "Successful"
+					? "success"
+					: connection.testConnection === "Failed"
+						? "danger"
+						: undefined,
 		},
-		{ label: "Connection Name", value: connection.connectionName },
-	] as const;
+		...(connection.lastError
+			? [{ label: "Last error", value: connection.lastError }]
+			: []),
+	];
 
 	function goToStep(step: number) {
 		setActiveStep(step);
@@ -400,20 +507,196 @@ export function VendorConfigurationTab({
 		finish();
 	}
 
-	function saveConnectionHost() {
-		const next = connectionHost.trim() || connection.host;
-		const finish = () => {
-			setConnectionHost(next);
-			setConnectionDraftOpen(false);
-			toast.success(`SFTP host updated to ${next}.`);
-		};
-		if (onUpdateConnectionHost) {
-			void onUpdateConnectionHost(next)
-				.then(finish)
-				.catch(() => toast.error("Could not update connection host."));
+	function openConnectionDraft() {
+		const base = connectionId
+			? {
+					...draftFromSftpConnection(connection),
+					privateKeyCredentialId: connection.privateKeyCredentialId || "",
+				}
+			: emptyConnectionFormDraft(vendorName);
+		// Local Docker: bump leftover wizard default 22 → 2222 when editing.
+		if (isLocalSftpHost(base.host) && base.port.trim() === "22") {
+			base.port = "2222";
+		}
+		setConnectionDraft(base);
+		setConnectionDraftOpen(true);
+	}
+
+	async function discoverAndPinHostKey() {
+		if (!connectionId) {
+			toast.error("Save the connection first, then pin the host key.");
 			return;
 		}
-		finish();
+		if (connection.method === "sftp_hosted") return;
+		const host = connection.host.trim();
+		let port = connection.port;
+		if (isLocalSftpHost(host) && port === 22) {
+			port = 2222;
+		}
+		setDiscoveringHostKey(true);
+		try {
+			let result: Awaited<ReturnType<typeof discoverVendorHostKeyById>>;
+			try {
+				result = await discoverVendorHostKeyById(connectionId, {
+					host: host || undefined,
+					port: port > 0 ? port : undefined,
+					pin: true,
+				});
+			} catch (firstErr) {
+				// Fallback: discover by host/port then PATCH config (older BE without pin).
+				const discovered = await discoverVendorHostKey({
+					host: host || "localhost",
+					port: port > 0 ? port : 2222,
+				});
+				if (!discovered.fingerprint?.trim()) {
+					throw firstErr;
+				}
+				if (!onSaveConnection) throw firstErr;
+				const draft = draftFromSftpConnection(connection);
+				draft.hostKeyFingerprint = discovered.fingerprint;
+				draft.port = String(discovered.port || port);
+				await onSaveConnection(draft, "update");
+				result = { ...discovered, pinned: true };
+			}
+
+			if (!result.fingerprint?.trim()) {
+				throw new Error("Discover returned an empty fingerprint.");
+			}
+
+			// pin=true already wrote config; still PATCH if older BE ignored pin.
+			if (!result.pinned && onSaveConnection) {
+				const draft = draftFromSftpConnection(connection);
+				draft.hostKeyFingerprint = result.fingerprint;
+				draft.port = String(result.port || port);
+				await onSaveConnection(draft, "update");
+			}
+
+			await onHostKeyPinned?.();
+			toast.success(
+				`Host key pinned (${result.fingerprint.slice(0, 12)}…). Set lifecycle Active, then Test.`
+			);
+		} catch (err) {
+			const status =
+				err && typeof err === "object" && "status" in err
+					? Number((err as { status?: number }).status)
+					: undefined;
+			const message =
+				err instanceof Error ? err.message : "Could not discover host key.";
+			if (status === 404) {
+				toast.error(
+					"Discover API not found (404). Restart vendor-management-core so /connections/.../discover-host-key/ is loaded."
+				);
+			} else {
+				toast.error(message);
+			}
+		} finally {
+			setDiscoveringHostKey(false);
+		}
+	}
+
+	async function discoverHostKey() {
+		if (connectionDraft.method !== "sftp_pull") return;
+		const host = connectionDraft.host.trim();
+		if (!host && !connectionId) {
+			toast.error("Enter a host before discovering the fingerprint.");
+			return;
+		}
+		const portNum = Number(connectionDraft.port);
+		const port =
+			Number.isFinite(portNum) && portNum > 0 ? portNum : undefined;
+		setDiscoveringHostKey(true);
+		try {
+			const result =
+				connectionId && !host
+					? await discoverVendorHostKeyById(connectionId, {
+							port,
+						})
+					: connectionId
+						? await discoverVendorHostKeyById(connectionId, {
+								host,
+								port,
+							})
+						: await discoverVendorHostKey({
+								host,
+								port,
+							});
+			setConnectionDraft((p) => ({
+				...p,
+				hostKeyFingerprint: result.fingerprint,
+			}));
+			toast.success(
+				result.key_type
+					? `Discovered ${result.key_type} host key. Confirm before save.`
+					: "Discovered host key. Confirm before save."
+			);
+		} catch (err) {
+			toast.error(
+				err instanceof Error
+					? err.message
+					: "Could not discover host key."
+			);
+		} finally {
+			setDiscoveringHostKey(false);
+		}
+	}
+
+	async function saveConnectionDraft() {
+		const error = validateConnectionDraft(connectionDraft);
+		if (error) {
+			toast.error(error);
+			return;
+		}
+		if (!onSaveConnection) {
+			setConnectionDraftOpen(false);
+			toast.success("Connection saved.");
+			return;
+		}
+		setConnectionSaving(true);
+		try {
+			await onSaveConnection(
+				connectionDraft,
+				connectionId ? "update" : "create"
+			);
+			setConnectionDraftOpen(false);
+			toast.success(
+				connectionId ? "Connection updated." : "Connection created."
+			);
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Could not save connection."
+			);
+		} finally {
+			setConnectionSaving(false);
+		}
+	}
+
+	async function registerCredentialMini() {
+		if (!onRegisterCredential) return;
+		if (!credMini.name.trim() || !credMini.secret_ref.trim()) {
+			toast.error("Credential name and secret_ref are required.");
+			return;
+		}
+		try {
+			const created = await onRegisterCredential({
+				name: credMini.name.trim(),
+				kind: credMini.kind,
+				secret_ref: credMini.secret_ref.trim(),
+			});
+			setConnectionDraft((prev) =>
+				credMini.kind === "private_key"
+					? { ...prev, privateKeyCredentialId: created.id }
+					: { ...prev, passwordCredentialId: created.id }
+			);
+			setCredMiniOpen(false);
+			setCredMini({ name: "", kind: "password", secret_ref: "" });
+			toast.success(
+				"Credential reference registered. Ensure the secret exists in .secrets.yml."
+			);
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Could not register credential."
+			);
+		}
 	}
 
 	function openProfileDraft() {
@@ -504,6 +787,8 @@ export function VendorConfigurationTab({
 				</div>
 			</div>
 
+			<VendorCategoriesPanel vendorId={vendorId} />
+
 			<div className="grid gap-2 sm:grid-cols-3">
 				{steps.map((step) => {
 					const active = activeStep === step.id;
@@ -565,7 +850,7 @@ export function VendorConfigurationTab({
 								vendor.
 							</p>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex flex-wrap items-center gap-2">
 							<span
 								className={cn(
 									"inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold",
@@ -576,6 +861,21 @@ export function VendorConfigurationTab({
 							>
 								{connection.status}
 							</span>
+							{needsFingerprint ? (
+								<Button
+									type="button"
+									variant="default"
+									size="sm"
+									className="h-8 text-xs"
+									disabled={discoveringHostKey}
+									onClick={() => void discoverAndPinHostKey()}
+								>
+									{discoveringHostKey ? (
+										<Loader2 className="mr-1.5 size-3.5 animate-spin" />
+									) : null}
+									Discover &amp; pin host key
+								</Button>
+							) : null}
 							<Button
 								type="button"
 								variant="outline"
@@ -591,18 +891,27 @@ export function VendorConfigurationTab({
 							>
 								Test Connection
 							</Button>
+							{connectionId && onDeleteConnection ? (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-8 text-xs text-destructive hover:text-destructive"
+									onClick={() => setDeleteConnectionOpen(true)}
+								>
+									Delete connection
+								</Button>
+							) : null}
 							<Button
 								type="button"
 								variant="outline"
 								size="sm"
 								className="h-8 text-xs"
-								onClick={() => {
-									setConnectionHost(connectionHost || connection.host);
-									setConnectionDraftOpen(true);
-								}}
+								disabled={!onSaveConnection}
+								onClick={openConnectionDraft}
 							>
 								<Pencil className="mr-1.5 size-3.5" />
-								Edit Connection
+								{connectionId ? "Edit Connection" : "Create Connection"}
 							</Button>
 						</div>
 					</div>
@@ -651,7 +960,15 @@ export function VendorConfigurationTab({
 						<CheckCircle2 className="size-4 shrink-0" />
 						{connected
 							? "Connection established successfully"
-							: "Connection could not be verified — update credentials and retry."}
+							: needsAuth
+								? "Authentication not configured — attach a password credential, then retry."
+								: needsFingerprint
+									? localPortHint
+										? "Host key not pinned, and port is 22 on localhost — use Discover & pin (sets fingerprint; edit port to 2222 for Docker SFTP)."
+										: "Host key not pinned — click Discover & pin host key, then set lifecycle Active and Test."
+									: localPortHint
+										? "Not verified yet — localhost often needs port 2222 for Docker SFTP. Edit Connection, then Test."
+										: "Connection not verified yet — set Active after pinning host key, then Test."}
 					</div>
 				</div>
 
@@ -1354,6 +1671,45 @@ export function VendorConfigurationTab({
 				</DialogContent>
 			</Dialog>
 
+			{/* Delete connection confirm */}
+			<AlertDialog
+				open={deleteConnectionOpen}
+				onOpenChange={setDeleteConnectionOpen}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete connection?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Soft-deletes this SFTP connection. Intake jobs that use it may
+							stop working until you create a new connection.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							onClick={() => {
+								if (!onDeleteConnection) return;
+								void onDeleteConnection()
+									.then(() => {
+										setDeleteConnectionOpen(false);
+										toast.success("Connection deleted.");
+									})
+									.catch((err) =>
+										toast.error(
+											err instanceof Error
+												? err.message
+												: "Could not delete connection."
+										)
+									);
+							}}
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
 			{/* Delete confirm */}
 			<AlertDialog
 				open={Boolean(deleteJobId)}
@@ -1381,23 +1737,423 @@ export function VendorConfigurationTab({
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{/* Connection edit */}
+			{/* Connection create/edit */}
 			<Dialog open={connectionDraftOpen} onOpenChange={setConnectionDraftOpen}>
-				<DialogContent className="sm:max-w-md">
+				<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
 					<DialogHeader>
-						<DialogTitle>Edit SFTP connection</DialogTitle>
+						<DialogTitle>
+							{connectionId ? "Edit SFTP connection" : "Create SFTP connection"}
+						</DialogTitle>
 						<DialogDescription>
-							Update the SFTP host used for this vendor connection.
+							Aligned with vendor-core Connection API (`sftp_pull` /
+							`sftp_hosted`). Secrets are referenced by `secret_ref` only.
 						</DialogDescription>
 					</DialogHeader>
-					<div className="space-y-1.5 py-1">
-						<Label htmlFor="sftp-host">SFTP host</Label>
-						<Input
-							id="sftp-host"
-							value={connectionHost}
-							onChange={(e) => setConnectionHost(e.target.value)}
-						/>
+					<div className="grid gap-3 py-1 sm:grid-cols-2">
+						<div className="space-y-1.5 sm:col-span-2">
+							<Label htmlFor="conn-name">Connection name</Label>
+							<Input
+								id="conn-name"
+								value={connectionDraft.name}
+								onChange={(e) =>
+									setConnectionDraft((p) => ({ ...p, name: e.target.value }))
+								}
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Method</Label>
+							<Select
+								value={connectionDraft.method}
+								onValueChange={(method: "sftp_pull" | "sftp_hosted") =>
+									setConnectionDraft((p) => ({ ...p, method }))
+								}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="sftp_pull">SFTP Pull</SelectItem>
+									<SelectItem value="sftp_hosted">SFTP Hosted</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Direction</Label>
+							<Select
+								value={connectionDraft.direction}
+								onValueChange={(direction) =>
+									setConnectionDraft((p) => ({ ...p, direction }))
+								}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="inbound">Inbound</SelectItem>
+									<SelectItem value="outbound">Outbound</SelectItem>
+									<SelectItem value="both">Both</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Environment</Label>
+							<Select
+								value={connectionDraft.environment}
+								onValueChange={(environment) =>
+									setConnectionDraft((p) => ({ ...p, environment }))
+								}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="development">Development</SelectItem>
+									<SelectItem value="test">Test</SelectItem>
+									<SelectItem value="uat">UAT</SelectItem>
+									<SelectItem value="production">Production</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Status</Label>
+							<Select
+								value={connectionDraft.status}
+								onValueChange={(status) =>
+									setConnectionDraft((p) => ({ ...p, status }))
+								}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="draft">Draft</SelectItem>
+									<SelectItem value="testing">Testing</SelectItem>
+									<SelectItem value="active">Active</SelectItem>
+									<SelectItem value="inactive">Inactive</SelectItem>
+									<SelectItem value="failed">Failed</SelectItem>
+									<SelectItem value="expired">Expired</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						{connectionDraft.method === "sftp_pull" ? (
+							<>
+								<div className="space-y-1.5 sm:col-span-2">
+									<Label htmlFor="conn-host">Host</Label>
+									<Input
+										id="conn-host"
+										value={connectionDraft.host}
+										onChange={(e) => {
+											const host = e.target.value;
+											setConnectionDraft((p) => ({
+												...p,
+												host,
+												port: portAfterHostChange(host, p.port),
+											}));
+										}}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-port">Port</Label>
+									{isLocalSftpHost(connectionDraft.host) ? (
+										<p className="text-xs text-muted-foreground">
+											Localhost → use 2222 for Docker SFTP.
+										</p>
+									) : null}
+									<Input
+										id="conn-port"
+										value={connectionDraft.port}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												port: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-user">Username</Label>
+									<Input
+										id="conn-user"
+										value={connectionDraft.username}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												username: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-inbound">Inbound path</Label>
+									<Input
+										id="conn-inbound"
+										value={connectionDraft.inboundPath}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												inboundPath: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-archive">Archive path</Label>
+									<Input
+										id="conn-archive"
+										value={connectionDraft.archivePath}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												archivePath: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5 sm:col-span-2">
+									<Label htmlFor="conn-fp">
+										Host key fingerprint (SHA-256 hex)
+									</Label>
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+										<Input
+											id="conn-fp"
+											value={connectionDraft.hostKeyFingerprint}
+											onChange={(e) =>
+												setConnectionDraft((p) => ({
+													...p,
+													hostKeyFingerprint: e.target.value,
+												}))
+											}
+											placeholder="Required before status=active"
+											className="font-mono text-xs"
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											disabled={discoveringHostKey}
+											onClick={() => void discoverHostKey()}
+											className="shrink-0"
+										>
+											{discoveringHostKey ? (
+												<Loader2 className="mr-2 size-4 animate-spin" />
+											) : null}
+											Discover
+										</Button>
+									</div>
+									<p className="text-xs text-muted-foreground">
+										Fetches the live host key. Confirm the value, then Save.
+										Required to set status Active.
+									</p>
+								</div>
+								<div className="space-y-1.5">
+									<Label>Password credential</Label>
+									<p className="text-xs text-muted-foreground">
+										Password auth — pick a credential whose secret_ref is in
+										.secrets.yml.
+									</p>
+									<Select
+										value={connectionDraft.passwordCredentialId || "__none__"}
+										onValueChange={(v) =>
+											setConnectionDraft((p) => ({
+												...p,
+												passwordCredentialId: v === "__none__" ? "" : v,
+											}))
+										}
+									>
+										<SelectTrigger>
+											<SelectValue placeholder="None" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__none__">None</SelectItem>
+											{credentials
+												.filter((c) => c.kind === "password")
+												.map((c) => (
+													<SelectItem key={c.id} value={c.id}>
+														{credentialOptionLabel(c)}
+													</SelectItem>
+												))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-1.5">
+									<Label>Private key credential</Label>
+									<p className="text-xs text-muted-foreground">
+										Only if key auth — leave None for password-only.
+									</p>
+									<Select
+										value={
+											connectionDraft.privateKeyCredentialId || "__none__"
+										}
+										onValueChange={(v) =>
+											setConnectionDraft((p) => ({
+												...p,
+												privateKeyCredentialId: v === "__none__" ? "" : v,
+											}))
+										}
+									>
+										<SelectTrigger>
+											<SelectValue placeholder="None" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__none__">None</SelectItem>
+											{credentials
+												.filter((c) => c.kind === "private_key")
+												.map((c) => (
+													<SelectItem key={c.id} value={c.id}>
+														{credentialOptionLabel(c)}
+													</SelectItem>
+												))}
+										</SelectContent>
+									</Select>
+								</div>
+							</>
+						) : (
+							<>
+								<div className="space-y-1.5 sm:col-span-2">
+									<Label htmlFor="conn-landing">Landing user</Label>
+									<Input
+										id="conn-landing"
+										value={connectionDraft.landingUser}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												landingUser: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-hin">Inbound path</Label>
+									<Input
+										id="conn-hin"
+										value={connectionDraft.inboundPath}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												inboundPath: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-ha">Archive path</Label>
+									<Input
+										id="conn-ha"
+										value={connectionDraft.archivePath}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												archivePath: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-he">Error path</Label>
+									<Input
+										id="conn-he"
+										value={connectionDraft.errorPath}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												errorPath: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="conn-hp">Processing path</Label>
+									<Input
+										id="conn-hp"
+										value={connectionDraft.processingPath}
+										onChange={(e) =>
+											setConnectionDraft((p) => ({
+												...p,
+												processingPath: e.target.value,
+											}))
+										}
+										className="font-mono"
+									/>
+								</div>
+							</>
+						)}
 					</div>
+					{onRegisterCredential ? (
+						<div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+							<div className="mb-2 flex items-center justify-between gap-2">
+								<p className="text-xs font-medium text-foreground">
+									Register credential reference
+								</p>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-7 text-xs"
+									onClick={() => setCredMiniOpen((o) => !o)}
+								>
+									{credMiniOpen ? "Hide" : "Add"}
+								</Button>
+							</div>
+							{credMiniOpen ? (
+								<div className="grid gap-2 sm:grid-cols-3">
+									<Input
+										placeholder="Name"
+										value={credMini.name}
+										onChange={(e) =>
+											setCredMini((p) => ({ ...p, name: e.target.value }))
+										}
+									/>
+									<Select
+										value={credMini.kind}
+										onValueChange={(kind: "password" | "private_key") =>
+											setCredMini((p) => ({ ...p, kind }))
+										}
+									>
+										<SelectTrigger>
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="password">password</SelectItem>
+											<SelectItem value="private_key">private_key</SelectItem>
+										</SelectContent>
+									</Select>
+									<Input
+										placeholder="secret_ref"
+										value={credMini.secret_ref}
+										onChange={(e) =>
+											setCredMini((p) => ({
+												...p,
+												secret_ref: e.target.value,
+											}))
+										}
+										className="font-mono text-xs"
+									/>
+									<Button
+										type="button"
+										size="sm"
+										className="sm:col-span-3"
+										onClick={() => void registerCredentialMini()}
+									>
+										Register secret_ref
+									</Button>
+								</div>
+							) : (
+								<p className="text-[11px] text-muted-foreground">
+									Creates a CredentialReference row only — the secret value
+									must already exist under `.secrets.yml`.
+								</p>
+							)}
+						</div>
+					) : null}
 					<DialogFooter>
 						<Button
 							type="button"
@@ -1406,8 +2162,12 @@ export function VendorConfigurationTab({
 						>
 							Cancel
 						</Button>
-						<Button type="button" onClick={saveConnectionHost}>
-							Save connection
+						<Button
+							type="button"
+							disabled={connectionSaving}
+							onClick={() => void saveConnectionDraft()}
+						>
+							{connectionSaving ? "Saving…" : "Save connection"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

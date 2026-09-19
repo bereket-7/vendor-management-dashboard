@@ -253,15 +253,19 @@ export function claimExceptionDtosToExceptions(
 		const id = str(row.id);
 		const severityRaw = str(row.severity, "error").toLowerCase();
 		const statusRaw = str(row.status, "open").toLowerCase();
+		const code = str(row.code, "EXC");
+		const message = str(row.message, "Exception");
+		const fileId = str(row.batch ?? row.source_inbound_file, id);
+		const vendor = str(row.vendor_name ?? row.vendor, "Vendor");
 		return {
 			id,
 			exceptionId: `EX-${id.slice(0, 8).toUpperCase()}`,
-			fileId: str(row.batch ?? row.source_inbound_file, id),
-			vendor: str(row.vendor_name ?? row.vendor, "Vendor"),
+			fileId,
+			vendor,
 			program,
 			severity: severityRaw === "warning" ? "warning" : "error",
-			code: str(row.code, "EXC"),
-			message: str(row.message, "Exception"),
+			code,
+			message,
 			claimId: row.claim_line ? str(row.claim_line) : null,
 			status:
 				statusRaw === "resolved"
@@ -270,6 +274,35 @@ export function claimExceptionDtosToExceptions(
 						? "in_progress"
 						: "open",
 			detectedAt: str(row.created_at, new Date().toISOString()),
+			category: str(row.category, "Validation"),
+			memberId: str(row.member_id, "—"),
+			memberName: str(row.member_name, "—"),
+			provider: str(row.provider_name ?? row.provider, "—"),
+			serviceLine: Number(row.service_line ?? 0) || 0,
+			dateOfService: str(row.date_of_service, "—"),
+			source: str(row.source, "claim-exception"),
+			whatFailed: str(row.what_failed, message),
+			whyItMatters: str(row.why_it_matters, "May affect claim acceptance."),
+			receivedValue: str(row.received_value, "—"),
+			expectedValue: str(row.expected_value, "—"),
+			loopSegment: str(row.loop_segment, "—"),
+			element: str(row.element, "—"),
+			elementDescription: str(row.element_description, "—"),
+			usage: str(row.usage, "—"),
+			maxUse: Number(row.max_use ?? 1) || 1,
+			ruleId: str(row.rule_id, code),
+			ruleDescription: str(row.rule_description, message),
+			recommendedAction: str(
+				row.recommended_action,
+				"Review and correct the source file, then reprocess."
+			),
+			ediSnippet: str(row.edi_snippet, ""),
+			responsibleParty: str(row.responsible_party, vendor),
+			assignedTo: str(row.assigned_to, "—"),
+			resolutionNotes: str(row.resolution_notes, ""),
+			attachmentsCount: Number(row.attachments_count ?? 0) || 0,
+			ediFixture: "837I",
+			fileName: str(row.file_name, fileId),
 		};
 	});
 }

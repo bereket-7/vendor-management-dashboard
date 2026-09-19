@@ -1,18 +1,87 @@
-/** Intentionally mock-backed analytics domain; no vendor-core route. */
-import { withMockOrRemote } from "@/lib/mock-mode";
+import {
+	fetchPdeReconciliations,
+	fetchProgramReportingOverview,
+	fetchProgramResponses,
+	fetchProgramSubmissions,
+} from "@/lib/vendor-reporting/program-reporting";
+import {
+	isPartDSubmission,
+	mapPartDKpis,
+	mapPdeReconciliationDto,
+	mapSubmissionDtoToPartDRow,
+	normalizeReportingPeriod,
+	type MedicarePartDKpis,
+	type MedicarePartDReconciliationRow,
+	type MedicarePartDSubmissionRow,
+} from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 
-import * as mock from "../../mock-data";
-
-export async function listPartDSubmissions() {
-	return withMockOrRemote(
-		() => mock.MEDICARE_PART_D_SUBMISSIONS,
-		async () => []
-	);
+export async function listPartDSubmissions(
+	reportingPeriod?: string
+): Promise<MedicarePartDSubmissionRow[]> {
+	const submissions = await fetchProgramSubmissions({
+		programType: "medicare",
+		reportingPeriod: normalizeReportingPeriod(reportingPeriod),
+	});
+	return submissions.filter(isPartDSubmission).map(mapSubmissionDtoToPartDRow);
 }
 
-export async function getPartDKpis() {
-	return withMockOrRemote(
-		() => mock.MEDICARE_PART_D_KPIS,
-		async () => mock.MEDICARE_PART_D_KPIS
+export async function getPartDKpis(
+	reportingPeriod?: string
+): Promise<MedicarePartDKpis> {
+	const period = normalizeReportingPeriod(reportingPeriod);
+	const [submissions, responses, overview] = await Promise.all([
+		fetchProgramSubmissions({
+			programType: "medicare",
+			reportingPeriod: period,
+		}),
+		fetchProgramResponses({ programType: "medicare" }),
+		fetchProgramReportingOverview({
+			programType: "medicare",
+			reportingPeriod: period,
+		}),
+	]);
+	return mapPartDKpis({
+		submissions,
+		responses,
+		medicareExtras: overview.medicareExtras,
+	});
+}
+
+export async function listPartDReconciliations(
+	reportingPeriod?: string
+): Promise<MedicarePartDReconciliationRow[]> {
+	const rows = await fetchPdeReconciliations({
+		reportingPeriod: normalizeReportingPeriod(reportingPeriod),
+	});
+	return rows.map(mapPdeReconciliationDto);
+}
+
+export type MedicarePartDResponseRow = {
+	id: string;
+	responseFile: string;
+	receivedOn: string;
+	pdeSubmission: string;
+	status: "Processed" | "Processed with Errors" | "Pending";
+};
+
+export async function listPartDResponses(
+	reportingPeriod?: string
+): Promise<MedicarePartDResponseRow[]> {
+	void reportingPeriod;
+	const { formatDisplayDate } = await import(
+		"@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers"
 	);
+	const rows = await fetchProgramResponses({ programType: "medicare" });
+	return rows.map((r) => ({
+		id: r.id,
+		responseFile: r.responseFile || "—",
+		receivedOn: formatDisplayDate(r.receivedAt, true),
+		pdeSubmission: r.submissionId || "—",
+		status:
+			r.errors && r.errors > 0
+				? ("Processed with Errors" as const)
+				: r.status === "Pending"
+					? ("Pending" as const)
+					: ("Processed" as const),
+	}));
 }

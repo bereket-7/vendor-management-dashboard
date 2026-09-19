@@ -35,16 +35,12 @@ export function isMembersMockEnabled(): boolean {
 
 /**
  * Claim vendor file queues (inbound / outbound) fixtures.
- * Default on for demos; set `NEXT_PUBLIC_CLAIM_FILES_USE_MOCK=false`
- * (with `USE_MOCK=false`) to use live vendor-core claim-vendor-files.
+ * Opt-in: set `NEXT_PUBLIC_CLAIM_FILES_USE_MOCK=true` (or global `USE_MOCK=true`).
+ * Default off so Claims / claim-headers stay on live vendor-core.
  */
 export function isClaimVendorFilesMockEnabled(): boolean {
 	if (isMockEnabled()) return true;
-	const value = process.env.NEXT_PUBLIC_CLAIM_FILES_USE_MOCK;
-	if (value === "false" || value === "0") return false;
-	return (
-		value === undefined || value === "" || value === "true" || value === "1"
-	);
+	return envFlag("NEXT_PUBLIC_CLAIM_FILES_USE_MOCK");
 }
 
 /** Inverse of {@link isMockEnabled} — NestJS / vendor-core are expected. */

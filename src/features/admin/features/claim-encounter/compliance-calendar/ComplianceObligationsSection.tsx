@@ -3,7 +3,6 @@
 import {
 	ArrowUp,
 	CalendarDays,
-	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
 	ChevronsLeft,
@@ -34,9 +33,9 @@ import {
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
-	COMPLIANCE_OBLIGATIONS,
 	COMPLIANCE_PROGRAM_LABELS,
-	COMPLIANCE_UPCOMING_DEADLINES,
+	type ComplianceObligationRow,
+	type UpcomingDeadline,
 	complianceProgramPillClass,
 	complianceStatusPillClass,
 } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
@@ -74,8 +73,16 @@ function DeadlineBadge({
 	);
 }
 
-export function ComplianceObligationsSection() {
-	const total = 156;
+export function ComplianceObligationsSection({
+	obligations,
+	upcomingDeadlines,
+	total,
+}: {
+	obligations: ComplianceObligationRow[];
+	upcomingDeadlines: UpcomingDeadline[];
+	total: number;
+}) {
+	const showing = obligations.length;
 
 	return (
 		<div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -84,7 +91,7 @@ export function ComplianceObligationsSection() {
 					<div className="flex flex-wrap items-baseline gap-2">
 						<span>Compliance Obligations</span>
 						<span className="text-xs font-normal text-muted-foreground">
-							Showing 1 to 10 of {total} obligations
+							Showing {showing} of {total} obligations
 						</span>
 					</div>
 				}
@@ -104,180 +111,125 @@ export function ComplianceObligationsSection() {
 								</SelectContent>
 							</Select>
 						</div>
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="text-xs tabular-nums text-muted-foreground">
-								1–10 of {total}
+						<div className="flex items-center gap-1">
+							<Button variant="outline" size="icon" className="size-8" disabled>
+								<ChevronsLeft className="size-3.5" />
+							</Button>
+							<Button variant="outline" size="icon" className="size-8" disabled>
+								<ChevronLeft className="size-3.5" />
+							</Button>
+							<span className="px-2 text-xs tabular-nums text-muted-foreground">
+								1
 							</span>
-							<div className="flex items-center gap-0.5">
-								<Button
-									variant="outline"
-									size="icon"
-									className="size-8"
-									aria-label="First page"
-								>
-									<ChevronsLeft className="size-3.5" />
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									className="size-8"
-									aria-label="Previous page"
-								>
-									<ChevronLeft className="size-3.5" />
-								</Button>
-								{[1, 2, 3, 4, 5].map((page) => (
-									<Button
-										key={page}
-										variant={page === 1 ? "default" : "outline"}
-										size="icon"
-										className="size-8 text-xs"
-									>
-										{page}
-									</Button>
-								))}
-								<span className="px-1 text-xs text-muted-foreground">…</span>
-								<Button
-									variant="outline"
-									size="icon"
-									className="size-8 text-xs"
-								>
-									16
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									className="size-8"
-									aria-label="Next page"
-								>
-									<ChevronRight className="size-3.5" />
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									className="size-8"
-									aria-label="Last page"
-								>
-									<ChevronsRight className="size-3.5" />
-								</Button>
-							</div>
+							<Button variant="outline" size="icon" className="size-8" disabled>
+								<ChevronRight className="size-3.5" />
+							</Button>
+							<Button variant="outline" size="icon" className="size-8" disabled>
+								<ChevronsRight className="size-3.5" />
+							</Button>
 						</div>
 					</div>
 				}
 			>
 				<CmsEdgeTableScroll>
 					<Table
-						className={CMS_EDGE_TABLE_CLASS}
 						containerClassName={CMS_EDGE_TABLE_CONTAINER}
+						className={cn(CMS_EDGE_TABLE_CLASS, "min-w-[960px]")}
 					>
 						<TableHeader>
-							<TableRow>
-								<TableHead className={cn(TABLE_HEAD, "min-w-[220px]")}>
-									Obligation / Description
-								</TableHead>
-								<TableHead className={TABLE_HEAD}>Program</TableHead>
-								<TableHead className={TABLE_HEAD}>Obligation Type</TableHead>
-								<TableHead className={TABLE_HEAD}>Frequency</TableHead>
+							<TableRow className="hover:bg-transparent">
 								<TableHead className={TABLE_HEAD}>
-									<span className="inline-flex items-center gap-0.5">
-										Due Date
-										<ArrowUp className="size-3 text-primary" />
+									<span className="inline-flex items-center gap-1">
+										Obligation
+										<ArrowUp className="size-3 opacity-40" />
 									</span>
 								</TableHead>
+								<TableHead className={TABLE_HEAD}>Program</TableHead>
+								<TableHead className={TABLE_HEAD}>Type</TableHead>
+								<TableHead className={TABLE_HEAD}>Frequency</TableHead>
+								<TableHead className={TABLE_HEAD}>Due Date</TableHead>
 								<TableHead className={TABLE_HEAD}>Status</TableHead>
-								<TableHead className={TABLE_HEAD}>
-									Days to Due / Overdue
-								</TableHead>
-								<TableHead className={TABLE_HEAD}>
-									Owner / Assigned To
-								</TableHead>
-								<TableHead className={TABLE_HEAD}>Source / Module</TableHead>
+								<TableHead className={TABLE_HEAD}>Days</TableHead>
+								<TableHead className={TABLE_HEAD}>Owner</TableHead>
+								<TableHead className={TABLE_HEAD}>Source</TableHead>
 								<TableHead className={cn(TABLE_HEAD, "text-right")}>
 									Action
 								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{COMPLIANCE_OBLIGATIONS.map((row) => (
-								<TableRow key={row.id}>
+							{obligations.length === 0 ? (
+								<TableRow>
 									<TableCell
-										className={cn(
-											TABLE_CELL,
-											"max-w-[240px] font-medium text-foreground"
-										)}
+										colSpan={10}
+										className="h-24 text-center text-muted-foreground"
 									>
-										<Link
-											href={`/admin/claim-encounter/regulatory/compliance-calendar/${row.id}`}
-											className="text-primary hover:underline"
-										>
-											{row.title}
-										</Link>
+										No obligations found.
 									</TableCell>
-									<TableCell className={TABLE_CELL}>
-										<span
-											className={cn(
-												CMS_EDGE_STATUS_PILL_CLASS,
-												complianceProgramPillClass(row.program)
-											)}
-										>
-											{COMPLIANCE_PROGRAM_LABELS[row.program]}
-										</span>
-									</TableCell>
-									<TableCell className={TABLE_CELL}>
-										{row.obligationType}
-									</TableCell>
-									<TableCell className={TABLE_CELL}>{row.frequency}</TableCell>
-									<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
-										{row.dueDate}
-									</TableCell>
-									<TableCell className={TABLE_CELL}>
-										<span
-											className={cn(
-												CMS_EDGE_STATUS_PILL_CLASS,
-												complianceStatusPillClass(row.status)
-											)}
-										>
-											{row.status}
-										</span>
-									</TableCell>
-									<TableCell
-										className={cn(
-											TABLE_CELL,
-											"tabular-nums font-medium",
-											row.daysToDue < 0 ? "text-red-600" : "text-foreground"
-										)}
-									>
-										{row.daysToDue}
-									</TableCell>
-									<TableCell className={TABLE_CELL}>{row.owner}</TableCell>
-									<TableCell className={TABLE_CELL}>
-										{row.sourceModule}
-									</TableCell>
-									<TableCell className={cn(TABLE_CELL, "text-right")}>
-										<div className="inline-flex overflow-hidden rounded-md border border-border/70">
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-7 rounded-none px-2.5 text-xs text-primary"
-												asChild
+								</TableRow>
+							) : (
+								obligations.map((row) => (
+									<TableRow key={row.id} className="hover:bg-muted/30">
+										<TableCell className={TABLE_CELL}>
+											<Link
+												href={`/admin/claim-encounter/regulatory/compliance-calendar/${row.id}`}
+												className="font-medium text-primary hover:underline"
 											>
+												{row.title}
+											</Link>
+										</TableCell>
+										<TableCell className={TABLE_CELL}>
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													complianceProgramPillClass(row.program)
+												)}
+											>
+												{COMPLIANCE_PROGRAM_LABELS[row.program]}
+											</span>
+										</TableCell>
+										<TableCell className={TABLE_CELL}>
+											{row.obligationType}
+										</TableCell>
+										<TableCell className={TABLE_CELL}>{row.frequency}</TableCell>
+										<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
+											{row.dueDate}
+										</TableCell>
+										<TableCell className={TABLE_CELL}>
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													complianceStatusPillClass(row.status)
+												)}
+											>
+												{row.status}
+											</span>
+										</TableCell>
+										<TableCell
+											className={cn(
+												TABLE_CELL,
+												"tabular-nums",
+												row.daysToDue < 0 && "font-semibold text-red-700"
+											)}
+										>
+											{row.daysToDue}
+										</TableCell>
+										<TableCell className={TABLE_CELL}>{row.owner}</TableCell>
+										<TableCell className={TABLE_CELL}>
+											{row.sourceModule}
+										</TableCell>
+										<TableCell className={cn(TABLE_CELL, "text-right")}>
+											<Button asChild variant="ghost" size="sm" className="h-7 text-xs">
 												<Link
 													href={`/admin/claim-encounter/regulatory/compliance-calendar/${row.id}`}
 												>
 													View
 												</Link>
 											</Button>
-											<Button
-												variant="ghost"
-												size="icon"
-												className="size-7 rounded-none border-l border-border/70"
-												aria-label="More actions"
-											>
-												<ChevronDown className="size-3.5" />
-											</Button>
-										</div>
-									</TableCell>
-								</TableRow>
-							))}
+										</TableCell>
+									</TableRow>
+								))
+							)}
 						</TableBody>
 					</Table>
 				</CmsEdgeTableScroll>
@@ -285,62 +237,50 @@ export function ComplianceObligationsSection() {
 
 			<CmsEdgeSectionPanel
 				title={
-					<div className="flex w-full items-center justify-between gap-2">
-						<span className="text-sm">Upcoming Deadlines (Next 7 Days)</span>
-						<Button variant="link" size="sm" className="h-auto px-0 text-xs">
-							View All
-						</Button>
-					</div>
+					<span className="inline-flex items-center gap-1.5">
+						<CalendarDays className="size-3.5" />
+						Upcoming Deadlines
+					</span>
 				}
-				bodyClassName="p-0"
-				footer={
-					<div className="border-t border-border/50 p-3">
-						<Button
-							variant="outline"
-							size="sm"
-							className="w-full gap-1.5 text-xs"
-						>
-							<CalendarDays className="size-3.5" />
-							View Full Calendar
-						</Button>
-					</div>
-				}
+				bodyClassName="space-y-0 p-0"
 			>
-				<ul className="divide-y divide-border/40">
-					{COMPLIANCE_UPCOMING_DEADLINES.map((item) => (
-						<li key={item.id}>
-							<Link
-								href={`/admin/claim-encounter/regulatory/compliance-calendar/${item.obligationId}`}
-								className="flex items-start gap-2.5 px-3 py-3 transition-colors hover:bg-muted/30"
-							>
-								<div className="flex shrink-0 items-start gap-1.5 pt-0.5">
-									<span
-										className="mt-1.5 size-2 shrink-0 rounded-full"
-										style={{ backgroundColor: item.dotColor }}
-									/>
-									<div className="text-center leading-tight">
-										<p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+				{upcomingDeadlines.length === 0 ? (
+					<p className="px-4 py-8 text-center text-xs text-muted-foreground">
+						No upcoming deadlines.
+					</p>
+				) : (
+					<ul className="divide-y divide-border/50">
+						{upcomingDeadlines.map((item) => (
+							<li key={item.id}>
+								<Link
+									href={`/admin/claim-encounter/regulatory/compliance-calendar/${item.obligationId}`}
+									className="flex gap-3 px-4 py-3 transition-colors hover:bg-muted/30"
+								>
+									<div className="flex w-10 shrink-0 flex-col items-center">
+										<span className="text-[9px] font-semibold uppercase text-muted-foreground">
 											{item.month}
-										</p>
-										<p className="text-lg font-bold tabular-nums text-foreground">
+										</span>
+										<span className="text-lg font-bold tabular-nums leading-none">
 											{item.day}
+										</span>
+									</div>
+									<div className="min-w-0 flex-1">
+										<div className="flex items-start justify-between gap-2">
+											<p className="line-clamp-2 text-xs font-medium text-foreground">
+												{item.title}
+											</p>
+											<DeadlineBadge tone={item.badgeTone} label={item.badge} />
+										</div>
+										<p className="mt-0.5 text-[10px] text-muted-foreground">
+											{COMPLIANCE_PROGRAM_LABELS[item.program]} ·{" "}
+											{item.obligationType}
 										</p>
 									</div>
-								</div>
-								<div className="min-w-0 flex-1">
-									<p className="text-xs font-semibold leading-snug text-foreground">
-										{item.title}
-									</p>
-									<p className="mt-0.5 text-[10px] text-muted-foreground">
-										{COMPLIANCE_PROGRAM_LABELS[item.program]} •{" "}
-										{item.obligationType}
-									</p>
-								</div>
-								<DeadlineBadge tone={item.badgeTone} label={item.badge} />
-							</Link>
-						</li>
-					))}
-				</ul>
+								</Link>
+							</li>
+						))}
+					</ul>
+				)}
 			</CmsEdgeSectionPanel>
 		</div>
 	);

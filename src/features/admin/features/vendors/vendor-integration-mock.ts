@@ -302,7 +302,7 @@ export function claimFileTypeForVendorType(vendorType: string): string {
 /**
  * Seed metadata for claim/encounter files.
  * Always available (not fixture-gated) so claim inbound/outbound demos work when
- * `NEXT_PUBLIC_CLAIM_FILES_USE_MOCK` is on but global `USE_MOCK` is off.
+ * `NEXT_PUBLIC_CLAIM_FILES_USE_MOCK=true` while global `USE_MOCK` is off.
  */
 export const CLAIM_VENDOR_SEED = VENDOR_DIRECTORY_SEED.map((v) => ({
 	id: v.id,
@@ -694,16 +694,33 @@ export type VendorConfigJob = {
 };
 
 export type VendorSftpConnection = {
+	id?: string | null;
+	connectionName: string;
+	method: string;
+	direction: string;
+	environment: string;
+	lifecycleStatus: string;
 	host: string;
 	port: number;
 	username: string;
+	inboundPath: string;
+	archivePath: string;
+	hostKeyFingerprint: string;
+	landingUser: string;
+	errorPath: string;
+	processingPath: string;
+	passwordCredentialId: string | null;
+	passwordCredentialName: string;
+	privateKeyCredentialId: string | null;
+	privateKeyCredentialName: string;
 	authMethod: string;
 	authKey: string;
 	lastVerified: string;
+	lastError: string;
+	healthStatus: string;
 	remoteDirectory: string;
 	status: "Connected" | "Disconnected";
-	testConnection: "Successful" | "Failed";
-	connectionName: string;
+	testConnection: "Successful" | "Failed" | "Unknown";
 };
 
 const CONFIG_FILE_TYPES = [
@@ -731,16 +748,33 @@ export function getVendorSftpConnection(
 			? "sftp.partner.example"
 			: profile.sftpHost.replace(/\.example$/, ".com");
 	return {
+		id: null,
+		connectionName: `${short} - SFTP Connection`,
+		method: "sftp_pull",
+		direction: "inbound",
+		environment: "test",
+		lifecycleStatus: "draft",
 		host,
 		port: 22,
 		username: `${short.toLowerCase()}_mfc`,
-		authMethod: "Key Based",
-		authKey: `id_rsa_${short.toLowerCase()}`,
-		lastVerified: "07/24/2026 6:00 AM",
+		inboundPath: `/${short}/incoming`,
+		archivePath: "archive",
+		hostKeyFingerprint: "",
+		landingUser: "",
+		errorPath: "error",
+		processingPath: "processing",
+		passwordCredentialId: null,
+		passwordCredentialName: "",
+		privateKeyCredentialId: null,
+		privateKeyCredentialName: "",
+		authMethod: "Not configured",
+		authKey: "—",
+		lastVerified: "—",
+		lastError: "",
+		healthStatus: "—",
 		remoteDirectory: `/${short}/incoming`,
 		status: profile.health === "failed" ? "Disconnected" : "Connected",
-		testConnection: profile.health === "failed" ? "Failed" : "Successful",
-		connectionName: `${short} - SFTP Connection`,
+		testConnection: profile.health === "failed" ? "Failed" : "Unknown",
 	};
 }
 

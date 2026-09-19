@@ -50,8 +50,6 @@ import {
 	CmsEdgeTripleRow,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
-	MEDICAID_ACCEPTANCE_TREND,
-	MEDICAID_ENCOUNTER_KPIS,
 	MEDICAID_RATE_BY_MONTH,
 	MEDICAID_RATE_BY_PLAN,
 	MEDICAID_RATE_BY_REPORT_TYPE,
@@ -59,6 +57,10 @@ import {
 	MEDICAID_SUMMARY_BY_TYPE,
 	MEDICAID_TOP_REJECTIONS,
 } from "@/features/admin/features/claim-encounter/medicaid-encounter/feature/queries/useMedicaidEncounterQuery";
+import { getAcceptanceDerived } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
+import { useProgramOverviewQuery } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
+import { emptyOverview } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
+import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
 import { cn } from "@/lib/utils";
 
 function PanelLink({ children }: { children: ReactNode }) {
@@ -118,8 +120,12 @@ function MetricCard({
 	);
 }
 
-function AcceptanceKpiRow() {
-	const k = MEDICAID_ENCOUNTER_KPIS;
+function AcceptanceKpiRow({
+	kpis,
+}: {
+	kpis: ReturnType<typeof getAcceptanceDerived>["kpis"];
+}) {
+	const k = kpis;
 
 	return (
 		<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -173,6 +179,54 @@ function AcceptanceKpiRow() {
 	);
 }
 
+function AcceptanceTrendChart({
+	data,
+}: {
+	data: ReturnType<typeof getAcceptanceDerived>["acceptanceTrend"];
+}) {
+	return (
+		<ChartPanel
+			title="Acceptance Rate Trend"
+			footer={<PanelLink>View Details</PanelLink>}
+		>
+			<ResponsiveContainer width="100%" height="100%" minHeight={180}>
+				<LineChart
+					data={data}
+					margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+				>
+					<CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+					<XAxis dataKey="month" tick={{ fontSize: 11 }} />
+					<YAxis
+						tick={{ fontSize: 11 }}
+						width={36}
+						domain={[0, 100]}
+						tickFormatter={(v) => `${v}%`}
+					/>
+					<Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
+					<Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+					<Line
+						type="monotone"
+						dataKey="rate"
+						name="Acceptance Rate"
+						stroke="#13446c"
+						strokeWidth={2}
+						dot={{ r: 3 }}
+					/>
+					<Line
+						type="monotone"
+						dataKey="prior"
+						name="Prior Period"
+						stroke="#94a3b8"
+						strokeWidth={2}
+						strokeDasharray="4 4"
+						dot={{ r: 2 }}
+					/>
+				</LineChart>
+			</ResponsiveContainer>
+		</ChartPanel>
+	);
+}
+
 function ChartPanel({
 	title,
 	children,
@@ -201,50 +255,6 @@ function ChartPanel({
 				{children}
 			</div>
 		</CmsEdgeSectionPanel>
-	);
-}
-
-function AcceptanceTrendChart() {
-	return (
-		<ChartPanel
-			title="Acceptance Rate Trend"
-			footer={<PanelLink>View Details</PanelLink>}
-		>
-			<ResponsiveContainer width="100%" height="100%" minHeight={180}>
-				<LineChart
-					data={MEDICAID_ACCEPTANCE_TREND}
-					margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-				>
-					<CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-					<XAxis dataKey="month" tick={{ fontSize: 11 }} />
-					<YAxis
-						tick={{ fontSize: 11 }}
-						width={36}
-						domain={[85, 100]}
-						tickFormatter={(v) => `${v}%`}
-					/>
-					<Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
-					<Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-					<Line
-						type="monotone"
-						dataKey="rate"
-						name="Acceptance Rate"
-						stroke="#13446c"
-						strokeWidth={2}
-						dot={{ r: 3 }}
-					/>
-					<Line
-						type="monotone"
-						dataKey="prior"
-						name="Prior Period"
-						stroke="#94a3b8"
-						strokeWidth={2}
-						strokeDasharray="4 4"
-						dot={{ r: 2 }}
-					/>
-				</LineChart>
-			</ResponsiveContainer>
-		</ChartPanel>
 	);
 }
 
@@ -350,7 +360,7 @@ function ReportsByTypeDonut() {
 	);
 }
 
-function TopRejectionReasonsTable() {
+function TopRejectionReasonsTable({ rows = MEDICAID_TOP_REJECTIONS }: { rows?: typeof MEDICAID_TOP_REJECTIONS }) {
 	return (
 		<CmsEdgeSectionPanel
 			className="flex h-full min-h-0 flex-col"
@@ -388,7 +398,7 @@ function TopRejectionReasonsTable() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICAID_TOP_REJECTIONS.map((row) => (
+						{rows.map((row) => (
 							<TableRow
 								key={row.code}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -434,7 +444,7 @@ function TopRejectionReasonsTable() {
 	);
 }
 
-function AcceptanceRateByMonthChart() {
+function AcceptanceRateByMonthChart({ data = MEDICAID_RATE_BY_MONTH }: { data?: Array<{ month: string; rate: number; prior?: number }> }) {
 	return (
 		<ChartPanel
 			title="Acceptance Rate by Month"
@@ -442,7 +452,7 @@ function AcceptanceRateByMonthChart() {
 		>
 			<ResponsiveContainer width="100%" height="100%" minHeight={180}>
 				<BarChart
-					data={MEDICAID_RATE_BY_MONTH}
+					data={data}
 					margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
 				>
 					<CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
@@ -621,10 +631,26 @@ function SummaryByReportTypeTable() {
 	);
 }
 
-export function MedicaidEncounterAcceptanceAnalyticsTab() {
+export function MedicaidEncounterAcceptanceAnalyticsTab({
+	programType = "medicaid",
+	reportingPeriod,
+}: {
+	programType?: ProgramType;
+	reportingPeriod?: string;
+} = {}) {
+	const overviewQuery = useProgramOverviewQuery(programType, reportingPeriod);
+	const derived = getAcceptanceDerived(
+		overviewQuery.data ?? emptyOverview(programType)
+	);
+
 	return (
 		<div className={CMS_EDGE_PAGE_STACK}>
-			<AcceptanceKpiRow />
+			{overviewQuery.isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading acceptance analytics…
+				</p>
+			) : null}
+			<AcceptanceKpiRow kpis={derived.kpis} />
 
 			<div
 				className={cn(
@@ -633,31 +659,52 @@ export function MedicaidEncounterAcceptanceAnalyticsTab() {
 				)}
 			>
 				<div className="flex min-h-0 min-w-0 flex-col">
-					<AcceptanceTrendChart />
+					<AcceptanceTrendChart data={derived.acceptanceTrend} />
 				</div>
 				<div className="flex min-h-0 min-w-0 flex-col">
-					<HorizontalRateChart
-						title="Acceptance Rate by Report Type"
-						data={MEDICAID_RATE_BY_REPORT_TYPE}
-						color="#8b5cf6"
-					/>
+					<CmsEdgeSectionPanel title="Acceptance Rate by Report Type">
+						<p className="border-t border-border/50 px-4 py-8 text-center text-sm text-muted-foreground">
+							No series from API
+						</p>
+					</CmsEdgeSectionPanel>
 				</div>
 				<div className="flex min-h-0 min-w-0 flex-col">
-					<HorizontalRateChart
-						title="Acceptance Rate by MCO / Plan"
-						data={MEDICAID_RATE_BY_PLAN}
-						color="#3b82f6"
-					/>
+					<CmsEdgeSectionPanel title="Acceptance Rate by MCO / Plan">
+						<p className="border-t border-border/50 px-4 py-8 text-center text-sm text-muted-foreground">
+							No series from API
+						</p>
+					</CmsEdgeSectionPanel>
 				</div>
 				<div className="flex min-h-0 min-w-0 flex-col">
-					<ReportsByTypeDonut />
+					<CmsEdgeSectionPanel title="Reports by Type">
+						<p className="border-t border-border/50 px-4 py-8 text-center text-sm text-muted-foreground">
+							No series from API
+						</p>
+					</CmsEdgeSectionPanel>
 				</div>
 			</div>
 
 			<CmsEdgeTripleRow
-				left={<TopRejectionReasonsTable />}
-				center={<AcceptanceRateByMonthChart />}
-				right={<SummaryByReportTypeTable />}
+				left={
+					<TopRejectionReasonsTable
+						rows={derived.topRejections.map((row) => ({
+							code: row.name,
+							description: row.name,
+							count: row.count,
+							pct: row.pct,
+						}))}
+					/>
+				}
+				center={
+					<AcceptanceRateByMonthChart data={derived.acceptanceTrend} />
+				}
+				right={
+					<CmsEdgeSectionPanel title="Summary by Report Type">
+						<p className="border-t border-border/50 px-4 py-8 text-center text-sm text-muted-foreground">
+							No series from API
+						</p>
+					</CmsEdgeSectionPanel>
+				}
 			/>
 
 			<CmsEdgePageFooter />

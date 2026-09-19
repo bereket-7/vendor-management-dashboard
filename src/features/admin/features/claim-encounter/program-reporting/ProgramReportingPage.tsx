@@ -526,30 +526,35 @@ export function ProgramReportingPage({
 						<ProgramReportingOverviewTab
 							key={programType}
 							programType={programType}
+							reportingPeriod={reportingPeriod}
 						/>
 					</TabsContent>
 					<TabsContent value="responses" className="mt-0 space-y-0">
 						<MedicaidEncounterResponsesTab
 							key={programType}
 							programType={programType}
+							reportingPeriod={reportingPeriod}
 						/>
 					</TabsContent>
 					<TabsContent value="validation" className="mt-0 space-y-0">
 						<MedicaidEncounterValidationTab
 							key={programType}
 							programType={programType}
+							reportingPeriod={reportingPeriod}
 						/>
 					</TabsContent>
 					<TabsContent value="audit" className="mt-0 space-y-0">
 						<ProgramReportingAuditTab
 							key={programType}
 							programType={programType}
+							reportingPeriod={reportingPeriod}
 						/>
 					</TabsContent>
 					<TabsContent value="documents" className="mt-0 space-y-0">
 						<MedicaidEncounterDocumentsTab
 							key={programType}
 							programType={programType}
+							reportingPeriod={reportingPeriod}
 						/>
 					</TabsContent>
 
@@ -559,22 +564,26 @@ export function ProgramReportingPage({
 								value="acceptance-analytics"
 								className="mt-0 space-y-0"
 							>
-								<MedicaidEncounterAcceptanceAnalyticsTab />
+								<MedicaidEncounterAcceptanceAnalyticsTab
+									programType={programType}
+									reportingPeriod={reportingPeriod}
+								/>
 							</TabsContent>
 							<TabsContent value="exceptions" className="mt-0 space-y-0">
 								<MedicaidEncounterExceptionsTab
 									key={programType}
 									programType={programType}
+									reportingPeriod={reportingPeriod}
 								/>
 							</TabsContent>
 						</>
 					) : (
 						<>
 							<TabsContent value="part-d" className="mt-0 space-y-0">
-								<MedicarePartDTab />
+								<MedicarePartDTab reportingPeriod={reportingPeriod} />
 							</TabsContent>
 							<TabsContent value="compliance" className="mt-0 space-y-0">
-								<MedicareComplianceTab />
+								<MedicareComplianceTab reportingPeriod={reportingPeriod} />
 							</TabsContent>
 						</>
 					)}
@@ -583,6 +592,7 @@ export function ProgramReportingPage({
 						<ProgramReportingSubmissionsTab
 							key={programType}
 							programType={programType}
+							reportingPeriod={reportingPeriod}
 						/>
 					</TabsContent>
 				</div>

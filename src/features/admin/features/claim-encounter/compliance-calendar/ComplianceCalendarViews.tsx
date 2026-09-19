@@ -11,9 +11,11 @@ import {
 	type CalendarScheduleItem,
 	complianceProgramPillClass,
 	complianceStatusPillClass,
-	getScheduleForWeek,
-	getScheduleListGroups,
 } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
+import {
+	scheduleForWeek,
+	scheduleListGroups,
+} from "@/features/admin/features/claim-encounter/compliance-calendar/feature/mappers/compliance-calendarMappers";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
@@ -48,8 +50,18 @@ function ScheduleChip({ item }: { item: CalendarScheduleItem }) {
 	return content;
 }
 
-export function ComplianceCalendarWeekView() {
-	const weekDays = getScheduleForWeek();
+export function ComplianceCalendarWeekView({
+	schedule,
+	anchor,
+	year,
+	monthIndex,
+}: {
+	schedule: CalendarScheduleItem[];
+	anchor: Date;
+	year: number;
+	monthIndex: number;
+}) {
+	const weekDays = scheduleForWeek(schedule, anchor, monthIndex, year);
 
 	return (
 		<div>
@@ -78,22 +90,12 @@ export function ComplianceCalendarWeekView() {
 			<div className="grid min-h-[520px] grid-cols-7">
 				{weekDays.map((day) => (
 					<div
-						key={day.dateKey}
-						className={cn(
-							"flex min-h-[520px] flex-col gap-1.5 border-r border-border/40 p-2 last:border-r-0",
-							day.isToday && "bg-primary/5",
-							!day.inCurrentMonth && "bg-muted/15"
-						)}
+						key={`body-${day.dateKey}`}
+						className="space-y-1.5 border-b border-r border-border/40 p-1.5 last:border-r-0"
 					>
-						{day.items.length === 0 ? (
-							<div className="flex flex-1 items-center justify-center">
-								<span className="text-[10px] text-muted-foreground/50">—</span>
-							</div>
-						) : (
-							day.items.map((item) => (
-								<ScheduleChip key={item.id} item={item} />
-							))
-						)}
+						{day.items.map((item) => (
+							<ScheduleChip key={item.id} item={item} />
+						))}
 					</div>
 				))}
 			</div>
@@ -101,91 +103,94 @@ export function ComplianceCalendarWeekView() {
 	);
 }
 
-function ListRow({ item }: { item: CalendarScheduleItem }) {
-	const href = item.obligationId
-		? `/admin/claim-encounter/regulatory/compliance-calendar/${item.obligationId}`
-		: undefined;
+export function ComplianceCalendarListView({
+	schedule,
+	year,
+	monthIndex,
+}: {
+	schedule: CalendarScheduleItem[];
+	year: number;
+	monthIndex: number;
+}) {
+	const groups = scheduleListGroups(schedule, year, monthIndex);
+
+	if (groups.length === 0) {
+		return (
+			<p className="px-4 py-10 text-center text-sm text-muted-foreground">
+				No obligations scheduled this month.
+			</p>
+		);
+	}
 
 	return (
-		<div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5 last:border-b-0 sm:gap-3">
-			<span
-				className="size-2 shrink-0 rounded-full"
-				style={{ backgroundColor: COMPLIANCE_PROGRAM_COLORS[item.program] }}
-			/>
-			<div className="min-w-0 flex-1">
-				{href ? (
-					<Link
-						href={href}
-						className="text-xs font-semibold text-primary hover:underline"
-					>
-						{item.title}
-					</Link>
-				) : (
-					<p className="text-xs font-semibold text-foreground">{item.title}</p>
-				)}
-				<p className="text-[10px] text-muted-foreground">
-					{COMPLIANCE_PROGRAM_LABELS[item.program]} • {item.obligationType} •{" "}
-					{item.owner}
-				</p>
-			</div>
-			<span
-				className={cn(
-					CMS_EDGE_STATUS_PILL_CLASS,
-					complianceProgramPillClass(item.program),
-					"shrink-0 text-[10px]"
-				)}
-			>
-				{COMPLIANCE_PROGRAM_LABELS[item.program]}
-			</span>
-			<span
-				className={cn(
-					CMS_EDGE_STATUS_PILL_CLASS,
-					complianceStatusPillClass(item.status),
-					"shrink-0 text-[10px]"
-				)}
-			>
-				{item.status}
-			</span>
-			<span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-				{item.dueDate}
-			</span>
-			{href ? (
-				<Button
-					variant="link"
-					size="sm"
-					className="h-auto shrink-0 px-0 text-[11px]"
-					asChild
-				>
-					<Link href={href}>View</Link>
-				</Button>
-			) : null}
+		<div className="divide-y divide-border/50">
+			{groups.map((group) => (
+				<div key={group.key} className="px-4 py-3">
+					<p className="mb-2 text-xs font-semibold text-foreground">
+						{group.label}
+					</p>
+					<CmsEdgeTableScroll>
+						<table className="w-full min-w-[640px] text-xs">
+							<tbody>
+								{group.items.map((item) => (
+									<tr
+										key={item.id}
+										className="border-b border-border/40 last:border-0"
+									>
+										<td className="py-2 pr-3">
+											{item.obligationId ? (
+												<Link
+													href={`/admin/claim-encounter/regulatory/compliance-calendar/${item.obligationId}`}
+													className="font-medium text-primary hover:underline"
+												>
+													{item.title}
+												</Link>
+											) : (
+												<span className="font-medium">{item.title}</span>
+											)}
+										</td>
+										<td className="py-2 pr-3">
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													complianceProgramPillClass(item.program)
+												)}
+											>
+												{COMPLIANCE_PROGRAM_LABELS[item.program]}
+											</span>
+										</td>
+										<td className="py-2 pr-3 text-muted-foreground">
+											{item.obligationType}
+										</td>
+										<td className="py-2 pr-3">
+											<span
+												className={cn(
+													CMS_EDGE_STATUS_PILL_CLASS,
+													complianceStatusPillClass(item.status)
+												)}
+											>
+												{item.status}
+											</span>
+										</td>
+										<td className="py-2 text-muted-foreground">{item.owner}</td>
+										<td className="py-2 text-right">
+											{item.obligationId ? (
+												<Button asChild variant="ghost" size="sm" className="h-7 text-xs">
+													<Link
+														href={`/admin/claim-encounter/regulatory/compliance-calendar/${item.obligationId}`}
+													>
+														View
+													</Link>
+												</Button>
+											) : null}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</CmsEdgeTableScroll>
+				</div>
+			))}
 		</div>
-	);
-}
-
-export function ComplianceCalendarListView() {
-	const groups = getScheduleListGroups();
-
-	return (
-		<CmsEdgeTableScroll className="max-h-[480px]">
-			<div className="divide-y divide-border/40">
-				{groups.map((group) => (
-					<section key={group.key}>
-						<div className="sticky top-0 z-10 border-b border-border/40 bg-muted/40 px-4 py-2">
-							<p className="text-xs font-semibold text-foreground">
-								{group.label}
-							</p>
-							<p className="text-[10px] text-muted-foreground">
-								{group.items.length} obligation
-								{group.items.length === 1 ? "" : "s"}
-							</p>
-						</div>
-						{group.items.map((item) => (
-							<ListRow key={item.id} item={item} />
-						))}
-					</section>
-				))}
-			</div>
-		</CmsEdgeTableScroll>
 	);
 }

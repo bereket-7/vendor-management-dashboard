@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -70,6 +71,7 @@ import {
 import {
 	useClaimHeadersLiveQuery,
 	useDeleteClaimLine,
+	useRevalidateClaimHeadersMutation,
 	useVendorCoreClaimLines,
 } from "@/features/admin/features/claim-encounter/feature/queries/useClaimEncounterQuery";
 import { claimHeaderDtosToClaimLines } from "@/features/admin/features/claim-encounter/live-claim-headers";
@@ -79,7 +81,7 @@ import { VENDOR_NAMES } from "@/features/admin/features/vendors/vendor-integrati
 import { StatusBadge } from "@/features/shared/vms/StatusBadge";
 import { Link, useRouter } from "@/i18n/navigation";
 import { downloadCsv, stampFilename } from "@/lib/export/csv";
-import { isClaimVendorFilesMockEnabled, isMockEnabled } from "@/lib/mock-mode";
+import { isMockEnabled } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
@@ -242,9 +244,9 @@ function PriorityPill({
 	);
 }
 
-/** Prefer claim-file fixtures (default on) so Claims mirrors inbound/outbound mock seed. */
+/** Live claim workbench when global mock is off (independent of claim-file queue fixtures). */
 export function ClaimsPage() {
-	const useFixtures = isMockEnabled() || isClaimVendorFilesMockEnabled();
+	const useFixtures = isMockEnabled();
 	if (!useFixtures) {
 		return (
 			<VendorCoreGate title="Claims">
@@ -261,6 +263,7 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 	const liveLinesQ = useVendorCoreClaimLines(useLive);
 	const liveHeadersQ = useClaimHeadersLiveQuery(useLive);
 	const deleteClaimLine = useDeleteClaimLine();
+	const revalidateMutation = useRevalidateClaimHeadersMutation();
 
 	const [search, setSearch] = useState("");
 	const [vendor, setVendor] = useState("all");
@@ -273,6 +276,8 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 	const [pageSize, setPageSize] = useState(25);
 	const [ediRow, setEdiRow] = useState<ClaimWorkbenchRow | null>(null);
 	const [refreshing, setRefreshing] = useState(false);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const [revalidating, setRevalidating] = useState(false);
 
 	const allRows = useMemo(() => {
 		if (useLive) {
@@ -588,6 +593,70 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 		}
 	}
 
+	const pageSelectableIds = useMemo(
+		() => pageRows.map((r) => r.id).filter(Boolean),
+		[pageRows]
+	);
+	const allPageSelected =
+		pageSelectableIds.length > 0 &&
+		pageSelectableIds.every((id) => selectedIds.has(id));
+	const somePageSelected = pageSelectableIds.some((id) => selectedIds.has(id));
+
+	function toggleSelectAllPage(checked: boolean) {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (checked) {
+				for (const id of pageSelectableIds) next.add(id);
+			} else {
+				for (const id of pageSelectableIds) next.delete(id);
+			}
+			return next;
+		});
+	}
+
+	function toggleSelectRow(id: string, checked: boolean) {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (checked) next.add(id);
+			else next.delete(id);
+			return next;
+		});
+	}
+
+	async function handleBulkRevalidate() {
+		const ids = [...selectedIds];
+		if (ids.length === 0) {
+			toast.message("Select at least one claim to re-validate.");
+			return;
+		}
+		setRevalidating(true);
+		try {
+			let validatedCount = 0;
+			let invalidCount = 0;
+			for (let i = 0; i < ids.length; i += 100) {
+				const chunk = ids.slice(i, i + 100);
+				const data = await revalidateMutation.mutateAsync(chunk);
+				validatedCount += data.validated_count;
+				invalidCount += data.results.filter(
+					(r) => r.validation_status === "invalid"
+				).length;
+			}
+			toast.success(
+				invalidCount === 0
+					? `Re-validated ${validatedCount} claim(s) — all clean`
+					: `Re-validated ${validatedCount} claim(s) — ${invalidCount} still invalid`
+			);
+			setSelectedIds(new Set());
+			await liveHeadersQ.refetch();
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Re-validate failed."
+			);
+		} finally {
+			setRevalidating(false);
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="space-y-3">
@@ -613,6 +682,24 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-1.5">
+					{useLive && selectedIds.size > 0 ? (
+						<Button
+							variant="default"
+							size="sm"
+							className={cn(toolbarBtn)}
+							disabled={revalidating || revalidateMutation.isPending}
+							onClick={() => void handleBulkRevalidate()}
+						>
+							<RefreshCw
+								className={cn(
+									"size-3.5",
+									(revalidating || revalidateMutation.isPending) &&
+										"animate-spin"
+								)}
+							/>
+							Re-validate ({selectedIds.size})
+						</Button>
+					) : null}
 					<Button
 						variant="outline"
 						size="sm"
@@ -1047,6 +1134,24 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
+											{useLive ? (
+												<TableHead className={cn(th, "w-10 pl-3")}>
+													<Checkbox
+														checked={
+															allPageSelected
+																? true
+																: somePageSelected
+																	? "indeterminate"
+																	: false
+														}
+														onCheckedChange={(v) =>
+															toggleSelectAllPage(v === true)
+														}
+														aria-label="Select all on page"
+														onClick={(e) => e.stopPropagation()}
+													/>
+												</TableHead>
+											) : null}
 											<TableHead
 												className={cn(th, "w-12 pl-3 text-right tabular-nums")}
 											>
@@ -1071,6 +1176,20 @@ function ClaimsBody({ useLive }: { useLive: boolean }) {
 												className="cursor-pointer hover:bg-muted/30"
 												onClick={() => openClaim(row)}
 											>
+												{useLive ? (
+													<TableCell
+														className={cn(td, "w-10 pl-3")}
+														onClick={(e) => e.stopPropagation()}
+													>
+														<Checkbox
+															checked={selectedIds.has(row.id)}
+															onCheckedChange={(v) =>
+																toggleSelectRow(row.id, v === true)
+															}
+															aria-label={`Select ${row.claimId}`}
+														/>
+													</TableCell>
+												) : null}
 												<TableCell
 													className={cn(
 														td,

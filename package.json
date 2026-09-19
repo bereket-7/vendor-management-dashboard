@@ -35,6 +35,7 @@
 		"seed:inbound-vendor-files": "node scripts/seed-inbound-vendor-files.mjs",
 		"seed:member-coverages": "node scripts/seed-member-coverages.mjs",
 		"seed:vendor-detail": "node scripts/seed-vendor-detail-demo.mjs",
+		"seed:program-reporting": "node scripts/seed-program-reporting.mjs",
 		"test-all": "pnpm run check-types && pnpm run check-format && pnpm run lint && pnpm run test && pnpm run build",
 		"analyze": "ANALYZE=true pnpm build",
 		"build:cloudflare": "opennextjs-cloudflare build",

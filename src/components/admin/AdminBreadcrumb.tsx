@@ -19,7 +19,6 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { siteConfig } from "@/constants/siteconfig";
-import { getObligationDetail } from "@/features/admin/features/claim-encounter/compliance-calendar/mock-data";
 import { getLtssAuthDetail } from "@/features/admin/features/claim-encounter/ltss/auth-detail-data";
 import {
 	getClaimResponse,
@@ -338,9 +337,8 @@ export function AdminBreadcrumb({ appTitle }: { appTitle: string }) {
 			}
 
 			if (prev === "compliance-calendar") {
-				const obligation = getObligationDetail(segment);
 				items.push({
-					label: obligation?.title ?? "Obligation Detail",
+					label: "Obligation Detail",
 					href: i < trail.length - 1 ? path : undefined,
 				});
 				continue;

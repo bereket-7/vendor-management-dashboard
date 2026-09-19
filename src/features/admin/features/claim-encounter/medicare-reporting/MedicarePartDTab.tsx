@@ -55,14 +55,16 @@ import {
 	MEDICARE_PART_D_ERROR_SEVERITY_STYLES,
 	MEDICARE_PART_D_ERROR_TYPE_FILTER,
 	MEDICARE_PART_D_KPIS,
-	MEDICARE_PART_D_RECONCILIATION,
 	MEDICARE_PART_D_RECONCILIATION_STATUS_STYLES,
 	MEDICARE_PART_D_RESPONSES,
 	MEDICARE_PART_D_RESPONSE_STATUS_STYLES,
-	MEDICARE_PART_D_SUBMISSIONS,
 	MEDICARE_PART_D_SUBMISSION_STATUS_STYLES,
 	MEDICARE_PART_D_VALIDATION_ERRORS,
 	type MedicarePartDErrorSeverity,
+	useMedicareReportingPartDKpisQuery,
+	useMedicareReportingPartDReconciliationsQuery,
+	useMedicareReportingPartDResponsesQuery,
+	useMedicareReportingPartDSubmissionsList,
 } from "@/features/admin/features/claim-encounter/medicare-reporting/feature/queries/useMedicareReportingQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
 import { cn } from "@/lib/utils";
@@ -168,8 +170,12 @@ function PartDMetricCard({
 	);
 }
 
-function PartDKpiRow() {
-	const k = MEDICARE_PART_D_KPIS;
+function PartDKpiRow({
+	kpis = MEDICARE_PART_D_KPIS,
+}: {
+	kpis?: typeof MEDICARE_PART_D_KPIS;
+}) {
+	const k = kpis;
 
 	return (
 		<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -294,7 +300,19 @@ function RowActions({ label }: { label: string }) {
 	);
 }
 
-function PdeSubmissionHistoryPanel() {
+function PdeSubmissionHistoryPanel({
+	submissions = [],
+}: {
+	submissions?: Array<{
+		id: string;
+		fileName: string;
+		submissionType: string;
+		pbp: string;
+		submittedOn: string;
+		recordCount: number;
+		status: keyof typeof MEDICARE_PART_D_SUBMISSION_STATUS_STYLES;
+	}>;
+}) {
 	return (
 		<CmsEdgeSectionPanel
 			className="flex h-full min-h-0 flex-col"
@@ -330,7 +348,7 @@ function PdeSubmissionHistoryPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICARE_PART_D_SUBMISSIONS.map((row) => (
+						{submissions.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -385,7 +403,11 @@ function PdeSubmissionHistoryPanel() {
 	);
 }
 
-function CmsResponseFilesPanel() {
+function CmsResponseFilesPanel({
+	rows = MEDICARE_PART_D_RESPONSES,
+}: {
+	rows?: typeof MEDICARE_PART_D_RESPONSES;
+}) {
 	return (
 		<CmsEdgeSectionPanel
 			className="flex h-full min-h-0 flex-col"
@@ -394,8 +416,8 @@ function CmsResponseFilesPanel() {
 			footer={
 				<TablePaginationFooter
 					viewAllLabel="View All Responses"
-					showing={5}
-					total={18}
+					showing={rows.length}
+					total={rows.length}
 				/>
 			}
 		>
@@ -416,7 +438,7 @@ function CmsResponseFilesPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICARE_PART_D_RESPONSES.map((row) => (
+						{rows.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -619,7 +641,20 @@ function ValidationErrorDetailsPanel() {
 	);
 }
 
-function ReconciliationStatusPanel() {
+function ReconciliationStatusPanel({
+	rows = [],
+}: {
+	rows?: Array<{
+		id: string;
+		type: string;
+		pbp: string;
+		recordsSubmitted: number;
+		cmsAccepted: number;
+		variance: number;
+		status: keyof typeof MEDICARE_PART_D_RECONCILIATION_STATUS_STYLES;
+		lastReconciled: string;
+	}>;
+}) {
 	return (
 		<CmsEdgeSectionPanel
 			className="flex h-full min-h-0 flex-col"
@@ -658,7 +693,7 @@ function ReconciliationStatusPanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICARE_PART_D_RECONCILIATION.map((row) => (
+						{rows.map((row) => (
 							<TableRow
 								key={row.id}
 								className="border-b border-border/40 hover:bg-muted/20"
@@ -867,10 +902,28 @@ function DocumentsPanel() {
 	);
 }
 
-export function MedicarePartDTab() {
+export function MedicarePartDTab({
+	reportingPeriod,
+}: { reportingPeriod?: string } = {}) {
+	const kpisQuery = useMedicareReportingPartDKpisQuery(reportingPeriod);
+	const { partDSubmissions, isLoading: submissionsLoading } =
+		useMedicareReportingPartDSubmissionsList(reportingPeriod);
+	const reconQuery =
+		useMedicareReportingPartDReconciliationsQuery(reportingPeriod);
+	const responsesQuery =
+		useMedicareReportingPartDResponsesQuery(reportingPeriod);
+
 	return (
 		<div className={PAGE_STACK}>
-			<PartDKpiRow />
+			{kpisQuery.isLoading ||
+			submissionsLoading ||
+			reconQuery.isLoading ||
+			responsesQuery.isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading Part D…
+				</p>
+			) : null}
+			<PartDKpiRow kpis={kpisQuery.data ?? MEDICARE_PART_D_KPIS} />
 
 			<div
 				className={cn(
@@ -878,8 +931,10 @@ export function MedicarePartDTab() {
 					SECTION_GAP
 				)}
 			>
-				<PdeSubmissionHistoryPanel />
-				<CmsResponseFilesPanel />
+				<PdeSubmissionHistoryPanel submissions={partDSubmissions} />
+				<CmsResponseFilesPanel
+					rows={(responsesQuery.data?.items ?? []) as typeof MEDICARE_PART_D_RESPONSES}
+				/>
 			</div>
 
 			<div
@@ -889,7 +944,9 @@ export function MedicarePartDTab() {
 				)}
 			>
 				<ValidationErrorDetailsPanel />
-				<ReconciliationStatusPanel />
+				<ReconciliationStatusPanel
+					rows={reconQuery.data?.items ?? []}
+				/>
 			</div>
 
 			<div

@@ -1,7 +1,11 @@
 import { isMockEnabled, isNestApiEnabled, isLiveIntegrationEnabled } from "@/lib/mock-mode";
 import { apiClient } from "@/lib/api/client";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
-import type { IdentityGroupCreateInput, IdentityGroupDto } from "@/lib/vendor-core/types";
+import type {
+	IdentityGroupCreateInput,
+	IdentityGroupDto,
+	IdentityGroupUpdateInput,
+} from "@/lib/vendor-core/types";
 
 import type {
 	ApiGroupListResponseDto,
@@ -85,8 +89,25 @@ export const groupApi = {
 			return model;
 		}
 		if (isLiveIntegrationEnabled()) {
+			const body: IdentityGroupCreateInput = {
+				name: payload.name,
+				description: payload.description,
+				membership_mode: payload.membership_mode,
+				members: payload.members?.map((m) => ({
+					external_id: m.external_id ?? undefined,
+					display_name: m.display_name ?? m.external_id ?? "Member",
+					role: m.role ?? undefined,
+				})),
+				characteristics: payload.characteristics?.map((c) => ({
+					key: c.key ?? "",
+					operator: c.operator ?? "eq",
+					value: c.value,
+				})),
+				period_start: payload.period_start,
+				period_end: payload.period_end,
+			};
 			const dto = (await vendorCoreApi.createIdentityGroup(
-				payload as unknown as Record<string, unknown>
+				body
 			)) as ApiIdentityGroupDto;
 			const model = toGroupModel(dto);
 			if (!model) throw new Error("Invalid create response");
@@ -112,9 +133,42 @@ export const groupApi = {
 			return model;
 		}
 		if (isLiveIntegrationEnabled()) {
+			const body: IdentityGroupUpdateInput = {
+				...(payload.name !== undefined ? { name: payload.name } : {}),
+				...(payload.description !== undefined
+					? { description: payload.description }
+					: {}),
+				...(payload.membership_mode !== undefined
+					? { membership_mode: payload.membership_mode }
+					: {}),
+				...(payload.members !== undefined
+					? {
+							members: payload.members.map((m) => ({
+								external_id: m.external_id ?? undefined,
+								display_name: m.display_name ?? m.external_id ?? "Member",
+								role: m.role ?? undefined,
+							})),
+						}
+					: {}),
+				...(payload.characteristics !== undefined
+					? {
+							characteristics: payload.characteristics.map((c) => ({
+								key: c.key ?? "",
+								operator: c.operator ?? "eq",
+								value: c.value,
+							})),
+						}
+					: {}),
+				...(payload.period_start !== undefined
+					? { period_start: payload.period_start }
+					: {}),
+				...(payload.period_end !== undefined
+					? { period_end: payload.period_end }
+					: {}),
+			};
 			const dto = (await vendorCoreApi.updateIdentityGroup(
 				id,
-				payload as unknown as Record<string, unknown>
+				body
 			)) as ApiIdentityGroupDto;
 			const model = toGroupModel(dto);
 			if (!model) throw new Error("Invalid update response");

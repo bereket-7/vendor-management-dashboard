@@ -63,14 +63,15 @@ import {
 	MEDICAID_EXCEPTIONS_BY_SEVERITY,
 	MEDICAID_EXCEPTIONS_BY_STATE,
 	MEDICAID_EXCEPTIONS_TREND,
-	MEDICAID_EXCEPTION_DETAILS,
-	MEDICAID_EXCEPTION_KPIS,
 	MEDICAID_EXCEPTION_SEVERITY_FILTER,
 	MEDICAID_EXCEPTION_SEVERITY_STYLES,
 	MEDICAID_EXCEPTION_STATUS_FILTER,
 	MEDICAID_EXCEPTION_STATUS_STYLES,
 	MEDICAID_TOP_EXCEPTION_REASONS,
+	type MedicaidExceptionDetailRow,
 	filterMedicaidExceptions,
+	useMedicaidEncounterExceptionDetailsList,
+	useUpdateProgramExceptionMutation,
 } from "@/features/admin/features/claim-encounter/medicaid-encounter/feature/queries/useMedicaidEncounterQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
 import { getProgramScale } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
@@ -183,8 +184,32 @@ function ExceptionMetricCard({
 	);
 }
 
-function ExceptionsKpiRow({ programType }: { programType?: ProgramType }) {
-	const k = MEDICAID_EXCEPTION_KPIS;
+function deriveExceptionKpis(rows: MedicaidExceptionDetailRow[]) {
+	return {
+		total: rows.length,
+		totalDelta: 0,
+		critical: rows.filter((r) => r.severity === "Critical").length,
+		criticalDelta: 0,
+		warning: rows.filter((r) => r.severity === "Warning").length,
+		warningDelta: 0,
+		info: rows.filter((r) => r.severity === "Info").length,
+		infoDelta: 0,
+		resolved: rows.filter((r) => r.status === "Resolved").length,
+		resolvedDelta: 0,
+		open: rows.filter((r) => r.status === "Open" || r.status === "In Review")
+			.length,
+		openDelta: 0,
+	};
+}
+
+function ExceptionsKpiRow({
+	programType,
+	kpis,
+}: {
+	programType?: ProgramType;
+	kpis: ReturnType<typeof deriveExceptionKpis>;
+}) {
+	const k = kpis;
 
 	return (
 		<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -513,6 +538,7 @@ function ExceptionDetailsPanel({
 	onReset,
 	rows,
 	programType,
+	onCycleStatus,
 }: {
 	search: string;
 	onSearchChange: (value: string) => void;
@@ -521,8 +547,9 @@ function ExceptionDetailsPanel({
 	status: string;
 	onStatusChange: (value: string) => void;
 	onReset: () => void;
-	rows: typeof MEDICAID_EXCEPTION_DETAILS;
+	rows: MedicaidExceptionDetailRow[];
 	programType?: ProgramType;
+	onCycleStatus?: (row: MedicaidExceptionDetailRow) => void;
 }) {
 	const isMedicare = programType === "medicare";
 
@@ -764,7 +791,10 @@ function ExceptionDetailsPanel({
 											variant="ghost"
 											size="icon"
 											className="size-7 text-primary"
-											onClick={() => toast.message(`Edit ${row.errorCode}`)}
+											onClick={() => {
+												if (onCycleStatus) onCycleStatus(row);
+												else toast.message(`Edit ${row.errorCode}`);
+											}}
 										>
 											<Pencil className="size-3.5" />
 										</Button>
@@ -780,19 +810,24 @@ function ExceptionDetailsPanel({
 }
 
 export function MedicaidEncounterExceptionsTab({
-	programType,
-}: { programType?: ProgramType } = {}) {
+	programType = "medicaid",
+}: { programType?: ProgramType; reportingPeriod?: string } = {}) {
 	const [search, setSearch] = useState("");
 	const [severity, setSeverity] = useState("All Severities");
 	const [status, setStatus] = useState("All Statuses");
 
+	const { exceptionDetails, isLoading } =
+		useMedicaidEncounterExceptionDetailsList(programType);
+	const updateException = useUpdateProgramExceptionMutation();
+	const kpis = deriveExceptionKpis(exceptionDetails);
+
 	const rows = useMemo(
 		() =>
-			filterMedicaidExceptions(MEDICAID_EXCEPTION_DETAILS, search, {
+			filterMedicaidExceptions(exceptionDetails, search, {
 				severity,
 				status,
 			}),
-		[search, severity, status]
+		[exceptionDetails, search, severity, status]
 	);
 
 	const resetFilters = () => {
@@ -801,9 +836,30 @@ export function MedicaidEncounterExceptionsTab({
 		setStatus("All Statuses");
 	};
 
+	const cycleStatus = (row: MedicaidExceptionDetailRow) => {
+		const next =
+			row.status === "Open"
+				? "In Review"
+				: row.status === "In Review"
+					? "Resolved"
+					: "Open";
+		updateException.mutate(
+			{ id: row.id, status: next },
+			{
+				onSuccess: () => toast.success(`Status → ${next}`),
+				onError: () => toast.error("Failed to update exception status"),
+			}
+		);
+	};
+
 	return (
 		<div className={EXCEPTION_PAGE_STACK}>
-			<ExceptionsKpiRow programType={programType} />
+			{isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading exceptions…
+				</p>
+			) : null}
+			<ExceptionsKpiRow programType={programType} kpis={kpis} />
 
 			<ExceptionDetailsPanel
 				search={search}
@@ -815,6 +871,7 @@ export function MedicaidEncounterExceptionsTab({
 				onReset={resetFilters}
 				rows={rows}
 				programType={programType}
+				onCycleStatus={cycleStatus}
 			/>
 
 			<div

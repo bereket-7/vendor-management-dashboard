@@ -1,11 +1,12 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
 	BadgeCheck,
 	Building2,
 	Check,
+	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
 	ClipboardList,
@@ -21,6 +22,11 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -34,8 +40,22 @@ import { CONTRACT_TYPE_OPTIONS } from "@/features/admin/features/contracts/featu
 import type { RiskLevel, VendorStatus } from "@/features/shared/vms/types";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import type { VendorCategoryDto } from "@/lib/vendor-core/types";
+import type {
+	CredentialDto,
+	VendorCategoryDto,
+} from "@/lib/vendor-core/types";
 
+import { toast } from "sonner";
+
+import {
+	discoverVendorHostKey,
+	listVendorCredentials,
+} from "../feature/api/vendorsApi";
+import {
+	defaultSftpPortForHost,
+	isLocalSftpHost,
+	portAfterHostChange,
+} from "../connection-form";
 import {
 	EMPTY_VENDOR_WIZARD,
 	VENDOR_WIZARD_STEPS,
@@ -845,8 +865,95 @@ function IntegrationStep({
 		});
 	}
 
+	const [advancedOpen, setAdvancedOpen] = useState(false);
+	const [credentials, setCredentials] = useState<CredentialDto[]>([]);
+	const [discoveringHostKey, setDiscoveringHostKey] = useState(false);
+
+	useEffect(() => {
+		if (!vendorName.trim() || values.connection.name.trim()) return;
+		patchConnection({ name: `${vendorName.trim()} SFTP` });
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- only seed name once vendor name appears
+	}, [vendorName]);
+
+	useEffect(() => {
+		let cancelled = false;
+		void listVendorCredentials()
+			.then((rows) => {
+				if (!cancelled) setCredentials(rows);
+			})
+			.catch(() => {
+				if (!cancelled) setCredentials([]);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const passwordCredentials = credentials.filter((c) => c.kind === "password");
+	const privateKeyCredentials = credentials.filter(
+		(c) => c.kind === "private_key"
+	);
+
 	const connectionReady =
-		values.connection.name.trim() && values.connection.host.trim();
+		values.connection.name.trim() &&
+		(values.connection.method === "sftp_hosted"
+			? values.connection.landing_user.trim()
+			: values.connection.host.trim() &&
+				values.connection.username.trim() &&
+				values.connection.host_key_fingerprint.trim());
+
+	async function discoverHostKey() {
+		if (values.connection.method !== "sftp_pull") return;
+		const host = values.connection.host.trim();
+		if (!host) {
+			toast.error("Enter a host before discovering the fingerprint.");
+			return;
+		}
+		const portNum = Number(values.connection.port);
+		const port =
+			Number.isFinite(portNum) && portNum > 0
+				? portNum
+				: Number(defaultSftpPortForHost(host));
+		const effectivePort =
+			isLocalSftpHost(host) && port === 22 ? 2222 : port;
+		setDiscoveringHostKey(true);
+		try {
+			const result = await discoverVendorHostKey({
+				host,
+				port: effectivePort,
+			});
+			if (!result.fingerprint?.trim()) {
+				throw new Error("Discover returned an empty fingerprint.");
+			}
+			patchConnection({
+				host_key_fingerprint: result.fingerprint
+					.trim()
+					.toLowerCase()
+					.replace(/^sha256:/i, "")
+					.replace(/:/g, ""),
+				port: String(result.port || effectivePort),
+			});
+			toast.success(
+				`Host key discovered (${result.fingerprint.slice(0, 12)}…). Connection will activate and test on create.`
+			);
+		} catch (err) {
+			const status =
+				err && typeof err === "object" && "status" in err
+					? Number((err as { status?: number }).status)
+					: undefined;
+			const message =
+				err instanceof Error ? err.message : "Could not discover host key.";
+			if (status === 404) {
+				toast.error(
+					"Discover API not found (404). Deploy vendor-management-core discover-host-key, or point FE at an API that has it."
+				);
+			} else {
+				toast.error(message);
+			}
+		} finally {
+			setDiscoveringHostKey(false);
+		}
+	}
 
 	return (
 		<div className="space-y-8">
@@ -921,6 +1028,9 @@ function IntegrationStep({
 				<p className="mb-3 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
 					SFTP connection
 				</p>
+				<p className="mb-3 text-sm text-muted-foreground">
+					Saved as draft. Pin host key and activate later on Configuration.
+				</p>
 				<div className="grid gap-4 sm:grid-cols-2">
 					<Field label="Connection name">
 						<Input
@@ -930,45 +1040,348 @@ function IntegrationStep({
 							className="h-11"
 						/>
 					</Field>
-					<Field label="Host">
-						<Input
-							value={values.connection.host}
-							onChange={(e) => patchConnection({ host: e.target.value })}
-							placeholder="sftp.example.com"
-							className="h-11 font-mono"
-						/>
-					</Field>
-					<Field label="Environment">
+					<Field label="Method">
 						<Select
-							value={values.connection.environment}
-							onValueChange={(environment) => patchConnection({ environment })}
+							value={values.connection.method}
+							onValueChange={(method: "sftp_pull" | "sftp_hosted") =>
+								patchConnection({ method })
+							}
 						>
 							<SelectTrigger className="h-11">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="production">Production</SelectItem>
-								<SelectItem value="staging">Staging</SelectItem>
-								<SelectItem value="test">Test</SelectItem>
+								<SelectItem value="sftp_pull">SFTP Pull</SelectItem>
+								<SelectItem value="sftp_hosted">SFTP Hosted</SelectItem>
 							</SelectContent>
 						</Select>
 					</Field>
-					<Field label="Status">
-						<Select
-							value={values.connection.status}
-							onValueChange={(status) => patchConnection({ status })}
-						>
-							<SelectTrigger className="h-11">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="active">Active</SelectItem>
-								<SelectItem value="inactive">Inactive</SelectItem>
-								<SelectItem value="pending">Pending</SelectItem>
-							</SelectContent>
-						</Select>
-					</Field>
+					{values.connection.method === "sftp_pull" ? (
+						<>
+							<Field label="Host">
+								<Input
+									value={values.connection.host}
+									onChange={(e) => {
+										const host = e.target.value;
+										patchConnection({
+											host,
+											port: portAfterHostChange(
+												host,
+												values.connection.port
+											),
+										});
+									}}
+									placeholder="sftp.example.com"
+									className="h-11 font-mono"
+								/>
+							</Field>
+							<Field
+								label="Port"
+								hint={
+									isLocalSftpHost(values.connection.host)
+										? "Localhost → 2222 for Docker SFTP (not 22)."
+										: "Default 22."
+								}
+							>
+								<Input
+									value={values.connection.port}
+									onChange={(e) =>
+										patchConnection({ port: e.target.value })
+									}
+									className="h-11 font-mono"
+								/>
+							</Field>
+							<Field label="Username">
+								<Input
+									value={values.connection.username}
+									onChange={(e) =>
+										patchConnection({ username: e.target.value })
+									}
+									className="h-11 font-mono"
+								/>
+							</Field>
+							<Field
+								label="Password credential (required)"
+								hint={
+									passwordCredentials.length === 0
+										? "No password credentials yet — register name + secret_ref below. Secret must already exist in .secrets.yml."
+										: "Pick an existing password credential, or register a secret_ref below. Required for SFTP pull."
+								}
+								className="sm:col-span-2"
+							>
+								<Select
+									value={
+										values.connection.password_credential_id || "__none__"
+									}
+									onValueChange={(v) =>
+										patchConnection({
+											password_credential_id: v === "__none__" ? "" : v,
+										})
+									}
+								>
+									<SelectTrigger className="h-11">
+										<SelectValue placeholder="Select credential" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">None</SelectItem>
+										{passwordCredentials.map((c) => (
+											<SelectItem key={c.id} value={c.id}>
+												{c.name} · {c.secret_ref}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</Field>
+							{!values.connection.password_credential_id ? (
+								<>
+									{passwordCredentials.length === 0 ? (
+										<p className="sm:col-span-2 text-sm text-muted-foreground">
+											Register a CredentialReference that points at a key
+											already present in{" "}
+											<span className="font-mono text-xs">.secrets.yml</span>.
+										</p>
+									) : null}
+									<Field label="Register credential name">
+										<Input
+											value={values.connection.credential_name}
+											onChange={(e) =>
+												patchConnection({
+													credential_name: e.target.value,
+													credential_kind: "password",
+												})
+											}
+											placeholder="Creates CredentialReference on save"
+											className="h-11"
+										/>
+									</Field>
+									<Field
+										label="secret_ref"
+										hint="Secret value must already exist in .secrets.yml."
+									>
+										<Input
+											value={values.connection.credential_secret_ref}
+											onChange={(e) =>
+												patchConnection({
+													credential_secret_ref: e.target.value,
+													credential_kind: "password",
+												})
+											}
+											className="h-11 font-mono text-xs"
+										/>
+									</Field>
+								</>
+							) : null}
+							<Field
+								label="Host key fingerprint (SHA-256 hex)"
+								hint="Required for Active SFTP pull. Discover probes the host (no auth)."
+								className="sm:col-span-2"
+							>
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+									<Input
+										value={values.connection.host_key_fingerprint}
+										onChange={(e) =>
+											patchConnection({
+												host_key_fingerprint: e.target.value,
+											})
+										}
+										placeholder="Discover or paste hex fingerprint"
+										className="h-11 flex-1 font-mono text-xs"
+									/>
+									<Button
+										type="button"
+										variant="secondary"
+										className="h-11 shrink-0"
+										disabled={
+											discoveringHostKey ||
+											!values.connection.host.trim()
+										}
+										onClick={() => void discoverHostKey()}
+									>
+										{discoveringHostKey ? (
+											<Loader2 className="mr-2 size-4 animate-spin" />
+										) : null}
+										Discover
+									</Button>
+								</div>
+							</Field>
+						</>
+					) : (
+						<Field label="Landing user" className="sm:col-span-2">
+							<Input
+								value={values.connection.landing_user}
+								onChange={(e) =>
+									patchConnection({ landing_user: e.target.value })
+								}
+								className="h-11 font-mono"
+							/>
+						</Field>
+					)}
 				</div>
+
+				<Collapsible
+					open={advancedOpen}
+					onOpenChange={setAdvancedOpen}
+					className="mt-4"
+				>
+					<CollapsibleTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="gap-1 px-0 text-muted-foreground"
+						>
+							<ChevronDown
+								className={cn(
+									"size-4 transition-transform",
+									advancedOpen && "rotate-180"
+								)}
+							/>
+							Advanced
+						</Button>
+					</CollapsibleTrigger>
+					<CollapsibleContent className="mt-3">
+						<div className="grid gap-4 sm:grid-cols-2">
+							{values.connection.method === "sftp_pull" ? (
+								<>
+									<Field label="Environment">
+										<Select
+											value={values.connection.environment}
+											onValueChange={(environment) =>
+												patchConnection({ environment })
+											}
+										>
+											<SelectTrigger className="h-11">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="development">
+													Development
+												</SelectItem>
+												<SelectItem value="test">Test</SelectItem>
+												<SelectItem value="uat">UAT</SelectItem>
+												<SelectItem value="production">
+													Production
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									</Field>
+									<Field label="Inbound path">
+										<Input
+											value={values.connection.inbound_path}
+											onChange={(e) =>
+												patchConnection({ inbound_path: e.target.value })
+											}
+											placeholder="upload"
+											className="h-11 font-mono"
+										/>
+									</Field>
+									<Field label="Archive path">
+										<Input
+											value={values.connection.archive_path}
+											onChange={(e) =>
+												patchConnection({ archive_path: e.target.value })
+											}
+											className="h-11 font-mono"
+										/>
+									</Field>
+									<Field
+										label="Private key credential"
+										hint="Only if key auth — leave None for password-only."
+										className="sm:col-span-2"
+									>
+										<Select
+											value={
+												values.connection.private_key_credential_id ||
+												"__none__"
+											}
+											onValueChange={(v) =>
+												patchConnection({
+													private_key_credential_id:
+														v === "__none__" ? "" : v,
+												})
+											}
+										>
+											<SelectTrigger className="h-11">
+												<SelectValue placeholder="None" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="__none__">None</SelectItem>
+												{privateKeyCredentials.map((c) => (
+													<SelectItem key={c.id} value={c.id}>
+														{c.name} · {c.secret_ref}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</Field>
+								</>
+							) : (
+								<>
+									<Field label="Environment">
+										<Select
+											value={values.connection.environment}
+											onValueChange={(environment) =>
+												patchConnection({ environment })
+											}
+										>
+											<SelectTrigger className="h-11">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="development">
+													Development
+												</SelectItem>
+												<SelectItem value="test">Test</SelectItem>
+												<SelectItem value="uat">UAT</SelectItem>
+												<SelectItem value="production">
+													Production
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									</Field>
+									<Field label="Inbound path">
+										<Input
+											value={values.connection.inbound_path}
+											onChange={(e) =>
+												patchConnection({ inbound_path: e.target.value })
+											}
+											className="h-11 font-mono"
+										/>
+									</Field>
+									<Field label="Archive path">
+										<Input
+											value={values.connection.archive_path}
+											onChange={(e) =>
+												patchConnection({ archive_path: e.target.value })
+											}
+											className="h-11 font-mono"
+										/>
+									</Field>
+									<Field label="Error path">
+										<Input
+											value={values.connection.error_path}
+											onChange={(e) =>
+												patchConnection({ error_path: e.target.value })
+											}
+											className="h-11 font-mono"
+										/>
+									</Field>
+									<Field label="Processing path">
+										<Input
+											value={values.connection.processing_path}
+											onChange={(e) =>
+												patchConnection({
+													processing_path: e.target.value,
+												})
+											}
+											className="h-11 font-mono"
+										/>
+									</Field>
+								</>
+							)}
+						</div>
+					</CollapsibleContent>
+				</Collapsible>
 			</div>
 
 			<div>
@@ -977,7 +1390,9 @@ function IntegrationStep({
 				</p>
 				{!connectionReady ? (
 					<p className="mb-3 text-sm text-muted-foreground">
-						Fill connection name and host to enable intake jobs.
+						{values.connection.method === "sftp_hosted"
+							? "Fill connection name and landing user to enable intake jobs."
+							: "Fill connection name, host, username, auth, and host key (Discover) to enable intake jobs."}
 					</p>
 				) : null}
 				{values.jobs.map((job, index) => (
@@ -1385,10 +1800,23 @@ function ReviewStep({
 				},
 				{
 					label: "Connection",
-					value:
-						values.connection.name.trim() && values.connection.host.trim()
-							? `${values.connection.name} (${values.connection.host})`
-							: "—",
+					value: values.connection.name.trim()
+						? `${values.connection.name} (${values.connection.method}${
+								values.connection.method === "sftp_hosted"
+									? values.connection.landing_user
+										? ` · ${values.connection.landing_user}`
+										: ""
+									: values.connection.host
+										? ` · ${values.connection.host}`
+										: ""
+							}${
+								values.connection.method === "sftp_pull"
+									? values.connection.host_key_fingerprint.trim()
+										? " · fingerprint ready · will activate + test"
+										: " · missing fingerprint"
+									: " · will activate + test"
+							})`
+						: "—",
 				},
 				{ label: "Intake jobs", value: String(values.jobs.length) },
 				{ label: "Notes", value: String(countFilledNotes(values)) },

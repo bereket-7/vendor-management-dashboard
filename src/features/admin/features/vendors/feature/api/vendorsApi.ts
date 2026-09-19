@@ -4,14 +4,21 @@ import type {
 	AccountDto,
 	AccountOpsSummaryDto,
 	AccountUpdateInput,
+	ConnectionCompactDto,
+	ConnectionCreateInput,
+	ConnectionDiscoverHostKeyResult,
 	ConnectionDto,
+	ConnectionTestResult,
+	ConnectionUpdateInput,
+	CredentialCreateInput,
+	CredentialDto,
 	InboundFileDto,
 	IntakeJobDto,
 	ProcessingEventDto,
 	VendorCategoryAssignmentCreateInput,
 	VendorCategoryAssignmentDto,
-	VendorCategoryDto,
 	VendorCategoryListQuery,
+	VendorDto,
 	VendorContactCreateInput,
 	VendorContactDto,
 	VendorContactUpdateInput,
@@ -30,9 +37,7 @@ import {
 
 export { rememberVendorAccountId };
 
-export async function listVendors(): Promise<
-	import("@/lib/vendor-core/types").VendorDto[]
-> {
+export async function listVendors(): Promise<VendorDto[]> {
 	const page = await vendorCoreApi.listVendors();
 	return page.results ?? [];
 }
@@ -63,7 +68,13 @@ export async function listVendorCategoryAssignments(vendorId?: string) {
 	return page.results ?? [];
 }
 
-export async function createVendorConnection(body: Record<string, unknown>) {
+export async function deleteVendorCategoryAssignment(id: string) {
+	return vendorCoreApi.deleteVendorCategoryAssignment(id);
+}
+
+export async function createVendorConnection(
+	body: ConnectionCreateInput
+): Promise<ConnectionCompactDto> {
 	return vendorCoreApi.createConnection(body);
 }
 
@@ -151,14 +162,34 @@ export async function runIntakeJob(id: string) {
 	return vendorCoreApi.runIntakeJob(id);
 }
 
-export async function testVendorConnection(id: string) {
+export async function disableIntakeJob(id: string) {
+	return vendorCoreApi.disableIntakeJob(id);
+}
+
+export async function testVendorConnection(
+	id: string
+): Promise<ConnectionTestResult> {
 	return vendorCoreApi.testConnection(id);
+}
+
+export async function discoverVendorHostKey(body: {
+	host: string;
+	port?: number;
+}): Promise<ConnectionDiscoverHostKeyResult> {
+	return vendorCoreApi.discoverHostKey(body);
+}
+
+export async function discoverVendorHostKeyById(
+	id: string,
+	body?: { host?: string; port?: number; pin?: boolean }
+): Promise<ConnectionDiscoverHostKeyResult> {
+	return vendorCoreApi.discoverHostKeyById(id, body);
 }
 
 export async function updateVendorConnection(
 	id: string,
-	body: Record<string, unknown>
-) {
+	body: ConnectionUpdateInput
+): Promise<ConnectionCompactDto> {
 	return vendorCoreApi.updateConnection(id, body);
 }
 
@@ -176,6 +207,17 @@ export async function restoreVendorConnection(id: string) {
 
 export async function hardDeleteVendorConnection(id: string) {
 	return vendorCoreApi.hardDeleteConnection(id);
+}
+
+export async function listVendorCredentials(): Promise<CredentialDto[]> {
+	const page = await vendorCoreApi.listCredentials();
+	return page.results ?? [];
+}
+
+export async function createVendorCredential(
+	body: CredentialCreateInput
+): Promise<CredentialDto> {
+	return vendorCoreApi.createCredential(body);
 }
 
 export async function listVendorAccounts(
@@ -442,6 +484,69 @@ export async function listInboundFileEvents(
 
 export async function reprocessInboundFile(id: string) {
 	return vendorCoreApi.reprocessInboundFile(id);
+}
+
+export async function downloadInboundFile(id: string) {
+	return vendorCoreApi.downloadInboundFile(id);
+}
+
+export async function triggerInboundFileBrowserDownload(id: string) {
+	const result = await downloadInboundFile(id);
+	const blob =
+		"blob" in result && result.blob instanceof Blob
+			? result.blob
+			: new Blob([result.text], {
+					type: result.contentType || "application/octet-stream",
+				});
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = result.filename || `inbound-file-${id}`;
+	a.click();
+	URL.revokeObjectURL(url);
+}
+
+export type VendorCertificateDto = {
+	id: string;
+	vendor_id: string;
+	certification_type: string;
+	certifying_body?: string | null;
+	certificate_number?: string | null;
+	scope_description?: string | null;
+	issued_at?: string | null;
+	expires_at?: string | null;
+	status: string;
+	document_id?: string | null;
+	verified_at?: string | null;
+	created_at?: string;
+	updated_at?: string;
+};
+
+export async function listVendorCertificates(
+	vendorId: string
+): Promise<VendorCertificateDto[]> {
+	const page = await vendorCoreApi.listCertificates({ vendor_id: vendorId });
+	return (page.results ?? []) as VendorCertificateDto[];
+}
+
+export async function createVendorCertificate(body: {
+	vendor_id: string;
+	certification_type: string;
+	certifying_body?: string | null;
+	certificate_number?: string | null;
+	scope_description?: string | null;
+	issued_at?: string | null;
+	expires_at?: string | null;
+	status?: string;
+}) {
+	return vendorCoreApi.createCertificate(body) as Promise<VendorCertificateDto>;
+}
+
+export async function updateVendorCertificate(
+	id: string,
+	body: Record<string, unknown>
+) {
+	return vendorCoreApi.updateCertificate(id, body) as Promise<VendorCertificateDto>;
 }
 
 export async function listVendorNotes(

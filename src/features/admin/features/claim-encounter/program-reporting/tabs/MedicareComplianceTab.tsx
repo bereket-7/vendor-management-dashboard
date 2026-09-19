@@ -28,11 +28,12 @@ import {
 	CmsEdgeSectionPanel,
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
+import { useComplianceCalendarObligationsList } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
 import {
 	MEDICARE_COMPLIANCE_ATTESTATIONS,
-	MEDICARE_COMPLIANCE_KPIS,
-	MEDICARE_COMPLIANCE_REQUIREMENTS,
+	useProgramOverviewQuery,
 } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
+import { emptyOverview } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import { cn } from "@/lib/utils";
 
 const PAGE_STACK = "space-y-5";
@@ -102,15 +103,47 @@ function MetricCard({
 	);
 }
 
-function ComplianceKpiRow() {
-	const k = MEDICARE_COMPLIANCE_KPIS;
+function obligationStatusStyle(status: string): string {
+	if (status === "Completed") {
+		return "border-emerald-200 bg-emerald-50 text-emerald-700";
+	}
+	if (status === "Overdue") {
+		return "border-red-200 bg-red-50 text-red-700";
+	}
+	if (status === "At Risk") {
+		return "border-amber-200 bg-amber-50 text-amber-800";
+	}
+	return "border-sky-200 bg-sky-50 text-sky-800";
+}
+
+function ComplianceKpiRow({
+	overallStatus,
+	obligations,
+}: {
+	overallStatus: string;
+	obligations: Array<{ status: string }>;
+}) {
+	const total = obligations.length;
+	const met = obligations.filter((o) => o.status === "Completed").length;
+	const upcoming = obligations.filter((o) => o.status === "Upcoming").length;
+	const overdue = obligations.filter((o) => o.status === "Overdue").length;
+	const atRisk = obligations.filter((o) => o.status === "At Risk").length;
+	const k = {
+		requirementsMet: met,
+		requirementsTotal: total,
+		upcomingDeadlines: upcoming,
+		overdueItems: overdue,
+		attestationsComplete: 0,
+		attestationsTotal: 0,
+		openGaps: atRisk + overdue,
+	};
 
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 			<MetricCard
 				label="Requirements Met"
 				value={`${k.requirementsMet}/${k.requirementsTotal}`}
-				hint={`${((k.requirementsMet / k.requirementsTotal) * 100).toFixed(1)}% Complete`}
+				hint={`${k.requirementsTotal > 0 ? ((k.requirementsMet / k.requirementsTotal) * 100).toFixed(1) : "0"}% Complete`}
 				icon={CheckCircle2}
 				tone="text-emerald-700 bg-emerald-500/10"
 				valueClassName="text-emerald-700"
@@ -136,7 +169,11 @@ function ComplianceKpiRow() {
 			<MetricCard
 				label="Attestations Complete"
 				value={`${k.attestationsComplete}/${k.attestationsTotal}`}
-				hint={`${((k.attestationsComplete / k.attestationsTotal) * 100).toFixed(0)}% Complete`}
+				hint={
+					k.attestationsTotal > 0
+						? `${((k.attestationsComplete / k.attestationsTotal) * 100).toFixed(0)}% Complete`
+						: "No attestation data"
+				}
 				icon={ClipboardCheck}
 				tone="text-sky-700 bg-sky-500/10"
 			/>
@@ -150,8 +187,8 @@ function ComplianceKpiRow() {
 			/>
 			<MetricCard
 				label="Overall Status"
-				value="Good"
-				hint="All Critical Requirements Met"
+				value={overallStatus || "—"}
+				hint="From program overview"
 				icon={Shield}
 				tone="text-emerald-700 bg-emerald-500/10"
 				valueClassName="text-emerald-700"
@@ -160,7 +197,19 @@ function ComplianceKpiRow() {
 	);
 }
 
-function RequirementsTablePanel() {
+function RequirementsTablePanel({
+	requirements,
+}: {
+	requirements: Array<{
+		id: string;
+		requirement: string;
+		regulation: string;
+		dueDate: string;
+		owner: string;
+		status: string;
+		statusStyle: string;
+	}>;
+}) {
 	return (
 		<CmsEdgeSectionPanel title="Compliance Requirements">
 			<CmsEdgeTableScroll className="border-t border-border/50">
@@ -178,31 +227,38 @@ function RequirementsTablePanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICARE_COMPLIANCE_REQUIREMENTS.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className={cn(TABLE_CELL, "font-medium")}>
-									{row.requirement}
-								</TableCell>
+						{requirements.length === 0 ? (
+							<TableRow>
 								<TableCell
-									className={cn(
-										TABLE_CELL,
-										"font-mono text-[11px] text-muted-foreground"
-									)}
+									colSpan={5}
+									className="px-4 py-8 text-center text-sm text-muted-foreground"
 								>
-									{row.regulation}
-								</TableCell>
-								<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
-									{row.dueDate}
-								</TableCell>
-								<TableCell className={TABLE_CELL}>{row.owner}</TableCell>
-								<TableCell className={cn(TABLE_CELL, "pr-5")}>
-									<StatusPill label={row.status} className={row.statusStyle} />
+									No medicare compliance obligations
 								</TableCell>
 							</TableRow>
-						))}
+						) : (
+							requirements.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className={cn(TABLE_CELL, "font-medium")}>
+										{row.requirement}
+									</TableCell>
+									<TableCell className={TABLE_CELL}>{row.regulation}</TableCell>
+									<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
+										{row.dueDate}
+									</TableCell>
+									<TableCell className={TABLE_CELL}>{row.owner}</TableCell>
+									<TableCell className={cn(TABLE_CELL, "pr-5")}>
+										<StatusPill
+											label={row.status}
+											className={row.statusStyle}
+										/>
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -211,6 +267,7 @@ function RequirementsTablePanel() {
 }
 
 function AttestationsTablePanel() {
+	const rows: typeof MEDICARE_COMPLIANCE_ATTESTATIONS = [];
 	return (
 		<CmsEdgeSectionPanel title="Attestations">
 			<CmsEdgeTableScroll className="border-t border-border/50">
@@ -227,23 +284,34 @@ function AttestationsTablePanel() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICARE_COMPLIANCE_ATTESTATIONS.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className={cn(TABLE_CELL, "font-medium")}>
-									{row.name}
-								</TableCell>
-								<TableCell className={TABLE_CELL}>{row.submittedBy}</TableCell>
-								<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
-									{row.submittedDate}
-								</TableCell>
-								<TableCell className={cn(TABLE_CELL, "pr-5")}>
-									<StatusPill label={row.status} className={row.statusStyle} />
+						{rows.length === 0 ? (
+							<TableRow>
+								<TableCell
+									colSpan={4}
+									className="px-4 py-8 text-center text-sm text-muted-foreground"
+								>
+									No attestations from API
 								</TableCell>
 							</TableRow>
-						))}
+						) : (
+							rows.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className={cn(TABLE_CELL, "font-medium")}>
+										{row.name}
+									</TableCell>
+									<TableCell className={TABLE_CELL}>{row.submittedBy}</TableCell>
+									<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
+										{row.submittedDate}
+									</TableCell>
+									<TableCell className={cn(TABLE_CELL, "pr-5")}>
+										<StatusPill label={row.status} className={row.statusStyle} />
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -251,12 +319,43 @@ function AttestationsTablePanel() {
 	);
 }
 
-export function MedicareComplianceTab() {
+export function MedicareComplianceTab({
+	reportingPeriod,
+}: { reportingPeriod?: string } = {}) {
+	const overviewQuery = useProgramOverviewQuery("medicare", reportingPeriod);
+	const overview = overviewQuery.data ?? emptyOverview("medicare");
+	const complianceStatus =
+		overview.kpis.kind === "medicare"
+			? overview.kpis.complianceStatus
+			: "—";
+
+	const { obligations, isLoading } = useComplianceCalendarObligationsList({
+		program: "medicare",
+	});
+
+	const requirements = obligations.map((row) => ({
+		id: row.id,
+		requirement: row.title,
+		regulation: row.obligationType || "—",
+		dueDate: row.dueDate,
+		owner: row.owner,
+		status: row.status,
+		statusStyle: obligationStatusStyle(row.status),
+	}));
+
 	return (
 		<div className={PAGE_STACK}>
-			<ComplianceKpiRow />
+			{overviewQuery.isLoading || isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading compliance…
+				</p>
+			) : null}
+			<ComplianceKpiRow
+				overallStatus={complianceStatus}
+				obligations={obligations}
+			/>
 			<div className={cn("flex flex-col", SECTION_GAP)}>
-				<RequirementsTablePanel />
+				<RequirementsTablePanel requirements={requirements} />
 				<AttestationsTablePanel />
 			</div>
 			<CmsEdgePageFooter />

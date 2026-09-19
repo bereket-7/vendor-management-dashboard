@@ -58,13 +58,11 @@ import {
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
 	MEDICAID_RECENT_WARNINGS,
-	MEDICAID_RESPONSES_BY_STATUS,
-	MEDICAID_RESPONSE_FILES,
-	MEDICAID_RESPONSE_KPIS,
 	MEDICAID_RESPONSE_STATUS_STYLES,
 	MEDICAID_RESPONSE_SUMMARY_TREND,
 	MEDICAID_TOP_ERROR_REASONS,
 	MEDICAID_WARNING_STATUS_STYLES,
+	useMedicaidEncounterResponseFilesList,
 } from "@/features/admin/features/claim-encounter/medicaid-encounter/feature/queries/useMedicaidEncounterQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
 import { getProgramScale } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
@@ -159,8 +157,57 @@ function ResponseMetricCard({
 	);
 }
 
-function ResponsesKpiRow({ programType }: { programType?: ProgramType }) {
-	const k = MEDICAID_RESPONSE_KPIS;
+type ResponseKpis = {
+	filesReceived: number;
+	filesReceivedDelta: number;
+	totalReports: number;
+	accepted: number;
+	acceptanceRate: number;
+	errors: number;
+	errorRate: number;
+	warnings: number;
+	warningRate: number;
+	pending: number;
+};
+
+function deriveResponseKpis(
+	files: Array<{
+		records: number;
+		accepted: number;
+		errors: number;
+		warnings: number;
+		status: string;
+	}>
+): ResponseKpis {
+	const filesReceived = files.length;
+	const totalReports = files.reduce((sum, f) => sum + f.records, 0);
+	const accepted = files.reduce((sum, f) => sum + f.accepted, 0);
+	const errors = files.reduce((sum, f) => sum + f.errors, 0);
+	const warnings = files.reduce((sum, f) => sum + f.warnings, 0);
+	const pending = files.filter((f) => f.status === "Pending").length;
+	const denom = totalReports || 1;
+	return {
+		filesReceived,
+		filesReceivedDelta: 0,
+		totalReports,
+		accepted,
+		acceptanceRate: (accepted / denom) * 100,
+		errors,
+		errorRate: (errors / denom) * 100,
+		warnings,
+		warningRate: (warnings / denom) * 100,
+		pending,
+	};
+}
+
+function ResponsesKpiRow({
+	programType,
+	kpis,
+}: {
+	programType?: ProgramType;
+	kpis: ResponseKpis;
+}) {
+	const k = kpis;
 	const isMedicare = programType === "medicare";
 
 	return (
@@ -225,8 +272,20 @@ function ResponsesKpiRow({ programType }: { programType?: ProgramType }) {
 
 function StateResponseFilesTable({
 	programType,
+	rows,
 }: {
 	programType?: ProgramType;
+	rows: Array<{
+		id: string;
+		fileName: string;
+		reportType: string;
+		receivedAt: string;
+		records: number;
+		accepted: number;
+		errors: number;
+		warnings: number;
+		status: keyof typeof MEDICAID_RESPONSE_STATUS_STYLES;
+	}>;
 }) {
 	const isMedicare = programType === "medicare";
 
@@ -237,7 +296,7 @@ function StateResponseFilesTable({
 			footer={
 				<div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/50 px-5 py-3 text-xs text-muted-foreground">
 					<span>
-						Showing 1 to 6 of {scaleProgramCount(40, programType)} entries
+						Showing {rows.length} of {rows.length} entries
 					</span>
 					<div className="flex items-center gap-1">
 						<Button variant="outline" size="icon" className="size-7" disabled>
@@ -245,16 +304,6 @@ function StateResponseFilesTable({
 						</Button>
 						<Button variant="default" size="icon" className="size-7 text-xs">
 							1
-						</Button>
-						<Button variant="outline" size="icon" className="size-7 text-xs">
-							2
-						</Button>
-						<Button variant="outline" size="icon" className="size-7 text-xs">
-							3
-						</Button>
-						<span className="px-1">…</span>
-						<Button variant="outline" size="icon" className="size-7 text-xs">
-							7
 						</Button>
 						<Button variant="outline" size="icon" className="size-7">
 							<ChevronRight className="size-3.5" />
@@ -269,14 +318,12 @@ function StateResponseFilesTable({
 					className={CMS_EDGE_TABLE_CLASS}
 				>
 					<TableHeader>
-						<TableRow className="border-b border-border/50 hover:bg-transparent">
-							<TableHead className={cn(RESPONSE_TABLE_HEAD, "min-w-[220px]")}>
-								Response File Name
+						<TableRow className="hover:bg-transparent">
+							<TableHead className={RESPONSE_TABLE_HEAD}>
+								{isMedicare ? "CMS Response File" : "Response File"}
 							</TableHead>
-							<TableHead className={cn(RESPONSE_TABLE_HEAD, "min-w-[120px]")}>
-								Report Type
-							</TableHead>
-							<TableHead className={cn(RESPONSE_TABLE_HEAD, "min-w-[140px]")}>
+							<TableHead className={RESPONSE_TABLE_HEAD}>Report Type</TableHead>
+							<TableHead className={RESPONSE_TABLE_HEAD}>
 								Received Date/Time
 							</TableHead>
 							<TableHead className={cn(RESPONSE_TABLE_HEAD, "text-right")}>
@@ -297,70 +344,78 @@ function StateResponseFilesTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{MEDICAID_RESPONSE_FILES.map((row) => (
-							<TableRow
-								key={row.id}
-								className="border-b border-border/40 hover:bg-muted/20"
-							>
-								<TableCell className={RESPONSE_TABLE_CELL}>
-									<Button
-										variant="link"
-										className={cn(
-											CMS_EDGE_TABLE_LINK_CLASS,
-											"whitespace-normal text-left"
-										)}
-									>
-										{formatProgramFileName(row.fileName, programType)}
-									</Button>
-								</TableCell>
-								<TableCell className={RESPONSE_TABLE_CELL}>
-									{row.reportType}
-								</TableCell>
+						{rows.length === 0 ? (
+							<TableRow>
 								<TableCell
-									className={cn(
-										RESPONSE_TABLE_CELL,
-										"whitespace-nowrap tabular-nums"
-									)}
+									colSpan={8}
+									className="px-4 py-8 text-center text-sm text-muted-foreground"
 								>
-									{row.receivedAt}
-								</TableCell>
-								<TableCell
-									className={cn(RESPONSE_TABLE_CELL, "text-right tabular-nums")}
-								>
-									{formatCount(scaleProgramCount(row.records, programType))}
-								</TableCell>
-								<TableCell
-									className={cn(
-										RESPONSE_TABLE_CELL,
-										"text-right tabular-nums text-emerald-700"
-									)}
-								>
-									{formatCount(scaleProgramCount(row.accepted, programType))}
-								</TableCell>
-								<TableCell
-									className={cn(
-										RESPONSE_TABLE_CELL,
-										"text-right tabular-nums text-red-600"
-									)}
-								>
-									{formatCount(scaleProgramCount(row.errors, programType))}
-								</TableCell>
-								<TableCell
-									className={cn(
-										RESPONSE_TABLE_CELL,
-										"text-right tabular-nums text-amber-600"
-									)}
-								>
-									{formatCount(scaleProgramCount(row.warnings, programType))}
-								</TableCell>
-								<TableCell className={cn(RESPONSE_TABLE_CELL, "pr-5")}>
-									<StatusPill
-										label={row.status}
-										className={MEDICAID_RESPONSE_STATUS_STYLES[row.status]}
-									/>
+									No response files
 								</TableCell>
 							</TableRow>
-						))}
+						) : (
+							rows.map((row) => (
+								<TableRow
+									key={row.id}
+									className="border-b border-border/40 hover:bg-muted/20"
+								>
+									<TableCell className={RESPONSE_TABLE_CELL}>
+										<Button
+											variant="link"
+											className={cn(
+												CMS_EDGE_TABLE_LINK_CLASS,
+												"whitespace-normal text-left"
+											)}
+										>
+											{formatProgramFileName(row.fileName, programType)}
+										</Button>
+									</TableCell>
+									<TableCell className={RESPONSE_TABLE_CELL}>
+										{row.reportType}
+									</TableCell>
+									<TableCell
+										className={cn(RESPONSE_TABLE_CELL, "tabular-nums")}
+									>
+										{row.receivedAt}
+									</TableCell>
+									<TableCell
+										className={cn(RESPONSE_TABLE_CELL, "text-right tabular-nums")}
+									>
+										{formatCount(scaleProgramCount(row.records, programType))}
+									</TableCell>
+									<TableCell
+										className={cn(
+											RESPONSE_TABLE_CELL,
+											"text-right tabular-nums text-emerald-700"
+										)}
+									>
+										{formatCount(scaleProgramCount(row.accepted, programType))}
+									</TableCell>
+									<TableCell
+										className={cn(
+											RESPONSE_TABLE_CELL,
+											"text-right tabular-nums text-red-600"
+										)}
+									>
+										{formatCount(scaleProgramCount(row.errors, programType))}
+									</TableCell>
+									<TableCell
+										className={cn(
+											RESPONSE_TABLE_CELL,
+											"text-right tabular-nums text-amber-600"
+										)}
+									>
+										{formatCount(scaleProgramCount(row.warnings, programType))}
+									</TableCell>
+									<TableCell className={cn(RESPONSE_TABLE_CELL, "pr-5")}>
+										<StatusPill
+											label={row.status}
+											className={MEDICAID_RESPONSE_STATUS_STYLES[row.status]}
+										/>
+									</TableCell>
+								</TableRow>
+							))
+						)}
 					</TableBody>
 				</Table>
 			</CmsEdgeTableScroll>
@@ -546,18 +601,22 @@ function ResponseFiltersPanel() {
 
 function ResponsesByStatusPanel({
 	programType,
+	files = [],
 }: {
 	programType?: ProgramType;
+	files?: Array<{ status: string }>;
 }) {
-	const total = scaleProgramCount(
-		MEDICAID_RESPONSE_KPIS.filesReceived,
-		programType
-	);
-	const pieData = MEDICAID_RESPONSES_BY_STATUS.map((item) => ({
-		name: item.name,
-		value: scaleProgramCount(item.count, programType),
-		color: item.color,
+	const counts = new Map<string, number>();
+	for (const f of files) {
+		counts.set(f.status, (counts.get(f.status) ?? 0) + 1);
+	}
+	const colors = ["#22c55e", "#f59e0b", "#ef4444", "#3b82f6", "#94a3b8"];
+	const pieData = [...counts.entries()].map(([name, count], i) => ({
+		name,
+		value: scaleProgramCount(count, programType),
+		color: colors[i % colors.length],
 	}));
+	const total = pieData.reduce((sum, item) => sum + item.value, 0) || 1;
 
 	return (
 		<CmsEdgeSectionPanel
@@ -591,7 +650,7 @@ function ResponsesByStatusPanel({
 					</div>
 				</div>
 				<ul className="flex min-w-0 flex-1 flex-col gap-2 text-xs">
-					{MEDICAID_RESPONSES_BY_STATUS.map((item) => (
+					{pieData.map((item) => (
 						<li
 							key={item.name}
 							className="flex items-center justify-between gap-2"
@@ -604,8 +663,10 @@ function ResponsesByStatusPanel({
 								{item.name}
 							</span>
 							<span className="shrink-0 tabular-nums text-muted-foreground">
-								{scaleProgramCount(item.count, programType)}
-								<span className="ml-1">({item.pct}%)</span>
+								{item.value}
+								<span className="ml-1">
+									({total ? ((item.value / total) * 100).toFixed(0) : 0}%)
+								</span>
 							</span>
 						</li>
 					))}
@@ -761,14 +822,24 @@ function RecentWarningsPanel({ programType }: { programType?: ProgramType }) {
 
 type MedicaidEncounterResponsesTabProps = {
 	programType?: ProgramType;
+	reportingPeriod?: string;
 };
 
 export function MedicaidEncounterResponsesTab({
-	programType,
+	programType = "medicaid",
 }: MedicaidEncounterResponsesTabProps = {}) {
+	const { responseFiles, isLoading } =
+		useMedicaidEncounterResponseFilesList(programType);
+	const kpis = deriveResponseKpis(responseFiles);
+
 	return (
 		<div className={RESPONSE_PAGE_STACK}>
-			<ResponsesKpiRow programType={programType} />
+			{isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading responses…
+				</p>
+			) : null}
+			<ResponsesKpiRow programType={programType} kpis={kpis} />
 
 			{/* Main content — wide left for tables, narrow right for chart + filters */}
 			<div
@@ -778,7 +849,10 @@ export function MedicaidEncounterResponsesTab({
 				)}
 			>
 				<div className={cn("flex min-w-0 flex-col", RESPONSE_SECTION_GAP)}>
-					<StateResponseFilesTable programType={programType} />
+					<StateResponseFilesTable
+						programType={programType}
+						rows={responseFiles}
+					/>
 					<TopErrorReasonsPanel programType={programType} />
 					<RecentWarningsPanel programType={programType} />
 				</div>
@@ -786,7 +860,10 @@ export function MedicaidEncounterResponsesTab({
 				<div className={cn("flex min-w-0 flex-col", RESPONSE_SECTION_GAP)}>
 					<ResponseSummaryTrendPanel programType={programType} />
 					<ResponseFiltersPanel />
-					<ResponsesByStatusPanel programType={programType} />
+					<ResponsesByStatusPanel
+						programType={programType}
+						files={responseFiles}
+					/>
 				</div>
 			</div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
 	AlertTriangle,
@@ -33,10 +33,11 @@ import {
 } from "@/features/admin/features/claim-encounter/compliance-calendar/ComplianceCalendarViews";
 import { ComplianceObligationsSection } from "@/features/admin/features/claim-encounter/compliance-calendar/ComplianceObligationsSection";
 import {
-	COMPLIANCE_CALENDAR_EVENTS,
-	COMPLIANCE_CALENDAR_KPIS,
-	COMPLIANCE_CALENDAR_WEEK_LABEL,
-	COMPLIANCE_DATE_RANGE,
+	buildMonthGrid,
+	labelToProgramFilter,
+	weekLabel,
+} from "@/features/admin/features/claim-encounter/compliance-calendar/feature/mappers/compliance-calendarMappers";
+import {
 	COMPLIANCE_FILTER_OWNERS,
 	COMPLIANCE_FILTER_PROGRAMS,
 	COMPLIANCE_FILTER_STATUSES,
@@ -44,10 +45,10 @@ import {
 	COMPLIANCE_LEGEND_ITEMS,
 	COMPLIANCE_PROGRAM_COLORS,
 	COMPLIANCE_PROGRAM_LABELS,
-	COMPLIANCE_PROGRAM_SUMMARY,
 	type CalendarDayEvent,
 	type ComplianceProgramKey,
-	buildMay2025Grid,
+	useComplianceCalendarBundleQuery,
+	useCreateComplianceObligationMutation,
 } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
 import { cn } from "@/lib/utils";
 
@@ -145,8 +146,14 @@ function CalendarDayCell({
 	);
 }
 
-function ProgramSummaryChart() {
-	const chartData = COMPLIANCE_PROGRAM_SUMMARY.map((item) => ({
+function ProgramSummaryChart({
+	summary,
+	total,
+}: {
+	summary: Array<{ key: Exclude<ComplianceProgramKey, "overdue">; count: number; pct: string }>;
+	total: number;
+}) {
+	const chartData = summary.map((item) => ({
 		name: COMPLIANCE_PROGRAM_LABELS[item.key],
 		value: item.count,
 		fill: COMPLIANCE_PROGRAM_COLORS[item.key],
@@ -175,7 +182,7 @@ function ProgramSummaryChart() {
 				</ResponsiveContainer>
 			</div>
 			<ul className="min-w-0 flex-1 space-y-1.5 text-xs">
-				{COMPLIANCE_PROGRAM_SUMMARY.map((item) => (
+				{summary.map((item) => (
 					<li
 						key={item.key}
 						className="flex items-center justify-between gap-2"
@@ -196,9 +203,7 @@ function ProgramSummaryChart() {
 				))}
 				<li className="flex items-center justify-between border-t border-border/50 pt-2 font-semibold text-foreground">
 					<span>Total</span>
-					<span className="tabular-nums">
-						{COMPLIANCE_CALENDAR_KPIS.total.value}
-					</span>
+					<span className="tabular-nums">{total}</span>
 				</li>
 			</ul>
 		</div>
@@ -206,20 +211,67 @@ function ProgramSummaryChart() {
 }
 
 export function ComplianceCalendarPage() {
+	const now = new Date();
 	const [view, setView] = useState("month");
-	const grid = buildMay2025Grid();
-	const kpis = COMPLIANCE_CALENDAR_KPIS;
+	const [cursor, setCursor] = useState({
+		year: now.getFullYear(),
+		monthIndex: now.getMonth(),
+	});
+	const [filterProgram, setFilterProgram] = useState("All");
+	const [filterStatus, setFilterStatus] = useState("All");
+	const createMutation = useCreateComplianceObligationMutation();
 
+	const bundleQuery = useComplianceCalendarBundleQuery(cursor);
+	const data = bundleQuery.data;
+	const kpis = data?.kpis ?? {
+		total: { value: 0, hint: "—" },
+		upcoming: { value: 0, pct: "0%" },
+		overdue: { value: 0, pct: "0%" },
+		completed: { value: 0, pct: "0%" },
+		atRisk: { value: 0, pct: "0%" },
+	};
+	const eventsByDay = data?.eventsByDay ?? {};
+	const schedule = data?.schedule ?? [];
+	const obligations = useMemo(() => {
+		let rows = data?.obligations ?? [];
+		const program = labelToProgramFilter(filterProgram);
+		if (program) rows = rows.filter((r) => r.program === program);
+		if (filterStatus !== "All") {
+			rows = rows.filter((r) => r.status === filterStatus);
+		}
+		return rows;
+	}, [data?.obligations, filterProgram, filterStatus]);
+
+	const grid = buildMonthGrid(cursor.year, cursor.monthIndex);
+	const monthLabel = new Date(cursor.year, cursor.monthIndex, 1).toLocaleDateString(
+		"en-US",
+		{ month: "long", year: "numeric" }
+	);
+	const anchor = new Date(
+		cursor.year,
+		cursor.monthIndex,
+		Math.min(now.getDate(), 28)
+	);
 	const periodLabel =
-		view === "week"
-			? COMPLIANCE_CALENDAR_WEEK_LABEL
-			: view === "list"
-				? "May 2025"
-				: "May 2025";
+		view === "week" ? weekLabel(anchor) : monthLabel;
+
+	async function handleAddObligation() {
+		try {
+			await createMutation.mutateAsync({
+				title: "New compliance obligation",
+				program: "other",
+				dueDate: new Date().toISOString().slice(0, 10),
+				status: "Upcoming",
+				owner: "Regulatory ops",
+			});
+			toast.success("Obligation created");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Create failed");
+		}
+	}
 
 	return (
 		<div className={PAGE_STACK}>
-			{/* Header */}
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div className="min-w-0 space-y-1">
 					<h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -229,13 +281,23 @@ export function ComplianceCalendarPage() {
 						Track and manage all regulatory, program, and quality obligations in
 						one place.
 					</p>
+					{bundleQuery.isError ? (
+						<p className="text-sm text-destructive">
+							Could not load compliance calendar.
+						</p>
+					) : null}
 				</div>
 				<div className="flex flex-wrap items-end gap-2">
 					<div className="flex flex-col gap-1">
 						<span className="text-[11px] font-medium text-muted-foreground">
 							Program
 						</span>
-						<Select defaultValue="all">
+						<Select
+							value={filterProgram === "All" ? "all" : filterProgram}
+							onValueChange={(v) =>
+								setFilterProgram(v === "all" ? "All" : v)
+							}
+						>
 							<SelectTrigger className="h-9 w-[140px] bg-card text-xs shadow-sm">
 								<SelectValue />
 							</SelectTrigger>
@@ -252,13 +314,30 @@ export function ComplianceCalendarPage() {
 						<span className="text-[11px] font-medium text-muted-foreground">
 							Measurement Year
 						</span>
-						<Select defaultValue="2025">
+						<Select
+							value={String(cursor.year)}
+							onValueChange={(v) =>
+								setCursor((c) => ({ ...c, year: Number(v) }))
+							}
+						>
 							<SelectTrigger className="h-9 w-[100px] bg-card text-xs shadow-sm">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="2025">2025</SelectItem>
-								<SelectItem value="2024">2024</SelectItem>
+								{Array.from(
+									new Set([
+										cursor.year,
+										now.getFullYear(),
+										now.getFullYear() - 1,
+										2027,
+									])
+								)
+									.sort((a, b) => b - a)
+									.map((y) => (
+										<SelectItem key={y} value={String(y)}>
+											{y}
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 					</div>
@@ -266,16 +345,14 @@ export function ComplianceCalendarPage() {
 						variant="outline"
 						size="sm"
 						className="h-9 bg-card text-xs shadow-sm"
+						onClick={() =>
+							setCursor({
+								year: now.getFullYear(),
+								monthIndex: now.getMonth(),
+							})
+						}
 					>
 						Today
-					</Button>
-					<Button
-						variant="outline"
-						size="icon"
-						className="size-9 bg-card shadow-sm"
-						aria-label="Calendar view"
-					>
-						<CalendarDays className="size-4" />
 					</Button>
 					<Button
 						variant="outline"
@@ -286,14 +363,18 @@ export function ComplianceCalendarPage() {
 					>
 						<Download className="size-4" />
 					</Button>
-					<Button size="sm" className="h-9 gap-1.5 text-xs">
+					<Button
+						size="sm"
+						className="h-9 gap-1.5 text-xs"
+						onClick={() => void handleAddObligation()}
+						disabled={createMutation.isPending}
+					>
 						<Plus className="size-3.5" />
 						Add Obligation
 					</Button>
 				</div>
 			</div>
 
-			{/* KPI row */}
 			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 				<SummaryKpiCard
 					label="Total Obligations"
@@ -332,7 +413,6 @@ export function ComplianceCalendarPage() {
 				/>
 			</div>
 
-			{/* Calendar + sidebar */}
 			<div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
 				<CmsEdgeSectionPanel
 					title={
@@ -343,6 +423,15 @@ export function ComplianceCalendarPage() {
 									size="icon"
 									className="size-7"
 									aria-label="Previous month"
+									onClick={() =>
+										setCursor((c) => {
+											const d = new Date(c.year, c.monthIndex - 1, 1);
+											return {
+												year: d.getFullYear(),
+												monthIndex: d.getMonth(),
+											};
+										})
+									}
 								>
 									<ChevronLeft className="size-4" />
 								</Button>
@@ -354,6 +443,15 @@ export function ComplianceCalendarPage() {
 									size="icon"
 									className="size-7"
 									aria-label="Next month"
+									onClick={() =>
+										setCursor((c) => {
+											const d = new Date(c.year, c.monthIndex + 1, 1);
+											return {
+												year: d.getFullYear(),
+												monthIndex: d.getMonth(),
+											};
+										})
+									}
 								>
 									<ChevronRight className="size-4" />
 								</Button>
@@ -403,7 +501,11 @@ export function ComplianceCalendarPage() {
 						</div>
 					}
 				>
-					{view === "month" ? (
+					{bundleQuery.isLoading ? (
+						<p className="px-4 py-12 text-center text-sm text-muted-foreground">
+							Loading calendar…
+						</p>
+					) : view === "month" ? (
 						<div>
 							<div className="grid grid-cols-7 border-b border-border/40 bg-muted/20">
 								{WEEKDAYS.map((day) => (
@@ -423,18 +525,25 @@ export function ComplianceCalendarPage() {
 										inMonth={cell.inMonth}
 										isToday={cell.isToday}
 										events={
-											cell.inMonth
-												? (COMPLIANCE_CALENDAR_EVENTS[cell.day] ?? [])
-												: []
+											cell.inMonth ? (eventsByDay[cell.day] ?? []) : []
 										}
 									/>
 								))}
 							</div>
 						</div>
 					) : view === "week" ? (
-						<ComplianceCalendarWeekView />
+						<ComplianceCalendarWeekView
+							schedule={schedule}
+							anchor={anchor}
+							year={cursor.year}
+							monthIndex={cursor.monthIndex}
+						/>
 					) : (
-						<ComplianceCalendarListView />
+						<ComplianceCalendarListView
+							schedule={schedule}
+							year={cursor.year}
+							monthIndex={cursor.monthIndex}
+						/>
 					)}
 				</CmsEdgeSectionPanel>
 
@@ -447,6 +556,10 @@ export function ComplianceCalendarPage() {
 									variant="link"
 									size="sm"
 									className="h-auto px-0 text-xs"
+									onClick={() => {
+										setFilterProgram("All");
+										setFilterStatus("All");
+									}}
 								>
 									Clear All
 								</Button>
@@ -456,7 +569,7 @@ export function ComplianceCalendarPage() {
 					>
 						<div className="space-y-1.5">
 							<Label className="text-xs text-muted-foreground">Program</Label>
-							<Select defaultValue="All">
+							<Select value={filterProgram} onValueChange={setFilterProgram}>
 								<SelectTrigger className="h-9 bg-card text-xs">
 									<SelectValue />
 								</SelectTrigger>
@@ -488,7 +601,7 @@ export function ComplianceCalendarPage() {
 						</div>
 						<div className="space-y-1.5">
 							<Label className="text-xs text-muted-foreground">Status</Label>
-							<Select defaultValue="All">
+							<Select value={filterStatus} onValueChange={setFilterStatus}>
 								<SelectTrigger className="h-9 bg-card text-xs">
 									<SelectValue />
 								</SelectTrigger>
@@ -526,7 +639,7 @@ export function ComplianceCalendarPage() {
 								<CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
 								<Input
 									readOnly
-									value={COMPLIANCE_DATE_RANGE}
+									value={monthLabel}
 									className="h-9 bg-card pl-8 text-xs"
 								/>
 							</div>
@@ -534,12 +647,19 @@ export function ComplianceCalendarPage() {
 					</CmsEdgeSectionPanel>
 
 					<CmsEdgeSectionPanel title="Program Summary" bodyClassName="p-4">
-						<ProgramSummaryChart />
+						<ProgramSummaryChart
+							summary={data?.programSummary ?? []}
+							total={Number(kpis.total.value) || 0}
+						/>
 					</CmsEdgeSectionPanel>
 				</div>
 			</div>
 
-			<ComplianceObligationsSection />
+			<ComplianceObligationsSection
+				obligations={obligations}
+				upcomingDeadlines={data?.upcomingDeadlines ?? []}
+				total={data?.total ?? obligations.length}
+			/>
 		</div>
 	);
 }

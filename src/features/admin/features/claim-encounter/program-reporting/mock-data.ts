@@ -934,146 +934,63 @@ export function getProgramScale(programType: ProgramType) {
 }
 
 export const MEDICARE_RISK_ADJUSTMENT_KPIS = {
-	totalMembers: 245_302,
-	hccCaptured: 216_456,
-	hccCapturedPct: 88.22,
-	suspectConditions: 28_764,
-	suspectPct: 11.72,
-	potentialGaps: 33_974,
-	gapsPct: 13.85,
-	noHcc: 19_894,
-	noHccPct: 8.11,
-	openReviews: 142,
-	chartReviewsDue: 38,
+	totalMembers: 0,
+	hccCaptured: 0,
+	hccCapturedPct: 0,
+	suspectConditions: 0,
+	suspectPct: 0,
+	potentialGaps: 0,
+	gapsPct: 0,
+	noHcc: 0,
+	noHccPct: 0,
+	openReviews: 0,
+	chartReviewsDue: 0,
 };
 
-export const MEDICARE_RISK_ADJUSTMENT_HCC_CATEGORIES = [
-	{
-		category: "Diabetes",
-		captured: 18_420,
-		suspected: 2_840,
-		gaps: 1_120,
-		target: 95.0,
-		rate: 92.4,
-	},
-	{
-		category: "Heart Failure",
-		captured: 12_680,
-		suspected: 1_960,
-		gaps: 840,
-		target: 94.0,
-		rate: 91.8,
-	},
-	{
-		category: "COPD",
-		captured: 9_240,
-		suspected: 1_420,
-		gaps: 620,
-		target: 93.0,
-		rate: 90.2,
-	},
-	{
-		category: "CKD",
-		captured: 8_120,
-		suspected: 1_280,
-		gaps: 540,
-		target: 92.0,
-		rate: 89.6,
-	},
-	{
-		category: "Depression",
-		captured: 6_840,
-		suspected: 980,
-		gaps: 420,
-		target: 90.0,
-		rate: 88.4,
-	},
-];
+export type MedicareRiskAdjustmentHccCategory = {
+	category: string;
+	captured: number;
+	suspected: number;
+	gaps: number;
+	target: number;
+	rate: number;
+};
+
+export const MEDICARE_RISK_ADJUSTMENT_HCC_CATEGORIES: MedicareRiskAdjustmentHccCategory[] = [];
 
 export const MEDICARE_COMPLIANCE_KPIS = {
-	requirementsMet: 24,
-	requirementsTotal: 26,
-	upcomingDeadlines: 4,
+	requirementsMet: 0,
+	requirementsTotal: 0,
+	upcomingDeadlines: 0,
 	overdueItems: 0,
-	attestationsComplete: 18,
-	attestationsTotal: 20,
-	openGaps: 3,
+	attestationsComplete: 0,
+	attestationsTotal: 0,
+	openGaps: 0,
+
 };
 
-export const MEDICARE_COMPLIANCE_REQUIREMENTS = [
-	{
-		id: "cr-1",
-		requirement: "Risk Adjustment Data Submission",
-		regulation: "42 CFR §422.310",
-		dueDate: "Jul 31, 2027",
-		owner: "Compliance Team",
-		status: "On Track",
-		statusStyle: "border-emerald-200 bg-emerald-50 text-emerald-700",
-	},
-	{
-		id: "cr-2",
-		requirement: "Part D PDE Submission",
-		regulation: "42 CFR §423.360",
-		dueDate: "Jul 20, 2027",
-		owner: "Pharmacy Ops",
-		status: "On Track",
-		statusStyle: "border-emerald-200 bg-emerald-50 text-emerald-700",
-	},
-	{
-		id: "cr-3",
-		requirement: "Encounter Data Submission",
-		regulation: "42 CFR §422.504",
-		dueDate: "Jul 15, 2027",
-		owner: "Claims Ops",
-		status: "On Track",
-		statusStyle: "border-emerald-200 bg-emerald-50 text-emerald-700",
-	},
-	{
-		id: "cr-4",
-		requirement: "HEDIS Measure Submission",
-		regulation: "NCQA HEDIS",
-		dueDate: "Aug 15, 2027",
-		owner: "Quality Team",
-		status: "Upcoming",
-		statusStyle: "border-amber-200 bg-amber-50 text-amber-800",
-	},
-	{
-		id: "cr-5",
-		requirement: "CMS Compliance Attestation",
-		regulation: "CMS Guidance",
-		dueDate: "Aug 30, 2027",
-		owner: "Compliance Team",
-		status: "Upcoming",
-		statusStyle: "border-amber-200 bg-amber-50 text-amber-800",
-	},
-];
+export type MedicareComplianceRequirement = {
+	id: string;
+	requirement: string;
+	regulation: string;
+	dueDate: string;
+	owner: string;
+	status: string;
+	statusStyle: string;
+};
 
-export const MEDICARE_COMPLIANCE_ATTESTATIONS = [
-	{
-		id: "att-1",
-		name: "Q2 2027 Data Quality Attestation",
-		submittedBy: "J. Martinez",
-		submittedDate: "Jul 10, 2027",
-		status: "Complete",
-		statusStyle: "border-emerald-200 bg-emerald-50 text-emerald-700",
-	},
-	{
-		id: "att-2",
-		name: "Part D Formulary Compliance",
-		submittedBy: "R. Chen",
-		submittedDate: "Jul 08, 2027",
-		status: "Complete",
-		statusStyle: "border-emerald-200 bg-emerald-50 text-emerald-700",
-	},
-	{
-		id: "att-3",
-		name: "Risk Adjustment Documentation",
-		submittedBy: "Pending",
-		submittedDate: "—",
-		status: "Pending",
-		statusStyle: "border-amber-200 bg-amber-50 text-amber-800",
-	},
-];
+export type MedicareComplianceAttestation = {
+	id: string;
+	name: string;
+	submittedBy: string;
+	submittedDate: string;
+	status: string;
+	statusStyle: string;
+};
+
+export const MEDICARE_COMPLIANCE_REQUIREMENTS: MedicareComplianceRequirement[] = [];
+
+export const MEDICARE_COMPLIANCE_ATTESTATIONS: MedicareComplianceAttestation[] = [];
 
 export type ProgramSubmissionsData =
 	| {

@@ -9,8 +9,10 @@ import {
 	Download,
 	FileText,
 	Flag,
+	Loader2,
 	MoreHorizontal,
 	Paperclip,
+	Plus,
 	Search,
 	Star,
 	X,
@@ -19,6 +21,13 @@ import { toast } from "sonner";
 
 import { SummaryCard, SummaryCardsGrid } from "@/components/admin/SummaryCard";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -42,13 +51,14 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import {
-	type VendorNoteUi,
 	vendorNoteDtoToUi,
 } from "../feature/mappers/noteMappers";
 import {
+	useCreateVendorNoteMutation,
 	useDeleteVendorNoteMutation,
 	useUpdateVendorNoteMutation,
 	useVendorNotesQuery,
@@ -62,8 +72,6 @@ type NoteCategory =
 	| "Access";
 type NotePriority = "High" | "Medium" | "Low";
 type NoteStatus = "Open" | "Closed" | "Archived";
-
-type VendorNote = VendorNoteUi;
 
 type VendorNotesTabProps = {
 	vendorId: string;
@@ -124,6 +132,7 @@ export function VendorNotesTab({
 	vendorName: _vendorName,
 }: VendorNotesTabProps) {
 	const notesQuery = useVendorNotesQuery(vendorId);
+	const createNoteMutation = useCreateVendorNoteMutation(vendorId);
 	const updateNoteMutation = useUpdateVendorNoteMutation();
 	const deleteNoteMutation = useDeleteVendorNoteMutation();
 	const notes = useMemo(
@@ -137,6 +146,9 @@ export function VendorNotesTab({
 	const [status, setStatus] = useState("all");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
+	const [createOpen, setCreateOpen] = useState(false);
+	const [newBody, setNewBody] = useState("");
+	const [newPinned, setNewPinned] = useState(false);
 
 	useEffect(() => {
 		const firstId = notesQuery.data?.[0]?.id;
@@ -195,6 +207,30 @@ export function VendorNotesTab({
 		setPage(1);
 	}
 
+	async function handleCreateNote() {
+		const trimmed = newBody.trim();
+		if (!trimmed) {
+			toast.message("Enter a note before saving");
+			return;
+		}
+		try {
+			const created = await createNoteMutation.mutateAsync({
+				body: trimmed,
+				is_pinned: newPinned,
+			});
+			toast.success("Note created");
+			setCreateOpen(false);
+			setNewBody("");
+			setNewPinned(false);
+			await notesQuery.refetch();
+			if (created?.id) setSelectedId(String(created.id));
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Could not create note"
+			);
+		}
+	}
+
 	function toggleStar(noteId: string) {
 		const note = notes.find((row) => row.id === noteId);
 		if (!note) return;
@@ -251,11 +287,22 @@ export function VendorNotesTab({
 
 			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
 				<div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-					<div className="border-b border-border px-4 py-3">
-						<h2 className="text-sm font-semibold tracking-tight">Notes</h2>
-						<p className="mt-0.5 text-xs text-muted-foreground">
-							Vendor notes and operational context.
-						</p>
+					<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+						<div>
+							<h2 className="text-sm font-semibold tracking-tight">Notes</h2>
+							<p className="mt-0.5 text-xs text-muted-foreground">
+								Vendor notes and operational context.
+							</p>
+						</div>
+						<Button
+							type="button"
+							size="sm"
+							className="h-8"
+							onClick={() => setCreateOpen(true)}
+						>
+							<Plus className="mr-1.5 size-3.5" />
+							Add note
+						</Button>
 					</div>
 
 					<div className="grid gap-2 border-b border-border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] lg:items-center">
@@ -689,6 +736,51 @@ export function VendorNotesTab({
 					)}
 				</aside>
 			</div>
+
+			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+				<DialogContent className="sm:max-w-lg">
+					<DialogHeader>
+						<DialogTitle>Add note</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-3">
+						<Textarea
+							value={newBody}
+							onChange={(e) => setNewBody(e.target.value)}
+							placeholder="Write a vendor note…"
+							rows={5}
+							className="resize-y"
+						/>
+						<label className="flex items-center gap-2 text-sm text-muted-foreground">
+							<input
+								type="checkbox"
+								checked={newPinned}
+								onChange={(e) => setNewPinned(e.target.checked)}
+								className="size-4 rounded border-border"
+							/>
+							Pin this note
+						</label>
+					</div>
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setCreateOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="button"
+							disabled={createNoteMutation.isPending}
+							onClick={() => void handleCreateNote()}
+						>
+							{createNoteMutation.isPending ? (
+								<Loader2 className="mr-2 size-4 animate-spin" />
+							) : null}
+							Save note
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</section>
 	);
 }

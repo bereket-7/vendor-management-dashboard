@@ -201,40 +201,91 @@ export function buildVendorIntegrationProfile(
 
 export function connectionToSftp(
 	connection: ConnectionDto | undefined,
-	vendorName: string,
-	health: VendorHealth
+	_vendorName: string,
+	_health: VendorHealth
 ): VendorSftpConnection {
-	const short =
-		vendorName
-			.replace(/[^a-zA-Z0-9]+/g, " ")
-			.trim()
-			.split(/\s+/)
-			.slice(0, 2)
-			.map((p) => p.slice(0, 3).toUpperCase())
-			.join("") || "VND";
-	const host =
-		typeof connection?.config?.host === "string"
-			? connection.config.host
-			: "sftp.partner.example";
-	const connected = health !== "failed" && connection?.status === "active";
+	const cfg = (connection?.config ?? {}) as Record<string, unknown>;
+	const host = typeof cfg.host === "string" ? cfg.host : "";
+	const username = typeof cfg.username === "string" ? cfg.username : "";
+	const inboundPath =
+		typeof cfg.inbound_path === "string"
+			? cfg.inbound_path
+			: typeof cfg.remote_path === "string"
+				? cfg.remote_path
+				: "";
+	const archivePath =
+		typeof cfg.archive_path === "string" ? cfg.archive_path : "";
+	const fingerprint =
+		typeof cfg.host_key_fingerprint === "string"
+			? cfg.host_key_fingerprint
+			: "";
+	const landingUser =
+		typeof cfg.landing_user === "string" ? cfg.landing_user : "";
+	const errorPath = typeof cfg.error_path === "string" ? cfg.error_path : "";
+	const processingPath =
+		typeof cfg.processing_path === "string" ? cfg.processing_path : "";
+	const portRaw = cfg.port;
+	const port =
+		typeof portRaw === "number"
+			? portRaw
+			: typeof portRaw === "string" && portRaw.trim()
+				? Number(portRaw)
+				: 22;
+
+	const passwordCred = connection?.password_credential ?? null;
+	const keyCred = connection?.private_key_credential ?? null;
+	let authMethod = "Not configured";
+	let authKey = "—";
+	if (keyCred && passwordCred) {
+		authMethod = "Password + private key";
+		authKey = [passwordCred.name, keyCred.name].filter(Boolean).join(" · ");
+	} else if (keyCred) {
+		authMethod = "Private key";
+		authKey = keyCred.name || "—";
+	} else if (passwordCred) {
+		authMethod = "Password";
+		authKey = passwordCred.name || "—";
+	}
+
+	const current = connection?.health?.current_status ?? "";
+	const healthy =
+		current === "healthy" ||
+		(connection?.status === "active" && current !== "failed");
+	const failed =
+		current === "failed" ||
+		connection?.status === "failed" ||
+		Boolean(connection?.health?.last_error);
 
 	return {
+		id: connection?.id ?? null,
+		connectionName: connection?.name ?? "",
+		method: connection?.method ?? "",
+		direction: connection?.direction ?? "inbound",
+		environment: connection?.environment ?? "test",
+		lifecycleStatus: connection?.status ?? "draft",
 		host,
-		port: Number(connection?.config?.port ?? 22),
-		username:
-			typeof connection?.config?.username === "string"
-				? connection.config.username
-				: `${short.toLowerCase()}_mfc`,
-		authMethod: "Key Based",
-		authKey: `id_rsa_${short.toLowerCase()}`,
+		port: Number.isFinite(port) ? port : 22,
+		username,
+		inboundPath,
+		archivePath,
+		hostKeyFingerprint: fingerprint,
+		landingUser,
+		errorPath,
+		processingPath,
+		passwordCredentialId: passwordCred?.id ?? null,
+		passwordCredentialName: passwordCred?.name ?? "",
+		privateKeyCredentialId: keyCred?.id ?? null,
+		privateKeyCredentialName: keyCred?.name ?? "",
+		authMethod,
+		authKey,
 		lastVerified: formatWhen(connection?.health?.last_success_at),
-		remoteDirectory:
-			typeof connection?.config?.remote_path === "string"
-				? connection.config.remote_path
-				: `/${short}/incoming`,
-		status: connected ? "Connected" : "Disconnected",
-		testConnection: connected ? "Successful" : "Failed",
-		connectionName: connection?.name ?? `${vendorName} SFTP`,
+		lastError: connection?.health?.last_error
+			? String(connection.health.last_error)
+			: "",
+		healthStatus: current || "—",
+		remoteDirectory: inboundPath,
+		status: healthy && !failed ? "Connected" : "Disconnected",
+		testConnection: failed ? "Failed" : healthy ? "Successful" : "Unknown",
 	};
 }
 

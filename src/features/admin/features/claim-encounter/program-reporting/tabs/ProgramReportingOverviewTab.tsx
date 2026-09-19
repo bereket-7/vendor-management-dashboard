@@ -61,8 +61,9 @@ import {
 	EXCEPTION_STATUS_STYLES,
 	type ProgramOverviewData,
 	SUBMISSION_STATUS_STYLES,
-	getOverviewData,
+	useProgramOverviewQuery,
 } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
+import { emptyOverview } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
 import { cn } from "@/lib/utils";
 
@@ -964,15 +965,23 @@ function MedicareOverviewContent({ data }: { data: ProgramOverviewData }) {
 
 type ProgramReportingOverviewTabProps = {
 	programType: ProgramType;
+	reportingPeriod?: string;
 };
 
 export function ProgramReportingOverviewTab({
 	programType,
+	reportingPeriod,
 }: ProgramReportingOverviewTabProps) {
-	const data = getOverviewData(programType);
+	const overviewQuery = useProgramOverviewQuery(programType, reportingPeriod);
+	const data = overviewQuery.data ?? emptyOverview(programType);
 
 	return (
 		<div className={OVERVIEW_PAGE_STACK}>
+			{overviewQuery.isLoading ? (
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					Loading overview…
+				</p>
+			) : null}
 			{programType === "medicare" ? (
 				<MedicareOverviewContent data={data} />
 			) : (

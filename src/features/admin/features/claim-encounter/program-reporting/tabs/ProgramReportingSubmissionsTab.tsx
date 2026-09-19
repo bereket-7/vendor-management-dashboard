@@ -63,8 +63,9 @@ import {
 	MEDICAID_SUBMISSION_STATUS_STYLES,
 	MEDICARE_SUBMISSION_STATUS_STYLES,
 	type ProgramSubmissionsData,
-	getSubmissionsData,
+	useProgramSubmissionsQuery,
 } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
+import { emptySubmissions } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
 import { cn } from "@/lib/utils";
 
@@ -907,12 +908,29 @@ function QuickActionsPanel({
 
 type ProgramReportingSubmissionsTabProps = {
 	programType: ProgramType;
+	reportingPeriod?: string;
 };
 
 export function ProgramReportingSubmissionsTab({
 	programType,
+	reportingPeriod,
 }: ProgramReportingSubmissionsTabProps) {
-	const data = getSubmissionsData(programType);
+	const submissionsQuery = useProgramSubmissionsQuery(
+		programType,
+		reportingPeriod
+	);
+	const data = submissionsQuery.data ?? emptySubmissions(programType);
+
+	if (submissionsQuery.isLoading) {
+		return (
+			<div className={PAGE_STACK}>
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					Loading submissions…
+				</p>
+				<CmsEdgePageFooter />
+			</div>
+		);
+	}
 
 	if (data.kind === "medicare") {
 		return (

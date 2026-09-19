@@ -12,6 +12,7 @@ import { isMockEnabled } from "@/lib/mock-mode";
 
 import {
 	formatWizardSyncFailures,
+	shouldCreateConnection,
 	syncVendorWizardExtras,
 } from "../feature/api/vendorWizardSync";
 import { createVendorRecord } from "../feature/api/vendorsApi";
@@ -82,13 +83,19 @@ function VendorCreateForm() {
 				return;
 			}
 
+			const wantsSftp = shouldCreateConnection(values);
+
 			setStatusMessage("Creating vendor record…");
 			const payload = wizardValuesToVendorCreatePayload(values);
 			const created = await createVendorRecord(payload);
 			const vendorName =
 				values.trade_name.trim() || values.legal_name.trim() || "Vendor";
 
-			setStatusMessage("Saving contacts, accounts, and integration…");
+			setStatusMessage(
+				wantsSftp
+					? "Saving integration, creating Active SFTP connection, and testing…"
+					: "Saving contacts, accounts, and integration…"
+			);
 			const syncResult = await syncVendorWizardExtras(
 				created.id,
 				values,
@@ -97,9 +104,32 @@ function VendorCreateForm() {
 
 			await invalidateVendorCore();
 
-			if (syncResult.failures.length > 0) {
+			const sftpFailed =
+				syncResult.sftpAttempted && !syncResult.sftpConnected;
+			const connectionFailures = syncResult.failures.filter(
+				(f) => f.section === "connection"
+			);
+			const otherFailures = syncResult.failures.filter(
+				(f) => f.section !== "connection"
+			);
+
+			if (sftpFailed) {
+				const detail =
+					connectionFailures.map((f) => f.message).join(" · ") ||
+					"SFTP create or test failed";
+				toast.error(
+					`Vendor created but SFTP is not connected: ${detail}. Fix on Configuration.`
+				);
+				if (otherFailures.length > 0) {
+					toast.warning(
+						`Also: ${formatWizardSyncFailures(otherFailures)}`
+					);
+				}
+			} else if (syncResult.failures.length > 0) {
 				const summary = formatWizardSyncFailures(syncResult.failures);
 				toast.warning(`Vendor created with partial errors: ${summary}`);
+			} else if (syncResult.sftpConnected) {
+				toast.success("Vendor created — SFTP connected and tested");
 			} else {
 				toast.success("Vendor created");
 			}

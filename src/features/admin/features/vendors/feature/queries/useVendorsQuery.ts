@@ -8,6 +8,9 @@ import {
 import type {
 	AccountCreateInput,
 	AccountUpdateInput,
+	ConnectionCreateInput,
+	ConnectionUpdateInput,
+	CredentialCreateInput,
 	VendorContactCreateInput,
 	VendorContactUpdateInput,
 	VendorIntegrationProfileUpdateInput,
@@ -18,11 +21,18 @@ import { getVendorDetailBundle } from "../api/vendorDetailApi";
 import {
 	createIntakeJob,
 	createVendorAccount,
+	createVendorCategoryAssignment,
+	createVendorCertificate,
+	createVendorConnection,
 	createVendorContact,
+	createVendorCredential,
 	createVendorNote,
 	deleteVendorAccount,
+	deleteVendorCategoryAssignment,
+	deleteVendorConnection,
 	deleteVendorContact,
 	deleteVendorNote,
+	disableIntakeJob,
 	getVendor,
 	getVendorIntegrationProfile,
 	hardDeleteVendorAccount,
@@ -30,8 +40,11 @@ import {
 	listVendorAccountOpsSummaries,
 	listVendorAccounts,
 	listVendorCategories,
+	listVendorCategoryAssignments,
+	listVendorCertificates,
 	listVendorConnections,
 	listVendorContacts,
+	listVendorCredentials,
 	listVendorInboundFiles,
 	listVendorJobs,
 	listVendorNotes,
@@ -40,8 +53,10 @@ import {
 	restoreVendorAccount,
 	runIntakeJob,
 	testVendorConnection,
+	triggerInboundFileBrowserDownload,
 	updateIntakeJob,
 	updateVendorAccount,
+	updateVendorCertificate,
 	updateVendorConnection,
 	updateVendorContact,
 	updateVendorIntegrationProfile,
@@ -256,6 +271,15 @@ export function useRunIntakeJobMutation() {
 	});
 }
 
+export function useDisableIntakeJobMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof disableIntakeJob>>,
+		string
+	>(domain, {
+		mutationFn: (id) => disableIntakeJob(id),
+	});
+}
+
 export function useUpdateIntakeJobMutation() {
 	return useVendorCoreFeatureMutation<
 		Awaited<ReturnType<typeof updateIntakeJob>>,
@@ -283,6 +307,90 @@ export function useReprocessInboundFileMutation() {
 	});
 }
 
+export function useDownloadInboundFileMutation() {
+	return useVendorCoreFeatureMutation<void, string>(domain, {
+		mutationFn: (id) => triggerInboundFileBrowserDownload(id),
+	});
+}
+
+export function useDeleteConnectionMutation() {
+	return useVendorCoreFeatureMutation<void, string>(domain, {
+		mutationFn: (id) => deleteVendorConnection(id),
+	});
+}
+
+export function useVendorCategoryAssignmentsQuery(
+	vendorId?: string,
+	enabled = true
+) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"category-assignments",
+		() => listVendorCategoryAssignments(String(vendorId)),
+		Boolean(vendorId) && enabled,
+		[vendorId ?? ""]
+	);
+}
+
+export function useCreateVendorCategoryAssignmentMutation(vendorId: string) {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof createVendorCategoryAssignment>>,
+		{ category_id: string; is_primary?: boolean }
+	>(domain, {
+		mutationFn: (body) =>
+			createVendorCategoryAssignment({
+				vendor_id: vendorId,
+				...body,
+			}),
+	});
+}
+
+export function useDeleteVendorCategoryAssignmentMutation() {
+	return useVendorCoreFeatureMutation<void, string>(domain, {
+		mutationFn: (id) => deleteVendorCategoryAssignment(id),
+	});
+}
+
+export function useVendorCertificatesQuery(vendorId?: string, enabled = true) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"certificates",
+		() => listVendorCertificates(String(vendorId)),
+		Boolean(vendorId) && enabled,
+		[vendorId ?? ""]
+	);
+}
+
+export function useCreateVendorCertificateMutation(vendorId: string) {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof createVendorCertificate>>,
+		{
+			certification_type: string;
+			certifying_body?: string;
+			certificate_number?: string;
+			scope_description?: string;
+			issued_at?: string;
+			expires_at?: string;
+			status?: string;
+		}
+	>(domain, {
+		mutationFn: (body) =>
+			createVendorCertificate({
+				vendor_id: vendorId,
+				...body,
+			}),
+	});
+}
+
+export function useUpdateVendorCertificateMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof updateVendorCertificate>>,
+		{ id: string; body: Record<string, unknown> }
+	>(domain, {
+		mutationFn: ({ id, body }) => updateVendorCertificate(id, body),
+	});
+}
+
 export function useTestConnectionMutation() {
 	return useVendorCoreFeatureMutation<
 		Awaited<ReturnType<typeof testVendorConnection>>,
@@ -295,9 +403,37 @@ export function useTestConnectionMutation() {
 export function useUpdateConnectionMutation() {
 	return useVendorCoreFeatureMutation<
 		Awaited<ReturnType<typeof updateVendorConnection>>,
-		{ id: string; body: Record<string, unknown> }
+		{ id: string; body: ConnectionUpdateInput }
 	>(domain, {
 		mutationFn: ({ id, body }) => updateVendorConnection(id, body),
+	});
+}
+
+export function useCreateConnectionMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof createVendorConnection>>,
+		ConnectionCreateInput
+	>(domain, {
+		mutationFn: (body) => createVendorConnection(body),
+	});
+}
+
+export function useVendorCredentialsQuery(enabled = true) {
+	return useVendorCoreFeatureQuery(
+		domain,
+		"credentials",
+		() => listVendorCredentials(),
+		enabled,
+		["all"]
+	);
+}
+
+export function useCreateCredentialMutation() {
+	return useVendorCoreFeatureMutation<
+		Awaited<ReturnType<typeof createVendorCredential>>,
+		CredentialCreateInput
+	>(domain, {
+		mutationFn: (body) => createVendorCredential(body),
 	});
 }
 

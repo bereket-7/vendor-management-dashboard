@@ -57,8 +57,9 @@ import {
 	AUDIT_STATUS_STYLES,
 	FINDING_SEVERITY_STYLES,
 	type ProgramAuditData,
-	getAuditData,
+	useProgramAuditQuery,
 } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
+import { emptyAudit } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
 import { cn } from "@/lib/utils";
 
@@ -606,12 +607,25 @@ function AuditQuickActionsPanel({ data }: { data: ProgramAuditData }) {
 
 type ProgramReportingAuditTabProps = {
 	programType: ProgramType;
+	reportingPeriod?: string;
 };
 
 export function ProgramReportingAuditTab({
 	programType,
 }: ProgramReportingAuditTabProps) {
-	const data = getAuditData(programType);
+	const auditQuery = useProgramAuditQuery(programType);
+	const data = auditQuery.data ?? emptyAudit(programType);
+
+	if (auditQuery.isLoading) {
+		return (
+			<div className={AUDIT_PAGE_STACK}>
+				<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+					Loading audit…
+				</p>
+				<CmsEdgePageFooter />
+			</div>
+		);
+	}
 
 	return (
 		<div className={AUDIT_PAGE_STACK}>

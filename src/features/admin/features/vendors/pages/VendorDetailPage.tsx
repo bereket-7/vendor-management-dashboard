@@ -92,6 +92,7 @@ import {
 	VendorActionsMenu,
 	vendorModelToActionsTarget,
 } from "../components/VendorActionsMenu";
+import { VendorCertificatesTab } from "../components/VendorCertificatesTab";
 import { VendorConfigurationTab } from "../components/VendorConfigurationTab";
 import { VendorContactsTab } from "../components/VendorContactsTab";
 import { VendorContractsTab } from "../components/VendorContractsTab";
@@ -107,10 +108,14 @@ import {
 import { accountDtoToRow } from "../feature/mappers/accountMappers";
 import {
 	listInboundFileEvents,
+	useCreateConnectionMutation,
+	useCreateCredentialMutation,
 	useCreateIntakeJobMutation,
 	useCreateVendorAccountMutation,
-	useCreateVendorNoteMutation,
+	useDeleteConnectionMutation,
 	useDeleteVendorAccountMutation,
+	useDisableIntakeJobMutation,
+	useDownloadInboundFileMutation,
 	useInvalidateVendorCore,
 	useReprocessInboundFileMutation,
 	useRunIntakeJobMutation,
@@ -119,9 +124,15 @@ import {
 	useUpdateIntakeJobMutation,
 	useUpdateVendorAccountMutation,
 	useUpdateVendorIntegrationProfileMutation,
+	useVendorCredentialsQuery,
 	useVendorDetailBundleQuery,
 } from "../feature/queries/useVendorsQuery";
 import { connectionToSftp, inboundFilesToRuns } from "../live-vendor-detail";
+import {
+	buildConnectionCreateInput,
+	buildConnectionUpdateInput,
+	emptyVendorSftpConnection,
+} from "../connection-form";
 import { runBucket } from "../vendor-types";
 
 const TABS = [
@@ -131,6 +142,7 @@ const TABS = [
 	"Contacts",
 	"Accounts",
 	"Contracts",
+	"Certificates",
 	"Audit Trail",
 	"Notes",
 ] as const;
@@ -333,14 +345,20 @@ function VendorDetailView() {
 	const updateJobMutation = useUpdateIntakeJobMutation();
 	const createJobMutation = useCreateIntakeJobMutation();
 	const reprocessMutation = useReprocessInboundFileMutation();
+	const downloadInboundMutation = useDownloadInboundFileMutation();
+	const disableJobMutation = useDisableIntakeJobMutation();
 	const testConnectionMutation = useTestConnectionMutation();
 	const updateConnectionMutation = useUpdateConnectionMutation();
+	const createConnectionMutation = useCreateConnectionMutation();
+	const deleteConnectionMutation = useDeleteConnectionMutation();
+	const createCredentialMutation = useCreateCredentialMutation();
 	const updateIntegrationProfileMutation =
 		useUpdateVendorIntegrationProfileMutation(String(vendorId));
 	const invalidateVendorCore = useInvalidateVendorCore();
 	const updateVendor = useUpdateVendorMutation();
 	const [editOpen, setEditOpen] = useState(false);
 	const [tab, setTab] = useState<Tab>("Overview");
+	const credentialsQuery = useVendorCredentialsQuery(tab === "Configuration");
 	const [status, setStatus] = useState<VendorStatus>("prospect");
 	const [trendRange, setTrendRange] = useState("7");
 	const [inviteTick, setInviteTick] = useState(0);
@@ -382,6 +400,9 @@ function VendorDetailView() {
 
 	const sftpConnection = useMemo(() => {
 		if (!vendor || !integration) return null;
+		if (!connections[0]) {
+			return emptyVendorSftpConnection(`${displayName} SFTP`);
+		}
 		return connectionToSftp(connections[0], displayName, integration.health);
 	}, [vendor, integration, connections, displayName]);
 
@@ -1385,6 +1406,10 @@ function VendorDetailView() {
 						await reprocessMutation.mutateAsync(runId);
 						toast.success("File reprocess queued.");
 					}}
+					onDownloadRun={async (runId) => {
+						await downloadInboundMutation.mutateAsync(runId);
+						toast.success("Download started.");
+					}}
 				/>
 			)}
 
@@ -1396,6 +1421,7 @@ function VendorDetailView() {
 					configJobs={configJobs}
 					connection={sftpConnection}
 					connectionId={connections[0]?.id ?? null}
+					credentials={credentialsQuery.data ?? []}
 					onCreateJob={async (draft) => {
 						if (!connections[0]?.id) {
 							throw new Error("Create a connection before adding jobs.");
@@ -1439,26 +1465,58 @@ function VendorDetailView() {
 						});
 					}}
 					onDisableJob={async (jobId) => {
-						await updateJobMutation.mutateAsync({
-							id: jobId,
-							body: { status: "disabled" },
-						});
+						await disableJobMutation.mutateAsync(jobId);
+						await bundleQuery.refetch();
 					}}
 					onTestConnection={async () => {
 						if (!connections[0]?.id) return;
-						await testConnectionMutation.mutateAsync(connections[0].id);
-						toast.success("Connection test completed.");
+						const result = await testConnectionMutation.mutateAsync(
+							connections[0].id
+						);
+						const detail = [
+							result.message,
+							result.path ? `path=${result.path}` : null,
+							typeof result.entry_count === "number"
+								? `entries=${result.entry_count}`
+								: null,
+							result.landing_user
+								? `landing_user=${result.landing_user}`
+								: null,
+						]
+							.filter(Boolean)
+							.join(" · ");
+						if (result.ok) {
+							toast.success(detail || "Connection test succeeded.");
+						} else {
+							toast.error(detail || "Connection test failed.");
+						}
 					}}
-					onUpdateConnectionHost={async (host) => {
+					onSaveConnection={async (draft, mode) => {
+						if (mode === "create") {
+							await createConnectionMutation.mutateAsync(
+								buildConnectionCreateInput(draft, vendor.id)
+							);
+							toast.success("Connection created.");
+						} else if (connections[0]?.id) {
+							await updateConnectionMutation.mutateAsync({
+								id: connections[0].id,
+								body: buildConnectionUpdateInput(draft),
+							});
+							toast.success("Connection updated.");
+						}
+						await bundleQuery.refetch();
+					}}
+					onDeleteConnection={async () => {
 						if (!connections[0]?.id) return;
-						const config = {
-							...(connections[0].config ?? {}),
-							host,
-						};
-						await updateConnectionMutation.mutateAsync({
-							id: connections[0].id,
-							body: { config },
-						});
+						await deleteConnectionMutation.mutateAsync(connections[0].id);
+						await bundleQuery.refetch();
+					}}
+					onHostKeyPinned={async () => {
+						invalidateVendorCore();
+						await bundleQuery.refetch();
+					}}
+					onRegisterCredential={async (input) => {
+						return createCredentialMutation.mutateAsync(input);
 					}}
 					onSaveIntegrationProfile={async (
 						patch: VendorIntegrationProfileUpdateInput
@@ -1474,6 +1532,10 @@ function VendorDetailView() {
 			)}
 
 			{tab === "Contracts" && <VendorContractsTab vendorId={vendor.id} />}
+
+			{tab === "Certificates" && (
+				<VendorCertificatesTab vendorId={vendor.id} />
+			)}
 
 			{tab === "Notes" && (
 				<VendorNotesTab vendorId={vendor.id} vendorName={displayName} />

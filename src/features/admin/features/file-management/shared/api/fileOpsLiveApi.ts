@@ -17,7 +17,7 @@ export const fileOpsLiveApi = {
 		vendorCoreApi.listIntakeJobRuns(params),
 
 	listValidationResults: (inboundFileId: string) =>
-		vendorCoreApi.listValidationResults({ inbound_file: inboundFileId }),
+		vendorCoreApi.listValidationResults({ inbound_file_id: inboundFileId }),
 
 	listEvents: (inboundFileId: string) =>
 		vendorCoreApi.listInboundFileEvents(inboundFileId),

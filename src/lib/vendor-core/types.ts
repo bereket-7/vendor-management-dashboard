@@ -187,6 +187,8 @@ export type VendorCategoryAssignmentDto = {
 	id: string;
 	vendor_id?: string;
 	category_id?: string;
+	vendor?: { id: string; vendor_code?: string; legal_name?: string };
+	category?: { id: string; code: string; name: string };
 	is_primary: boolean;
 	created_at?: string;
 	updated_at?: string;
@@ -422,33 +424,171 @@ export type VendorCategoryCompactDto = {
 	name: string;
 };
 
+export type ConnectionMethod =
+	| "sftp_pull"
+	| "sftp_hosted"
+	| "manual_upload"
+	| "rest_api"
+	| "webhook"
+	| "cloud_storage"
+	| "as2"
+	| "shared_folder"
+	| "database"
+	| "adf"
+	| (string & {});
+
+export type ConnectionDirection = "inbound" | "outbound" | "both" | (string & {});
+
+export type ConnectionEnvironment =
+	| "development"
+	| "test"
+	| "uat"
+	| "production"
+	| (string & {});
+
+export type ConnectionStatus =
+	| "draft"
+	| "testing"
+	| "active"
+	| "inactive"
+	| "failed"
+	| "expired"
+	| (string & {});
+
+export type CredentialKind =
+	| "password"
+	| "private_key"
+	| "api_key"
+	| "oauth_client_secret"
+	| "pgp_passphrase"
+	| "other"
+	| (string & {});
+
+export type CredentialCompact = {
+	id: string;
+	reference_id?: string;
+	name: string;
+};
+
 export type CredentialDto = {
 	id: string;
+	reference_id?: string;
 	name: string;
-	kind: string;
+	kind: CredentialKind | string;
 	secret_ref: string;
+	description?: string;
 	created_at?: string;
+	updated_at?: string;
+};
+
+export type CredentialCreateInput = {
+	name: string;
+	secret_ref: string;
+	kind?: CredentialKind | string;
+	description?: string;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
+};
+
+/** Canonical sftp_pull config keys used by Paramiko connector. */
+export type SftpPullConfig = {
+	host?: string;
+	port?: number;
+	username?: string;
+	inbound_path?: string;
+	remote_path?: string;
+	archive_path?: string;
+	host_key_fingerprint?: string;
+	connect_timeout?: number;
+	encryption?: string;
+	[key: string]: unknown;
+};
+
+/** Canonical sftp_hosted landing config. */
+export type SftpHostedConfig = {
+	landing_user?: string;
+	inbound_path?: string;
+	archive_path?: string;
+	error_path?: string;
+	processing_path?: string;
+	[key: string]: unknown;
+};
+
+export type ConnectionConfig = SftpPullConfig & SftpHostedConfig;
+
+export type ConnectionHealth = {
+	last_success_at?: string;
+	last_failure_at?: string;
+	last_error?: string;
+	current_status?: string;
 };
 
 export type ConnectionDto = {
 	id: string;
+	reference_id?: string;
 	name: string;
 	vendor: string | VendorRef;
 	account: string | VendorRef | null;
-	method: string;
-	direction: string;
-	environment: string;
-	status: string;
-	config: Record<string, unknown>;
-	health: {
-		last_success_at?: string;
-		last_failure_at?: string;
-		last_error?: string;
-		current_status?: string;
-	};
+	method: ConnectionMethod | string;
+	direction: ConnectionDirection | string;
+	environment: ConnectionEnvironment | string;
+	status: ConnectionStatus | string;
+	effective_start?: string | null;
+	effective_end?: string | null;
+	password_credential?: CredentialCompact | null;
+	private_key_credential?: CredentialCompact | null;
+	config: ConnectionConfig;
+	health: ConnectionHealth;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
 	created_at?: string;
 	updated_at?: string;
 	vendor_id: string;
+};
+
+export type ConnectionCreateInput = {
+	name: string;
+	vendor_id: string;
+	method: ConnectionMethod | string;
+	account_id?: string | null;
+	direction?: ConnectionDirection | string | null;
+	environment?: ConnectionEnvironment | string | null;
+	status?: ConnectionStatus | string | null;
+	effective_start?: string | null;
+	effective_end?: string | null;
+	password_credential_id?: string | null;
+	private_key_credential_id?: string | null;
+	config?: ConnectionConfig;
+	metadata?: Record<string, unknown>;
+	is_visible?: boolean;
+};
+
+export type ConnectionUpdateInput = Partial<ConnectionCreateInput>;
+
+export type ConnectionCompactDto = {
+	id: string;
+	reference_id?: string;
+	name: string;
+};
+
+export type ConnectionTestResult = {
+	ok?: boolean;
+	message?: string;
+	path?: string;
+	entry_count?: number;
+	sample?: unknown[];
+	landing_user?: string;
+	inbound_path?: string;
+	category?: string;
+	code?: string;
+};
+
+export type ConnectionDiscoverHostKeyResult = {
+	fingerprint: string;
+	key_type?: string;
+	host: string;
+	port: number;
+	pinned?: boolean;
 };
 
 export type IntakeJobDto = {
@@ -2231,18 +2371,27 @@ export function normalizeConnection(
 ): ConnectionDto {
 	const vendor = raw.vendor as string | VendorRef;
 	const vendor_id = refId(vendor) ?? "";
+	const password_credential =
+		(raw.password_credential as ConnectionDto["password_credential"]) ?? null;
+	const private_key_credential =
+		(raw.private_key_credential as ConnectionDto["private_key_credential"]) ??
+		null;
 	return {
 		...(raw as unknown as ConnectionDto),
 		id: String(raw.id),
+		reference_id:
+			raw.reference_id != null ? String(raw.reference_id) : undefined,
 		name: String(raw.name ?? ""),
 		vendor,
 		vendor_id,
 		account: (raw.account as ConnectionDto["account"]) ?? null,
 		method: String(raw.method ?? ""),
-		direction: String(raw.direction ?? ""),
-		environment: String(raw.environment ?? ""),
-		status: String(raw.status ?? ""),
-		config: (raw.config as Record<string, unknown>) ?? {},
+		direction: String(raw.direction ?? "inbound"),
+		environment: String(raw.environment ?? "test"),
+		status: String(raw.status ?? "draft"),
+		password_credential,
+		private_key_credential,
+		config: (raw.config as ConnectionDto["config"]) ?? {},
 		health: (raw.health as ConnectionDto["health"]) ?? {},
 	};
 }
@@ -3238,4 +3387,26 @@ export type ClaimHeaderSummaryDto = {
 	duplicate_count: number;
 	by_frequency: Record<string, number>;
 	by_vendor: Record<string, number>;
+};
+
+export type ClaimHeaderValidateExceptionDto = {
+	id: string;
+	code: string;
+	message: string;
+	severity: "critical" | "high" | "medium" | "low";
+	status: "open" | "in_review" | "resolved" | "escalated_to_vendor";
+};
+
+export type ClaimHeaderValidateResultDto = {
+	claim_header_id: string;
+	reference_id: string;
+	claim_reference_id: string;
+	validation_status: "valid" | "invalid" | "warning";
+	is_duplicate: boolean;
+	exceptions: ClaimHeaderValidateExceptionDto[];
+};
+
+export type ClaimHeaderValidateResult = {
+	validated_count: number;
+	results: ClaimHeaderValidateResultDto[];
 };

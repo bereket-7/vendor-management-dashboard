@@ -113,10 +113,23 @@ export type VendorWizardValues = {
 	};
 	connection: {
 		name: string;
-		method: string;
+		method: "sftp_pull" | "sftp_hosted";
 		host: string;
+		port: string;
+		username: string;
+		inbound_path: string;
+		archive_path: string;
+		host_key_fingerprint: string;
+		landing_user: string;
+		error_path: string;
+		processing_path: string;
 		environment: string;
 		status: string;
+		password_credential_id: string;
+		private_key_credential_id: string;
+		credential_name: string;
+		credential_kind: "password" | "private_key";
+		credential_secret_ref: string;
 	};
 };
 
@@ -153,10 +166,23 @@ export const EMPTY_VENDOR_WIZARD: VendorWizardValues = {
 	},
 	connection: {
 		name: "",
-		method: "sftp",
+		method: "sftp_pull",
 		host: "",
-		environment: "production",
-		status: "active",
+		port: "22",
+		username: "",
+		inbound_path: "upload",
+		archive_path: "archive",
+		host_key_fingerprint: "",
+		landing_user: "",
+		error_path: "error",
+		processing_path: "processing",
+		environment: "test",
+		status: "draft",
+		password_credential_id: "",
+		private_key_credential_id: "",
+		credential_name: "",
+		credential_kind: "password",
+		credential_secret_ref: "",
 	},
 };
 
@@ -313,13 +339,43 @@ export function validateAccountsStep(
 export function validateIntegrationStep(
 	values: VendorWizardValues
 ): string | null {
+	const c = values.connection;
 	const connectionStarted =
-		values.connection.name.trim() || values.connection.host.trim();
-	if (
-		connectionStarted &&
-		(!values.connection.name.trim() || !values.connection.host.trim())
-	) {
-		return "Connection needs both name and host.";
+		c.name.trim() ||
+		c.host.trim() ||
+		c.username.trim() ||
+		c.landing_user.trim();
+	if (connectionStarted) {
+		if (!c.name.trim()) {
+			return "Connection needs a name.";
+		}
+		if (c.method === "sftp_hosted") {
+			if (!c.landing_user.trim()) {
+				return "Connection needs landing user for SFTP hosted.";
+			}
+		} else if (!c.host.trim()) {
+			return "Connection needs a host.";
+		} else if (!c.username.trim()) {
+			return "Connection needs a username.";
+		} else {
+			const hasPasswordPick = Boolean(c.password_credential_id.trim());
+			const hasPrivateKey = Boolean(c.private_key_credential_id.trim());
+			const hasRegister =
+				Boolean(c.credential_name.trim()) &&
+				Boolean(c.credential_secret_ref.trim());
+			const registerPartial =
+				Boolean(c.credential_name.trim()) !==
+				Boolean(c.credential_secret_ref.trim());
+			if (registerPartial && !hasPasswordPick && !hasPrivateKey) {
+				return "Register credential needs both name and secret_ref.";
+			}
+			if (!hasPasswordPick && !hasPrivateKey && !hasRegister) {
+				return "Pick a password credential or register name + secret_ref.";
+			}
+			if (!c.host_key_fingerprint.trim()) {
+				return "Discover (or paste) the host key fingerprint before continuing.";
+			}
+		}
 	}
 	if (values.jobs.length > 0 && !connectionStarted) {
 		return "Add a connection before intake jobs.";

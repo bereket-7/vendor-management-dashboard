@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import { buildAcceptPath, createVendorInvite } from "@/lib/auth/vendor-invites";
 import { isMockEnabled, isNestApiEnabled, withMockOrRemote } from "@/lib/mock-mode";
 import {
 	VendorCoreApiError,
@@ -41,6 +42,72 @@ import type {
 	VendorModel,
 	VendorTeamMember,
 } from "./types";
+
+/** Result of inviteVendor — vendor record plus shareable invite link fields. */
+export type VendorInviteResult = {
+	vendor: VendorModel;
+	invite: {
+		token: string;
+		expiresAt: string;
+		acceptPath: string;
+	};
+};
+
+function inviteDtoToVendorModel(
+	dto: {
+		id: string;
+		legal_name: string;
+		email: string;
+		categories: string[];
+		vendor_id: string | null;
+		created_at: string;
+		expires_at: string;
+	}
+): VendorModel {
+	const now = dto.created_at || new Date().toISOString();
+	return {
+		id: dto.vendor_id ?? dto.id,
+		legalName: dto.legal_name,
+		tradeName: null,
+		status: "invited",
+		categories: dto.categories ?? [],
+		tags: [],
+		country: "",
+		city: "",
+		taxId: null,
+		website: null,
+		description: null,
+		contacts: [
+			{
+				id: `c-${dto.id}`,
+				name: dto.email.split("@")[0] ?? dto.email,
+				email: dto.email,
+				phone: null,
+				role: "Primary",
+				isPrimary: true,
+			},
+		],
+		riskLevel: "medium",
+		riskScore: 0,
+		onboardingProgress: 0,
+		createdAt: now,
+		updatedAt: now,
+	};
+}
+
+function toInviteResult(
+	vendor: VendorModel,
+	invite: { token: string; expiresAt: string; acceptPath?: string }
+): VendorInviteResult {
+	return {
+		vendor,
+		invite: {
+			token: invite.token,
+			expiresAt: invite.expiresAt,
+			acceptPath: invite.acceptPath ?? buildAcceptPath(invite.token),
+		},
+	};
+}
 
 /** NestJS admin paths — see docs/api-contracts/vms.md */
 const vmsPaths = {
@@ -234,9 +301,10 @@ export const vmsApi = {
 		legalName: string;
 		email: string;
 		categories: string[];
-	}) {
+		note?: string;
+	}): Promise<VendorInviteResult> {
 		if (isMockEnabled()) {
-			return mockDelay(
+			const vendor = await mockDelay(
 				vmsStore.createVendor({
 					legalName: data.legalName,
 					tradeName: null,
@@ -261,6 +329,18 @@ export const vmsApi = {
 					],
 				})
 			);
+			const invite = createVendorInvite({
+				vendorId: vendor.id,
+				legalName: data.legalName,
+				email: data.email,
+				categories: data.categories,
+				note: data.note,
+			});
+			return toInviteResult(vendor, {
+				token: invite.token,
+				expiresAt: invite.expiresAt,
+				acceptPath: buildAcceptPath(invite.token),
+			});
 		}
 		if (isVendorCoreLive()) {
 			const dto = await vendorCoreApi.inviteVendor({
@@ -268,12 +348,28 @@ export const vmsApi = {
 				email: data.email,
 				categories: data.categories,
 			});
-			return vendorDtoToModel(dto);
+			return toInviteResult(inviteDtoToVendorModel(dto), {
+				token: dto.token,
+				expiresAt: dto.expires_at,
+				acceptPath: buildAcceptPath(dto.token),
+			});
 		}
 		if (isNestApiEnabled()) {
-			return apiClient<VendorModel>(vmsPaths.invite, {
+			const vendor = await apiClient<VendorModel>(vmsPaths.invite, {
 				method: "POST",
 				body: JSON.stringify(data),
+			});
+			const invite = createVendorInvite({
+				vendorId: vendor.id,
+				legalName: data.legalName,
+				email: data.email,
+				categories: data.categories,
+				note: data.note,
+			});
+			return toInviteResult(vendor, {
+				token: invite.token,
+				expiresAt: invite.expiresAt,
+				acceptPath: buildAcceptPath(invite.token),
 			});
 		}
 		throw new Error("Vendor invite unavailable");
@@ -309,7 +405,7 @@ export const vmsApi = {
 	async getOnboarding(id: string) {
 		if (isMockEnabled()) return mockDelay(vmsStore.getOnboarding(id));
 		if (isVendorCoreLive()) {
-			return mapDjangoOnboarding(await vendorCoreApi.getOnboarding(id));
+			return mapDjangoOnboarding(await vendorCoreApi.getOnboardingCase(id));
 		}
 		if (isNestApiEnabled()) {
 			return apiClient<OnboardingCaseModel>(vmsPaths.onboardingDetail(id));
@@ -325,7 +421,7 @@ export const vmsApi = {
 			if (patch.reviewerNote !== undefined)
 				body.rejection_reason = patch.reviewerNote;
 			return mapDjangoOnboarding(
-				await vendorCoreApi.updateOnboarding(id, body)
+				await vendorCoreApi.updateOnboardingCase(id, body)
 			);
 		}
 		if (isNestApiEnabled()) {
@@ -383,11 +479,19 @@ export const vmsApi = {
 	async addDocument(doc: Parameters<typeof vmsStore.addDocument>[0]) {
 		if (isMockEnabled()) return mockDelay(vmsStore.addDocument(doc));
 		if (isVendorCoreLive()) {
+			const sizeBytes = (doc.fileSizeKb ?? 0) * 1024;
 			return mapDjangoDocument(
 				await vendorCoreApi.createDocument({
-					vendor: doc.vendorId,
+					vendor_id: doc.vendorId,
 					document_type: doc.type,
 					title: doc.name,
+					storage_key: `vms/${doc.vendorId}/${encodeURIComponent(doc.name)}`,
+					checksum_sha256:
+						doc.checksum && /^[a-f0-9]{64}$/i.test(doc.checksum)
+							? doc.checksum
+							: "0".repeat(64),
+					mime_type: "application/octet-stream",
+					size_bytes: sizeBytes,
 					status: doc.status,
 					expires_at: doc.expiresAt,
 				})
@@ -445,9 +549,10 @@ export const vmsApi = {
 		if (isVendorCoreLive()) {
 			return mapDjangoContract(
 				await vendorCoreApi.createContract({
-					vendor: input.vendorId,
+					vendor_id: input.vendorId,
 					contract_number: input.number,
 					title: input.title,
+					contract_type: input.contractType ?? "msa",
 					status: input.status,
 					effective_date: input.startDate,
 					expiration_date: input.endDate,
@@ -818,8 +923,10 @@ export const vmsApi = {
 	async listTeam() {
 		if (isMockEnabled()) return mockDelay(vmsStore.listTeam());
 		if (isVendorCoreLive()) {
-			const page = await vendorCoreApi.listVendorTeam();
-			return (page.results ?? []).map(mapDjangoTeamMember);
+			const rows = await vendorCoreApi.listVendorTeam();
+			return rows.map((row) =>
+				mapDjangoTeamMember(row as unknown as Record<string, unknown>)
+			);
 		}
 		if (isNestApiEnabled()) {
 			return apiClient<VendorTeamMember[] | { results?: VendorTeamMember[] }>(
@@ -840,8 +947,8 @@ export const vmsApi = {
 				legal_name: legalName,
 				trade_name: raw.trade_name != null ? String(raw.trade_name) : null,
 				status: String(raw.status ?? "prospect"),
-				country: raw.country != null ? String(raw.country) : null,
-				city: raw.city != null ? String(raw.city) : null,
+				country: raw.country != null ? String(raw.country) : undefined,
+				city: raw.city != null ? String(raw.city) : undefined,
 				metadata:
 					raw.metadata && typeof raw.metadata === "object"
 						? (raw.metadata as Record<string, unknown>)

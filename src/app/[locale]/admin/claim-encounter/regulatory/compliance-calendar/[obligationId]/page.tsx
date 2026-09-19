@@ -1,19 +1,31 @@
+"use client";
+
+import { use } from "react";
+
 import { notFound } from "next/navigation";
 
 import { ComplianceObligationDetailPage } from "@/features/admin/features/claim-encounter/compliance-calendar/ComplianceObligationDetailPage";
-import { getObligationDetail } from "@/features/admin/features/claim-encounter/compliance-calendar/mock-data";
+import { useComplianceObligationDetailQuery } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
 
-export default async function Page({
+export default function Page({
 	params,
 }: {
 	params: Promise<{ obligationId: string }>;
 }) {
-	const { obligationId } = await params;
-	const obligation = getObligationDetail(obligationId);
+	const { obligationId } = use(params);
+	const query = useComplianceObligationDetailQuery(obligationId);
 
-	if (!obligation) {
+	if (query.isLoading) {
+		return (
+			<p className="px-4 py-12 text-sm text-muted-foreground">
+				Loading obligation…
+			</p>
+		);
+	}
+
+	if (!query.data) {
 		notFound();
 	}
 
-	return <ComplianceObligationDetailPage obligation={obligation} />;
+	return <ComplianceObligationDetailPage obligation={query.data} />;
 }

@@ -51,15 +51,14 @@ import {
 	MEDICAID_EXTERNAL_TOP_REJECTION_CODES,
 	MEDICAID_EXTERNAL_VALIDATION_DETAILS,
 	MEDICAID_EXTERNAL_VALIDATION_STATUS_STYLES,
-	MEDICAID_EXTERNAL_VALIDATION_SUMMARY,
 	MEDICAID_EXTERNAL_VALIDATION_TREND,
 	MEDICAID_INTERNAL_VALIDATION_DETAILS,
 	MEDICAID_INTERNAL_VALIDATION_STATUS_STYLES,
-	MEDICAID_INTERNAL_VALIDATION_SUMMARY,
 	MEDICAID_VALIDATION_QUICK_ACTIONS,
 	MEDICAID_VALIDATION_TOP_ERROR_CODES,
 	MEDICAID_VALIDATION_TREND,
 	MEDICAID_VALIDATION_TYPE_BREAKDOWN,
+	useMedicaidEncounterValidationDerivedQuery,
 } from "@/features/admin/features/claim-encounter/medicaid-encounter/feature/queries/useMedicaidEncounterQuery";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
 import { getProgramScale } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
@@ -172,10 +171,26 @@ function SummaryStatCard({
 
 function InternalValidationSummaryPanel({
 	programType,
+	kpis,
 }: {
 	programType?: ProgramType;
+	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
 }) {
-	const s = MEDICAID_INTERNAL_VALIDATION_SUMMARY;
+	const files = kpis?.filesReceived ?? 0;
+	const passed = kpis?.accepted ?? 0;
+	const warnings = kpis?.warnings ?? 0;
+	const errors = kpis?.errors ?? 0;
+	const total = files || 1;
+	const s = {
+		filesValidated: files,
+		filesValidatedDelta: 0,
+		passed,
+		passedPct: (passed / total) * 100,
+		warnings,
+		warningsPct: (warnings / total) * 100,
+		errors,
+		errorsPct: (errors / total) * 100,
+	};
 
 	return (
 		<CmsEdgeSectionPanel title="Internal Validation Summary">
@@ -223,10 +238,25 @@ function InternalValidationSummaryPanel({
 
 function ExternalValidationSummaryPanel({
 	programType,
+	kpis,
 }: {
 	programType?: ProgramType;
+	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
 }) {
-	const s = MEDICAID_EXTERNAL_VALIDATION_SUMMARY;
+	const files = kpis?.filesReceived ?? 0;
+	const passed = kpis?.accepted ?? 0;
+	const warnings = kpis?.warnings ?? 0;
+	const errors = kpis?.errors ?? 0;
+	const total = files || 1;
+	const s = {
+		filesValidated: files,
+		passed,
+		passedPct: (passed / total) * 100,
+		warnings,
+		warningsPct: (warnings / total) * 100,
+		errors,
+		errorsPct: (errors / total) * 100,
+	};
 	const isMedicare = programType === "medicare";
 
 	return (
@@ -819,21 +849,30 @@ function ValidationQuickActionsPanel({
 
 function InternalValidationView({
 	programType,
+	topErrorCodes,
+	trend,
+	kpis,
 }: {
 	programType?: ProgramType;
+	topErrorCodes?: typeof MEDICAID_VALIDATION_TOP_ERROR_CODES;
+	trend?: typeof MEDICAID_VALIDATION_TREND;
+	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
 }) {
 	return (
 		<div className={VALIDATION_PAGE_STACK}>
-			<InternalValidationSummaryPanel programType={programType} />
+			<InternalValidationSummaryPanel programType={programType} kpis={kpis} />
 			<InternalValidationDetailsPanel programType={programType} />
-			<TopErrorCodesPanel programType={programType} />
+			<TopErrorCodesPanel programType={programType} rows={topErrorCodes} />
 			<div
 				className={cn(
 					"grid grid-cols-1 items-stretch lg:grid-cols-2",
 					VALIDATION_SECTION_GAP
 				)}
 			>
-				<ValidationTrendPanel title="Internal Validation Trend (by Week)" />
+				<ValidationTrendPanel
+					title="Internal Validation Trend (by Week)"
+					data={trend}
+				/>
 				<ValidationTypeBreakdownPanel scope="internal" />
 			</div>
 			<ValidationQuickActionsPanel scope="internal" />
@@ -843,14 +882,20 @@ function InternalValidationView({
 
 function ExternalValidationView({
 	programType,
+	topErrorCodes,
+	trend,
+	kpis,
 }: {
 	programType?: ProgramType;
+	topErrorCodes?: typeof MEDICAID_EXTERNAL_TOP_REJECTION_CODES;
+	trend?: typeof MEDICAID_EXTERNAL_VALIDATION_TREND;
+	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
 }) {
 	const isMedicare = programType === "medicare";
 
 	return (
 		<div className={VALIDATION_PAGE_STACK}>
-			<ExternalValidationSummaryPanel programType={programType} />
+			<ExternalValidationSummaryPanel programType={programType} kpis={kpis} />
 			<ExternalValidationDetailsPanel programType={programType} />
 			<TopErrorCodesPanel
 				programType={programType}
@@ -859,7 +904,7 @@ function ExternalValidationView({
 						? "External (CMS) Validation – Top Rejection Codes"
 						: "External (State) Validation – Top Rejection Codes"
 				}
-				rows={MEDICAID_EXTERNAL_TOP_REJECTION_CODES}
+				rows={topErrorCodes}
 				lastColumnLabel="% of Total Rejections"
 			/>
 			<div
@@ -874,7 +919,7 @@ function ExternalValidationView({
 							? "External (CMS) Validation Trend (by Week)"
 							: "External (State) Validation Trend (by Week)"
 					}
-					data={MEDICAID_EXTERNAL_VALIDATION_TREND}
+					data={trend}
 				/>
 				<ValidationTypeBreakdownPanel scope="external" />
 			</div>
@@ -884,13 +929,25 @@ function ExternalValidationView({
 }
 
 export function MedicaidEncounterValidationTab({
-	programType,
-}: { programType?: ProgramType } = {}) {
+	programType = "medicaid",
+	reportingPeriod: _reportingPeriod,
+}: { programType?: ProgramType; reportingPeriod?: string } = {}) {
 	const [subTab, setSubTab] = useState<ValidationSubTab>("internal");
 	const isMedicare = programType === "medicare";
+	const validationQuery = useMedicaidEncounterValidationDerivedQuery(programType);
+	const derivedTop = validationQuery.data?.topErrorCodes ?? [];
+	const derivedTrend = validationQuery.data?.trend ?? [];
+	const derivedExternalTop = derivedTop;
+	const derivedExternalTrend = derivedTrend;
+	const derivedKpis = validationQuery.data?.kpis;
 
 	return (
 		<div className={VALIDATION_PAGE_STACK}>
+			{validationQuery.isLoading ? (
+				<p className="px-4 py-4 text-center text-sm text-muted-foreground">
+					Loading validation…
+				</p>
+			) : null}
 			<Tabs
 				value={subTab}
 				onValueChange={(value) => setSubTab(value as ValidationSubTab)}
@@ -909,10 +966,20 @@ export function MedicaidEncounterValidationTab({
 				</div>
 
 				<TabsContent value="internal" className="mt-4 space-y-0">
-					<InternalValidationView programType={programType} />
+					<InternalValidationView
+						programType={programType}
+						topErrorCodes={derivedTop}
+						trend={derivedTrend}
+						kpis={derivedKpis}
+					/>
 				</TabsContent>
 				<TabsContent value="external" className="mt-4 space-y-0">
-					<ExternalValidationView programType={programType} />
+					<ExternalValidationView
+						programType={programType}
+						topErrorCodes={derivedExternalTop}
+						trend={derivedExternalTrend}
+						kpis={derivedKpis}
+					/>
 				</TabsContent>
 			</Tabs>
 

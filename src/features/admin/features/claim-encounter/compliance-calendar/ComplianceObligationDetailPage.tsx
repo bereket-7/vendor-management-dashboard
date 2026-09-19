@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
 	ArrowLeft,
@@ -19,6 +19,12 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -29,11 +35,15 @@ import {
 	CMS_EDGE_STATUS_PILL_CLASS,
 	CmsEdgeSectionPanel,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
-import type { ObligationDetail } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
+import type {
+	ObligationDetail,
+	ObligationStatus,
+} from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
 import {
 	COMPLIANCE_PROGRAM_LABELS,
 	complianceProgramPillClass,
 	complianceStatusPillClass,
+	useUpdateComplianceObligationMutation,
 } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -98,11 +108,30 @@ function PanelLink({ children }: { children: ReactNode }) {
 }
 
 export function ComplianceObligationDetailPage({
-	obligation,
+	obligation: initial,
 }: {
 	obligation: ObligationDetail;
 }) {
+	const [obligation, setObligation] = useState(initial);
+	const updateMutation = useUpdateComplianceObligationMutation();
 	const isOverdue = obligation.status === "Overdue";
+
+	async function patch(body: {
+		status?: ObligationStatus;
+		owner?: string;
+		notes?: string;
+	}) {
+		try {
+			const next = await updateMutation.mutateAsync({
+				id: obligation.id,
+				body,
+			});
+			setObligation(next);
+			toast.success("Obligation updated");
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Update failed");
+		}
+	}
 
 	return (
 		<div className={STACK}>
@@ -402,23 +431,85 @@ export function ComplianceObligationDetailPage({
 			{/* Bottom action bar */}
 			<div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:pl-[var(--sidebar-width,16rem)]">
 				<div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2">
-					<Button size="sm" className="h-9 gap-1.5 text-xs">
-						<ExternalLink className="size-3.5" />
-						Go to Source Module
+					<Button size="sm" className="h-9 gap-1.5 text-xs" asChild>
+						<Link
+							href={
+								obligation.sourceModule?.toLowerCase().includes("cms")
+									? "/admin/claim-encounter/regulatory/cms-edge"
+									: "/admin/claim-encounter/regulatory/program-reporting"
+							}
+						>
+							<ExternalLink className="size-3.5" />
+							Go to Source Module
+						</Link>
 					</Button>
-					<Button variant="outline" size="sm" className="h-9 gap-1 text-xs">
-						Update Status
-						<ChevronDown className="size-3.5" />
-					</Button>
-					<Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-9 gap-1 text-xs"
+								disabled={updateMutation.isPending}
+							>
+								Update Status
+								<ChevronDown className="size-3.5" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start">
+							{(
+								[
+									"Upcoming",
+									"At Risk",
+									"Overdue",
+									"Completed",
+								] as ObligationStatus[]
+							).map((status) => (
+								<DropdownMenuItem
+									key={status}
+									onClick={() => void patch({ status })}
+								>
+									{status}
+								</DropdownMenuItem>
+							))}
+						</DropdownMenuContent>
+					</DropdownMenu>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9 gap-1.5 text-xs"
+						disabled={updateMutation.isPending}
+						onClick={() =>
+							void patch({
+								owner: prompt("Assign to", obligation.owner) || undefined,
+							})
+						}
+					>
 						<UserRound className="size-3.5" />
 						Assign / Reassign
 					</Button>
-					<Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9 gap-1.5 text-xs"
+						disabled={updateMutation.isPending}
+						onClick={() => {
+							const notes = prompt("Add note", obligation.notes);
+							if (notes != null) void patch({ notes });
+						}}
+					>
 						<Plus className="size-3.5" />
 						Add Note
 					</Button>
-					<Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-9 gap-1.5 text-xs"
+						onClick={() =>
+							toast.info(
+								"Document metadata upload via PATCH documents JSON — use API for binary files"
+							)
+						}
+					>
 						<Upload className="size-3.5" />
 						Upload Document
 					</Button>

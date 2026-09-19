@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 import {
@@ -39,6 +39,7 @@ import {
 	resolveClaimExceptionLive,
 	resolveClaimVendorFile,
 	restoreClaimLine,
+	revalidateClaimHeaders,
 	seedClaimLines,
 	seedInboundVendorQueueDemo,
 	sendClaimVendorFileLive,
@@ -133,6 +134,40 @@ export function useClaimHeadersLiveQuery(
 			params?.limit ?? 100,
 		]
 	);
+}
+
+export function useRevalidateClaimHeadersMutation() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (claimHeaderIds: string[]) => {
+			const ids = [...new Set(claimHeaderIds.map((id) => id.trim()).filter(Boolean))];
+			if (ids.length === 0) {
+				return Promise.reject(new Error("Select at least one claim to re-validate."));
+			}
+			if (ids.length > 100) {
+				return Promise.reject(
+					new Error("Re-validate at most 100 claims per request.")
+				);
+			}
+			return revalidateClaimHeaders(ids);
+		},
+		onSuccess: async () => {
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: featureQueryKey(domain, "claim-headers-live"),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: featureQueryKey(domain, "exceptions"),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: featureQueryKey(domain, "claim-lines-live"),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: featureQueryKey(domain),
+				}),
+			]);
+		},
+	});
 }
 
 /** Stash-compatible alias of useClaimVendorFileDetailQuery. */
