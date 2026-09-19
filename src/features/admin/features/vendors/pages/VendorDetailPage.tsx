@@ -762,9 +762,9 @@ function VendorDetailView() {
 				</div>
 			</div>
 
-			{/* Tabs */}
+			{/* Tabs — single full-width row */}
 			<nav
-				className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8"
+				className="flex w-full gap-1.5"
 				aria-label="Vendor sections"
 			>
 				{TABS.map((item) => (
@@ -773,25 +773,27 @@ function VendorDetailView() {
 						type="button"
 						onClick={() => setTab(item)}
 						className={cn(
-							"rounded-lg border px-2.5 py-2.5 text-center text-xs font-semibold transition-colors shadow-sm",
+							"min-w-0 flex-1 rounded-lg border px-1.5 py-2.5 text-center text-[11px] font-semibold leading-tight transition-colors shadow-sm sm:px-2 sm:text-xs",
 							tab === item
 								? "border-primary bg-primary text-primary-foreground"
 								: "border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
 						)}
 					>
-						{item}
-						{tabCounts[item] != null && (
-							<span
-								className={cn(
-									"ml-1 text-xs font-medium",
-									tab === item
-										? "text-primary-foreground/80"
-										: "text-muted-foreground"
-								)}
-							>
-								({tabCounts[item]})
-							</span>
-						)}
+						<span className="block truncate">
+							{item}
+							{tabCounts[item] != null && (
+								<span
+									className={cn(
+										"ml-1 font-medium",
+										tab === item
+											? "text-primary-foreground/80"
+											: "text-muted-foreground"
+									)}
+								>
+									({tabCounts[item]})
+								</span>
+							)}
+						</span>
 					</button>
 				))}
 			</nav>
