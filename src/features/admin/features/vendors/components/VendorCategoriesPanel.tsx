@@ -88,16 +88,31 @@ export function VendorCategoriesPanel({ vendorId }: VendorCategoriesPanelProps) 
 				<div>
 					<h3 className="text-sm font-semibold tracking-tight">Categories</h3>
 					<p className="text-xs text-muted-foreground">
-						Assign catalog categories to this vendor.
+						Vendor-level catalog tags (spend / commodity type) — not tied to
+						SFTP connections. Used for classification and reporting.
 					</p>
 				</div>
 			</div>
 
-			{assignmentsQ.isLoading ? (
+			{categoriesQ.isLoading ? (
+				<p className="text-sm text-muted-foreground">Loading categories…</p>
+			) : (categoriesQ.data ?? []).length === 0 ? (
+				<p className="mb-3 text-sm text-amber-800 dark:text-amber-200">
+					Category catalog is empty on this API. Ops must seed{" "}
+					<code className="rounded bg-muted px-1 text-[11px]">
+						VendorCategory
+					</code>{" "}
+					rows (e.g.{" "}
+					<code className="rounded bg-muted px-1 text-[11px]">
+						manage.py seed_vendor_categories
+					</code>{" "}
+					on the API host). Local seed does not fill remote.
+				</p>
+			) : assignmentsQ.isLoading ? (
 				<p className="text-sm text-muted-foreground">Loading categories…</p>
 			) : assignments.length === 0 ? (
 				<p className="mb-3 text-sm text-muted-foreground">
-					No categories assigned yet.
+					No categories assigned to this vendor yet.
 				</p>
 			) : (
 				<ul className="mb-3 space-y-2">

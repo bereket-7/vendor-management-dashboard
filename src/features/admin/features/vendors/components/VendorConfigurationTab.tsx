@@ -1739,8 +1739,8 @@ export function VendorConfigurationTab({
 
 			{/* Connection create/edit */}
 			<Dialog open={connectionDraftOpen} onOpenChange={setConnectionDraftOpen}>
-				<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-					<DialogHeader>
+				<DialogContent className="flex max-h-[85vh] w-[min(96vw,56rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+					<DialogHeader className="shrink-0 border-b border-border px-6 py-4 text-left">
 						<DialogTitle>
 							{connectionId ? "Edit SFTP connection" : "Create SFTP connection"}
 						</DialogTitle>
@@ -1749,8 +1749,9 @@ export function VendorConfigurationTab({
 							`sftp_hosted`). Secrets are referenced by `secret_ref` only.
 						</DialogDescription>
 					</DialogHeader>
-					<div className="grid gap-3 py-1 sm:grid-cols-2">
-						<div className="space-y-1.5 sm:col-span-2">
+					<div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
 							<Label htmlFor="conn-name">Connection name</Label>
 							<Input
 								id="conn-name"
@@ -1838,7 +1839,7 @@ export function VendorConfigurationTab({
 
 						{connectionDraft.method === "sftp_pull" ? (
 							<>
-								<div className="space-y-1.5 sm:col-span-2">
+								<div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
 									<Label htmlFor="conn-host">Host</Label>
 									<Input
 										id="conn-host"
@@ -1915,7 +1916,7 @@ export function VendorConfigurationTab({
 										className="font-mono"
 									/>
 								</div>
-								<div className="space-y-1.5 sm:col-span-2">
+								<div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
 									<Label htmlFor="conn-fp">
 										Host key fingerprint (SHA-256 hex)
 									</Label>
@@ -2014,7 +2015,7 @@ export function VendorConfigurationTab({
 							</>
 						) : (
 							<>
-								<div className="space-y-1.5 sm:col-span-2">
+								<div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
 									<Label htmlFor="conn-landing">Landing user</Label>
 									<Input
 										id="conn-landing"
@@ -2154,7 +2155,8 @@ export function VendorConfigurationTab({
 							)}
 						</div>
 					) : null}
-					<DialogFooter>
+					</div>
+					<DialogFooter className="shrink-0 border-t border-border px-6 py-4 sm:justify-end">
 						<Button
 							type="button"
 							variant="outline"
