@@ -18,11 +18,11 @@ import type {
 	VendorCategoryAssignmentCreateInput,
 	VendorCategoryAssignmentDto,
 	VendorCategoryListQuery,
-	VendorDto,
 	VendorContactCreateInput,
 	VendorContactDto,
 	VendorContactUpdateInput,
 	VendorCreateInput,
+	VendorDto,
 	VendorIntegrationProfileDto,
 	VendorIntegrationProfileUpdateInput,
 	VendorNoteDto,
@@ -546,7 +546,10 @@ export async function updateVendorCertificate(
 	id: string,
 	body: Record<string, unknown>
 ) {
-	return vendorCoreApi.updateCertificate(id, body) as Promise<VendorCertificateDto>;
+	return vendorCoreApi.updateCertificate(
+		id,
+		body
+	) as Promise<VendorCertificateDto>;
 }
 
 export async function listVendorNotes(

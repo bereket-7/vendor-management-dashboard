@@ -1,10 +1,10 @@
 import {
+	type ComplianceObligationWrite,
 	createComplianceObligation,
 	fetchComplianceCalendarOverview,
 	fetchComplianceObligation,
 	fetchComplianceObligations,
 	updateComplianceObligation,
-	type ComplianceObligationWrite,
 } from "@/lib/vendor-reporting/compliance-calendar";
 
 import {

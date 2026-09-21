@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 
+import type { ProgramType } from "../../types";
 import {
 	getAcceptanceAnalytics,
 	getAuditData,
@@ -13,7 +14,6 @@ import {
 	getSubmissionsData,
 	patchProgramException,
 } from "../api/program-reportingApi";
-import type { ProgramType } from "../../types";
 
 const domain = "program-reporting";
 

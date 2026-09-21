@@ -54,9 +54,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import {
-	vendorNoteDtoToUi,
-} from "../feature/mappers/noteMappers";
+import { vendorNoteDtoToUi } from "../feature/mappers/noteMappers";
 import {
 	useCreateVendorNoteMutation,
 	useDeleteVendorNoteMutation,
@@ -225,9 +223,7 @@ export function VendorNotesTab({
 			await notesQuery.refetch();
 			if (created?.id) setSelectedId(String(created.id));
 		} catch (err) {
-			toast.error(
-				err instanceof Error ? err.message : "Could not create note"
-			);
+			toast.error(err instanceof Error ? err.message : "Could not create note");
 		}
 	}
 

@@ -1106,9 +1106,7 @@ function OperationsAuditTab({
 	const [ediFullscreen, setEdiFullscreen] = useState(false);
 
 	const validationStatus =
-		validateResult?.validation_status ??
-		headerValidationStatus ??
-		null;
+		validateResult?.validation_status ?? headerValidationStatus ?? null;
 	const exceptions = validateResult?.exceptions ?? [];
 	const showLiveValidation = Boolean(validationStatus || exceptions.length > 0);
 
@@ -1867,9 +1865,7 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 		setValidateResult(null);
 	}, [claimIdParam]);
 
-	const headerUuid = matchedHeaderDto?.id
-		? String(matchedHeaderDto.id)
-		: null;
+	const headerUuid = matchedHeaderDto?.id ? String(matchedHeaderDto.id) : null;
 	const headerValidationStatus =
 		validateResult?.validation_status ??
 		(matchedHeaderDto?.validation_status
@@ -1918,9 +1914,7 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 			);
 			await headersQ.refetch();
 		} catch (err) {
-			toast.error(
-				err instanceof Error ? err.message : "Re-validate failed"
-			);
+			toast.error(err instanceof Error ? err.message : "Re-validate failed");
 		}
 	}
 
@@ -2189,9 +2183,7 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 								"border-border/80 bg-background text-muted-foreground hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
 							)}
 							disabled={
-								!headerUuid ||
-								revalidateMutation.isPending ||
-								actionBusy
+								!headerUuid || revalidateMutation.isPending || actionBusy
 							}
 							onClick={() => void handleRevalidate()}
 						>
@@ -2291,9 +2283,7 @@ function ClaimDetailBody({ useLive }: { useLive: boolean }) {
 							<DropdownMenuGroup>
 								<DropdownMenuItem
 									className={actionItemClass}
-									disabled={
-										actionBusy || revalidateMutation.isPending
-									}
+									disabled={actionBusy || revalidateMutation.isPending}
 									onClick={() => void handleRevalidate()}
 								>
 									<span className="flex size-7 items-center justify-center rounded-sm bg-emerald-500/10 text-emerald-800 dark:text-emerald-200">

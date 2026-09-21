@@ -12,8 +12,8 @@ import type {
 } from "../../dto/setting.dto";
 import type { AppSettingModel } from "../../types/setting.types";
 import { toSettingModelList } from "../mappers/setting.mapper";
-import { MOCK_SETTINGS } from "./setting.mock";
 import { settingEndpoints } from "./setting.endpoints";
+import { MOCK_SETTINGS } from "./setting.mock";
 
 export const settingApi = {
 	async list(): Promise<AppSettingModel[]> {
@@ -23,12 +23,10 @@ export const settingApi = {
 			return toSettingModelList((page.results ?? []) as ApiSettingDto[]);
 		}
 		if (isNestApiEnabled()) {
-			const res = await apiClient<
-				ApiSettingListResponseDto | ApiSettingDto[]
-			>(settingEndpoints.list());
-			return toSettingModelList(
-				Array.isArray(res) ? res : (res.results ?? [])
+			const res = await apiClient<ApiSettingListResponseDto | ApiSettingDto[]>(
+				settingEndpoints.list()
 			);
+			return toSettingModelList(Array.isArray(res) ? res : (res.results ?? []));
 		}
 		return [];
 	},

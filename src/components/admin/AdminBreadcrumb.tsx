@@ -61,6 +61,7 @@ const STATIC_LABELS: Record<string, string> = {
 	"routing-rules": "Routing Rules",
 	create: "Create",
 	invite: "Invite",
+	new: "New",
 	"file-monitoring": "File Monitoring",
 	select: "Select Vendor, File, or Failed Run",
 	investigate: "Investigation Details",
@@ -215,6 +216,13 @@ export function AdminBreadcrumb({ appTitle }: { appTitle: string }) {
 			}
 
 			if (prev === "members") {
+				if (segment === "new" || segment === "import") {
+					items.push({
+						label: STATIC_LABELS[segment] ?? formatSegment(segment),
+						href: i < trail.length - 1 ? path : undefined,
+					});
+					continue;
+				}
 				const member = getMember(decodeURIComponent(segment));
 				items.push({
 					label: member ? displayName(member) : "Member Profile",

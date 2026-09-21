@@ -1,5 +1,9 @@
-import { isMockEnabled, isNestApiEnabled, isLiveIntegrationEnabled } from "@/lib/mock-mode";
 import { apiClient } from "@/lib/api/client";
+import {
+	isLiveIntegrationEnabled,
+	isMockEnabled,
+	isNestApiEnabled,
+} from "@/lib/mock-mode";
 import { vendorCoreApi } from "@/lib/vendor-core/api";
 import type {
 	IdentityGroupCreateInput,
@@ -15,9 +19,8 @@ import type {
 } from "../../dto/group.dto";
 import type { GroupModel } from "../../types/group.types";
 import { toGroupModel, toGroupModelList } from "../mappers/group.mapper";
-import { MOCK_GROUPS } from "./group.mock";
 import { groupEndpoints } from "./group.endpoints";
-
+import { MOCK_GROUPS } from "./group.mock";
 
 function coreDtoToApiDto(dto: IdentityGroupDto): ApiIdentityGroupDto {
 	return {
@@ -114,10 +117,13 @@ export const groupApi = {
 			return model;
 		}
 		if (isNestApiEnabled()) {
-			const dto = await apiClient<ApiIdentityGroupDto>(groupEndpoints.create(), {
-				method: "POST",
-				body: JSON.stringify(payload),
-			});
+			const dto = await apiClient<ApiIdentityGroupDto>(
+				groupEndpoints.create(),
+				{
+					method: "POST",
+					body: JSON.stringify(payload),
+				}
+			);
 			const model = toGroupModel(dto);
 			if (!model) throw new Error("Invalid create response");
 			return model;

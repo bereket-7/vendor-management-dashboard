@@ -379,7 +379,10 @@ function StateResponseFilesTable({
 										{row.receivedAt}
 									</TableCell>
 									<TableCell
-										className={cn(RESPONSE_TABLE_CELL, "text-right tabular-nums")}
+										className={cn(
+											RESPONSE_TABLE_CELL,
+											"text-right tabular-nums"
+										)}
 									>
 										{formatCount(scaleProgramCount(row.records, programType))}
 									</TableCell>

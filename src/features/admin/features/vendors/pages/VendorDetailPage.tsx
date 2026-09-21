@@ -99,6 +99,11 @@ import { VendorContractsTab } from "../components/VendorContractsTab";
 import { VendorNotesTab } from "../components/VendorNotesTab";
 import { VendorOperationsTab } from "../components/VendorOperationsTab";
 import {
+	buildConnectionCreateInput,
+	buildConnectionUpdateInput,
+	emptyVendorSftpConnection,
+} from "../connection-form";
+import {
 	findVendorAccountByCode,
 	getVendorAccount,
 	listVendorAccounts,
@@ -128,11 +133,6 @@ import {
 	useVendorDetailBundleQuery,
 } from "../feature/queries/useVendorsQuery";
 import { connectionToSftp, inboundFilesToRuns } from "../live-vendor-detail";
-import {
-	buildConnectionCreateInput,
-	buildConnectionUpdateInput,
-	emptyVendorSftpConnection,
-} from "../connection-form";
 import { runBucket } from "../vendor-types";
 
 const TABS = [
@@ -1535,9 +1535,7 @@ function VendorDetailView() {
 
 			{tab === "Contracts" && <VendorContractsTab vendorId={vendor.id} />}
 
-			{tab === "Certificates" && (
-				<VendorCertificatesTab vendorId={vendor.id} />
-			)}
+			{tab === "Certificates" && <VendorCertificatesTab vendorId={vendor.id} />}
 
 			{tab === "Notes" && (
 				<VendorNotesTab vendorId={vendor.id} vendorName={displayName} />

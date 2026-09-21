@@ -42,7 +42,8 @@ export const COMPLIANCE_CALENDAR_MONTH = { year: 2027, month: 5 }; // June 2027 
 export const COMPLIANCE_CALENDAR_TODAY = 16;
 
 /** Events keyed by day of month (June 2027) */
-export const COMPLIANCE_CALENDAR_EVENTS: Record<number, CalendarDayEvent[]> = {};
+export const COMPLIANCE_CALENDAR_EVENTS: Record<number, CalendarDayEvent[]> =
+	{};
 
 export const COMPLIANCE_PROGRAM_SUMMARY: Array<{
 	key: Exclude<ComplianceProgramKey, "overdue">;

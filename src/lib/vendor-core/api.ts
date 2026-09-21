@@ -2452,9 +2452,8 @@ export const vendorCoreApi = {
 		status?: string;
 		vendor_id?: string;
 		limit?: number;
-	offset?: number;
-	}) =>
-		vendorCoreApi.listOnboardingCases(params),
+		offset?: number;
+	}) => vendorCoreApi.listOnboardingCases(params),
 
 	listOnboardingCases: (params?: {
 		status?: string;

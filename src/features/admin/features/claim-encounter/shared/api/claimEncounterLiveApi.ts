@@ -63,16 +63,16 @@ export const claimEncounterLiveApi = {
 	},
 
 	listMemberCoverages: async () => {
-		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.memberCoveragesList
-		);
+		const page = await vendorCoreFetch<
+			PaginatedResult<Record<string, unknown>>
+		>(vendorCoreEndpoints.memberCoveragesList);
 		return unwrapPage(page);
 	},
 
 	listProviders: async () => {
-		const page = await vendorCoreFetch<PaginatedResult<Record<string, unknown>>>(
-			vendorCoreEndpoints.providersList
-		);
+		const page = await vendorCoreFetch<
+			PaginatedResult<Record<string, unknown>>
+		>(vendorCoreEndpoints.providersList);
 		return unwrapPage(page);
 	},
 };

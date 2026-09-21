@@ -25,7 +25,9 @@ type VendorCategoriesPanelProps = {
 	vendorId: string;
 };
 
-export function VendorCategoriesPanel({ vendorId }: VendorCategoriesPanelProps) {
+export function VendorCategoriesPanel({
+	vendorId,
+}: VendorCategoriesPanelProps) {
 	const categoriesQ = useVendorCategoriesQuery(true);
 	const assignmentsQ = useVendorCategoryAssignmentsQuery(vendorId, true);
 	const createMutation = useCreateVendorCategoryAssignmentMutation(vendorId);
@@ -161,7 +163,10 @@ export function VendorCategoriesPanel({ vendorId }: VendorCategoriesPanelProps) 
 			)}
 
 			<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-				<Select value={pickId || "__none__"} onValueChange={(v) => setPickId(v === "__none__" ? "" : v)}>
+				<Select
+					value={pickId || "__none__"}
+					onValueChange={(v) => setPickId(v === "__none__" ? "" : v)}
+				>
 					<SelectTrigger className="h-9 flex-1">
 						<SelectValue placeholder="Select category" />
 					</SelectTrigger>
@@ -178,7 +183,9 @@ export function VendorCategoriesPanel({ vendorId }: VendorCategoriesPanelProps) 
 					type="button"
 					size="sm"
 					className="h-9"
-					disabled={!pickId || createMutation.isPending || available.length === 0}
+					disabled={
+						!pickId || createMutation.isPending || available.length === 0
+					}
 					onClick={() => void handleAdd()}
 				>
 					{createMutation.isPending ? (

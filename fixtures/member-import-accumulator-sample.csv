@@ -1,0 +1,5 @@
+Cardholder ID,Person Code,Patient First Name,Patient Last Name,Patient Date Of Birth,Gender,Patient Relationship Code,Client ID,Phone,Amount Applied To Deductible,Amount Applied To OOP
+ACC-30021,01,Priya,Shah,1986-07-14,F,18,ACC-10,(410) 555-0188,250.00,250.00
+ACC-30022,01,Liam,Ortega,1979-01-25,M,18,ACC-11,(301) 555-0122,100.00,100.00
+ACC-30022,01,Liam,Ortega,1979-01-25,M,18,ACC-11,(301) 555-0122,75.00,75.00
+ACC-30023,02,Mia,Ortega,2012-03-08,F,19,ACC-11,(301) 555-0122,40.00,40.00

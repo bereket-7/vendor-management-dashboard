@@ -91,13 +91,17 @@ export type MedicaidOverviewException = {
 	status: MedicaidExceptionStatus;
 };
 
-export const MEDICAID_OVERVIEW_RECENT_SUBMISSIONS: MedicaidOverviewRecentSubmission[] = [];
+export const MEDICAID_OVERVIEW_RECENT_SUBMISSIONS: MedicaidOverviewRecentSubmission[] =
+	[];
 
-export const MEDICAID_OVERVIEW_ACCEPTANCE_TREND: MedicaidOverviewAcceptanceTrendPoint[] = [];
+export const MEDICAID_OVERVIEW_ACCEPTANCE_TREND: MedicaidOverviewAcceptanceTrendPoint[] =
+	[];
 
-export const MEDICAID_OVERVIEW_REJECTION_DONUT: MedicaidOverviewRejectionDonutSlice[] = [];
+export const MEDICAID_OVERVIEW_REJECTION_DONUT: MedicaidOverviewRejectionDonutSlice[] =
+	[];
 
-export const MEDICAID_OVERVIEW_RECENT_RESPONSES: MedicaidOverviewRecentResponse[] = [];
+export const MEDICAID_OVERVIEW_RECENT_RESPONSES: MedicaidOverviewRecentResponse[] =
+	[];
 
 export const MEDICAID_OVERVIEW_EXCEPTIONS: MedicaidOverviewException[] = [];
 
@@ -266,9 +270,11 @@ export type MedicaidRecentWarning = {
 
 export const MEDICAID_RESPONSE_FILES: MedicaidResponseFile[] = [];
 
-export const MEDICAID_RESPONSE_SUMMARY_TREND: MedicaidResponseSummaryTrendPoint[] = [];
+export const MEDICAID_RESPONSE_SUMMARY_TREND: MedicaidResponseSummaryTrendPoint[] =
+	[];
 
-export const MEDICAID_RESPONSES_BY_STATUS: MedicaidResponsesByStatusSlice[] = [];
+export const MEDICAID_RESPONSES_BY_STATUS: MedicaidResponsesByStatusSlice[] =
+	[];
 
 export const MEDICAID_TOP_ERROR_REASONS: MedicaidTopErrorReason[] = [];
 
@@ -327,9 +333,11 @@ export type MedicaidFindingsTrendPoint = {
 	high: number;
 };
 
-export const MEDICAID_RECENT_AUDIT_ACTIVITIES: MedicaidRecentAuditActivity[] = [];
+export const MEDICAID_RECENT_AUDIT_ACTIVITIES: MedicaidRecentAuditActivity[] =
+	[];
 
-export const MEDICAID_FINDINGS_BY_SEVERITY: MedicaidFindingsBySeveritySlice[] = [];
+export const MEDICAID_FINDINGS_BY_SEVERITY: MedicaidFindingsBySeveritySlice[] =
+	[];
 
 export const MEDICAID_FINDINGS_TREND: MedicaidFindingsTrendPoint[] = [];
 
@@ -361,7 +369,8 @@ export type MedicaidCorrectiveActionsSummarySlice = {
 
 export const MEDICAID_TOP_AUDIT_FINDINGS: MedicaidTopAuditFinding[] = [];
 
-export const MEDICAID_CORRECTIVE_ACTIONS_SUMMARY: MedicaidCorrectiveActionsSummarySlice[] = [];
+export const MEDICAID_CORRECTIVE_ACTIONS_SUMMARY: MedicaidCorrectiveActionsSummarySlice[] =
+	[];
 
 export const MEDICAID_AUDIT_QUICK_ACTIONS = [
 	{
@@ -631,7 +640,8 @@ export type MedicaidExceptionsByStateRow = {
 	pct: number;
 };
 
-export const MEDICAID_EXCEPTIONS_BY_SEVERITY: MedicaidExceptionsBySeveritySlice[] = [];
+export const MEDICAID_EXCEPTIONS_BY_SEVERITY: MedicaidExceptionsBySeveritySlice[] =
+	[];
 
 export const MEDICAID_EXCEPTIONS_TREND: MedicaidExceptionsTrendPoint[] = [];
 
@@ -788,19 +798,25 @@ export type MedicaidValidationTypeBreakdownSlice = {
 	pct: number;
 };
 
-export const MEDICAID_INTERNAL_VALIDATION_DETAILS: MedicaidInternalValidationDetail[] = [];
+export const MEDICAID_INTERNAL_VALIDATION_DETAILS: MedicaidInternalValidationDetail[] =
+	[];
 
-export const MEDICAID_EXTERNAL_VALIDATION_DETAILS: MedicaidExternalValidationDetail[] = [];
+export const MEDICAID_EXTERNAL_VALIDATION_DETAILS: MedicaidExternalValidationDetail[] =
+	[];
 
-export const MEDICAID_VALIDATION_TOP_ERROR_CODES: MedicaidValidationCodeCount[] = [];
+export const MEDICAID_VALIDATION_TOP_ERROR_CODES: MedicaidValidationCodeCount[] =
+	[];
 
 export const MEDICAID_VALIDATION_TREND: MedicaidValidationTrendPoint[] = [];
 
-export const MEDICAID_EXTERNAL_VALIDATION_TREND: MedicaidValidationTrendPoint[] = [];
+export const MEDICAID_EXTERNAL_VALIDATION_TREND: MedicaidValidationTrendPoint[] =
+	[];
 
-export const MEDICAID_EXTERNAL_TOP_REJECTION_CODES: MedicaidValidationCodeCount[] = [];
+export const MEDICAID_EXTERNAL_TOP_REJECTION_CODES: MedicaidValidationCodeCount[] =
+	[];
 
-export const MEDICAID_VALIDATION_TYPE_BREAKDOWN: MedicaidValidationTypeBreakdownSlice[] = [];
+export const MEDICAID_VALIDATION_TYPE_BREAKDOWN: MedicaidValidationTypeBreakdownSlice[] =
+	[];
 
 export const MEDICAID_VALIDATION_QUICK_ACTIONS = [
 	{

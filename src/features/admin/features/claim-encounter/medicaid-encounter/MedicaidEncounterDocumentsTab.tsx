@@ -875,10 +875,8 @@ export function MedicaidEncounterDocumentsTab({
 	);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-	const { documentLibrary, isLoading } = useMedicaidEncounterDocumentLibraryList(
-		programType,
-		period
-	);
+	const { documentLibrary, isLoading } =
+		useMedicaidEncounterDocumentLibraryList(programType, period);
 	const docKpis = deriveDocumentKpis(documentLibrary);
 
 	const rows = useMemo(

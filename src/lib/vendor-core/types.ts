@@ -437,7 +437,11 @@ export type ConnectionMethod =
 	| "adf"
 	| (string & {});
 
-export type ConnectionDirection = "inbound" | "outbound" | "both" | (string & {});
+export type ConnectionDirection =
+	| "inbound"
+	| "outbound"
+	| "both"
+	| (string & {});
 
 export type ConnectionEnvironment =
 	| "development"
@@ -1972,7 +1976,17 @@ export type WorkQueueImportResultDto = {
 	error_count: number;
 	created: string[];
 	updated: string[];
-	errors: Record<string, unknown>[];
+	errors: Array<
+		| string
+		| {
+				row?: string | number;
+				line?: string | number;
+				code?: string;
+				field?: string;
+				error?: string;
+				message?: string;
+		  }
+	>;
 };
 
 export type WorkQueueSeedInput = {

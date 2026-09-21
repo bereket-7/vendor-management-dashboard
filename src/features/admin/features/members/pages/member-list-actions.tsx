@@ -1,56 +1,21 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-	useDeleteMemberMutation,
-	useSeedMembersMutation,
-	useVendorCoreVendors,
-} from "@/features/admin/features/members/feature/queries/useMembersQuery";
+import { useDeleteMemberMutation } from "@/features/admin/features/members/feature/queries/useMembersQuery";
 import { Link, useRouter } from "@/i18n/navigation";
-import { isMembersMockEnabled } from "@/lib/mock-mode";
 
 export function MemberDirectoryActions() {
-	const seed = useSeedMembersMutation();
-	const vendorsQ = useVendorCoreVendors();
-	const defaultVendorId = vendorsQ.data?.[0]?.id;
-	const useApi = !isMembersMockEnabled();
-
 	return (
 		<>
-			{useApi ? (
-				<Button
-					variant="outline"
-					size="sm"
-					className="h-9"
-					disabled={seed.isPending}
-					onClick={() =>
-						seed.mutate(
-							{
-								vendor_id: defaultVendorId,
-								count: 2,
-								force: true,
-							},
-							{
-								onSuccess: (res) =>
-									toast.success(
-										res?.created != null
-											? `Seeded ${res.created} member(s)`
-											: "Seed complete"
-									),
-								onError: (err) =>
-									toast.error(
-										err instanceof Error ? err.message : "Seed failed"
-									),
-							}
-						)
-					}
-				>
-					Seed
-				</Button>
-			) : null}
+			<Button variant="outline" size="sm" className="h-9 gap-1.5" asChild>
+				<Link href="/admin/members/import">
+					<Upload className="size-3.5" />
+					Import
+				</Link>
+			</Button>
 			<Button size="sm" className="h-9" asChild>
 				<Link href="/admin/members/new">Add member</Link>
 			</Button>

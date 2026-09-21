@@ -319,10 +319,9 @@ async function main() {
 		const secretRef = `sftp.${mock.code.toLowerCase().replace(/-/g, "_")}.password`;
 
 		let credentialId = null;
-		const existingCreds = await listAll(
-			token,
-			"/api/v1/credentials/"
-		).catch(() => []);
+		const existingCreds = await listAll(token, "/api/v1/credentials/").catch(
+			() => []
+		);
 		const existingCred = existingCreds.find((c) => c.secret_ref === secretRef);
 		if (existingCred) {
 			credentialId = existingCred.id;

@@ -956,7 +956,8 @@ export type MedicareRiskAdjustmentHccCategory = {
 	rate: number;
 };
 
-export const MEDICARE_RISK_ADJUSTMENT_HCC_CATEGORIES: MedicareRiskAdjustmentHccCategory[] = [];
+export const MEDICARE_RISK_ADJUSTMENT_HCC_CATEGORIES: MedicareRiskAdjustmentHccCategory[] =
+	[];
 
 export const MEDICARE_COMPLIANCE_KPIS = {
 	requirementsMet: 0,
@@ -966,7 +967,6 @@ export const MEDICARE_COMPLIANCE_KPIS = {
 	attestationsComplete: 0,
 	attestationsTotal: 0,
 	openGaps: 0,
-
 };
 
 export type MedicareComplianceRequirement = {
@@ -988,9 +988,11 @@ export type MedicareComplianceAttestation = {
 	statusStyle: string;
 };
 
-export const MEDICARE_COMPLIANCE_REQUIREMENTS: MedicareComplianceRequirement[] = [];
+export const MEDICARE_COMPLIANCE_REQUIREMENTS: MedicareComplianceRequirement[] =
+	[];
 
-export const MEDICARE_COMPLIANCE_ATTESTATIONS: MedicareComplianceAttestation[] = [];
+export const MEDICARE_COMPLIANCE_ATTESTATIONS: MedicareComplianceAttestation[] =
+	[];
 
 export type ProgramSubmissionsData =
 	| {

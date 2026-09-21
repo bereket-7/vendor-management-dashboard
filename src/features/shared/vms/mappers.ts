@@ -67,7 +67,8 @@ function mapStatus(status?: string): VendorStatus {
 	if (status && (allowed as string[]).includes(status)) {
 		return status as VendorStatus;
 	}
-	if (status === "approved" || status === "pending_approval") return "under_review";
+	if (status === "approved" || status === "pending_approval")
+		return "under_review";
 	if (status === "draft") return "prospect";
 	return "prospect";
 }
@@ -193,14 +194,16 @@ export function mapDjangoDocument(row: Record<string, unknown>): DocumentModel {
 		id: str(row.id),
 		vendorId: str(row.vendor),
 		vendorName: str(row.vendor_name ?? "Vendor"),
-		type: (str(row.document_type, "other") as DocumentModel["type"]),
+		type: str(row.document_type, "other") as DocumentModel["type"],
 		name: str(row.title),
-		status: (str(row.status, "pending") as DocumentModel["status"]),
+		status: str(row.status, "pending") as DocumentModel["status"],
 		uploadedAt: str(row.created_at, new Date().toISOString()),
 		expiresAt: row.expires_at ? str(row.expires_at) : null,
 		visibility: "both",
 		fileSizeKb:
-			row.size_bytes != null ? Math.round(num(row.size_bytes) / 1024) : undefined,
+			row.size_bytes != null
+				? Math.round(num(row.size_bytes) / 1024)
+				: undefined,
 		version: row.version != null ? num(row.version) : undefined,
 		uploadedBy: row.uploaded_by ? str(row.uploaded_by) : undefined,
 		reviewedBy: row.reviewed_by ? str(row.reviewed_by) : null,
@@ -240,7 +243,7 @@ export function mapDjangoContract(row: Record<string, unknown>): ContractModel {
 		title: str(row.title),
 		vendorId: str(row.vendor),
 		vendorName: str(row.vendor_name ?? "Vendor"),
-		status: (str(row.status, "draft") as ContractModel["status"]),
+		status: str(row.status, "draft") as ContractModel["status"],
 		value: num(row.total_contract_value),
 		currency: str(row.currency, "USD"),
 		startDate: str(row.effective_date, new Date().toISOString().slice(0, 10)),
@@ -253,18 +256,17 @@ export function mapDjangoContract(row: Record<string, unknown>): ContractModel {
 export function mapDjangoRfx(row: Record<string, unknown>): RfxModel {
 	const typeRaw = str(row.rfx_type, "RFP").toUpperCase();
 	const type: RfxModel["type"] =
-		typeRaw === "RFI" || typeRaw === "RFP" || typeRaw === "RFQ" ? typeRaw : "RFP";
+		typeRaw === "RFI" || typeRaw === "RFP" || typeRaw === "RFQ"
+			? typeRaw
+			: "RFP";
 	return {
 		id: str(row.id),
 		number: str(row.reference_number),
 		title: str(row.title),
 		type,
-		status: (str(row.status, "draft") as RfxModel["status"]),
+		status: str(row.status, "draft") as RfxModel["status"],
 		category: str(row.category ?? ""),
-		closesAt: str(
-			row.bid_submission_deadline,
-			new Date().toISOString()
-		),
+		closesAt: str(row.bid_submission_deadline, new Date().toISOString()),
 		invitedVendorIds: [],
 		bidCount: 0,
 		budget: null,
@@ -286,7 +288,7 @@ export function mapDjangoBid(
 		vendorName: str(row.vendor_name ?? "Vendor"),
 		amount: num(row.amount ?? row.total_amount),
 		currency: str(row.currency, "USD"),
-		status: (str(row.status, "submitted") as BidModel["status"]),
+		status: str(row.status, "submitted") as BidModel["status"],
 		notes: row.notes ? str(row.notes) : null,
 		submittedAt: row.submitted_at ? str(row.submitted_at) : null,
 	};
@@ -302,7 +304,7 @@ export function mapDjangoPurchaseOrder(
 		vendorName: str(row.vendor_name ?? "Vendor"),
 		contractId: row.contract ? str(row.contract) : null,
 		rfxId: row.rfx ? str(row.rfx) : null,
-		status: (str(row.status, "draft") as PurchaseOrderModel["status"]),
+		status: str(row.status, "draft") as PurchaseOrderModel["status"],
 		currency: str(row.currency, "USD"),
 		total: num(row.total_amount ?? row.total),
 		lines: [],
@@ -320,12 +322,15 @@ export function mapDjangoInvoice(row: Record<string, unknown>): InvoiceModel {
 		vendorName: str(row.vendor_name ?? "Vendor"),
 		poId: row.purchase_order ? str(row.purchase_order) : null,
 		poNumber: row.po_number ? str(row.po_number) : null,
-		status: (str(row.status, "submitted") as InvoiceModel["status"]),
+		status: str(row.status, "submitted") as InvoiceModel["status"],
 		amount: num(row.amount ?? row.total_amount),
 		currency: str(row.currency, "USD"),
 		matchScore: row.match_score != null ? num(row.match_score) : null,
 		submittedAt: row.submitted_at ? str(row.submitted_at) : null,
-		dueDate: str(row.due_date ?? row.updated_at, new Date().toISOString().slice(0, 10)),
+		dueDate: str(
+			row.due_date ?? row.updated_at,
+			new Date().toISOString().slice(0, 10)
+		),
 		updatedAt: str(row.updated_at, new Date().toISOString()),
 	};
 }
@@ -347,13 +352,15 @@ export function mapDjangoApproval(
 		title: str(row.title ?? row.subject, "Approval"),
 		entityId: str(row.entity_id ?? row.related_entity_id ?? row.id),
 		vendorName: str(row.vendor_name ?? ""),
-		status: (str(row.status, "pending") as ApprovalRequestModel["status"]),
+		status: str(row.status, "pending") as ApprovalRequestModel["status"],
 		requestedBy: str(row.requested_by ?? ""),
 		requestedAt: str(row.created_at, new Date().toISOString()),
 	};
 }
 
-export function mapDjangoScorecard(row: Record<string, unknown>): ScorecardModel {
+export function mapDjangoScorecard(
+	row: Record<string, unknown>
+): ScorecardModel {
 	return {
 		id: str(row.id),
 		vendorId: str(row.vendor),

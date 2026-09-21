@@ -6,16 +6,16 @@ import {
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import {
+	scheduleForWeek,
+	scheduleListGroups,
+} from "@/features/admin/features/claim-encounter/compliance-calendar/feature/mappers/compliance-calendarMappers";
+import {
 	COMPLIANCE_PROGRAM_COLORS,
 	COMPLIANCE_PROGRAM_LABELS,
 	type CalendarScheduleItem,
 	complianceProgramPillClass,
 	complianceStatusPillClass,
 } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
-import {
-	scheduleForWeek,
-	scheduleListGroups,
-} from "@/features/admin/features/claim-encounter/compliance-calendar/feature/mappers/compliance-calendarMappers";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
@@ -175,7 +175,12 @@ export function ComplianceCalendarListView({
 										<td className="py-2 text-muted-foreground">{item.owner}</td>
 										<td className="py-2 text-right">
 											{item.obligationId ? (
-												<Button asChild variant="ghost" size="sm" className="h-7 text-xs">
+												<Button
+													asChild
+													variant="ghost"
+													size="sm"
+													className="h-7 text-xs"
+												>
 													<Link
 														href={`/admin/claim-encounter/regulatory/compliance-calendar/${item.obligationId}`}
 													>

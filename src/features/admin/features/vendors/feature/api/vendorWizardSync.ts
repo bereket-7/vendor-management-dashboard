@@ -4,10 +4,7 @@ import type {
 	VendorIntegrationProfileUpdateInput,
 } from "@/lib/vendor-core/types";
 
-import {
-	defaultSftpPortForHost,
-	isLocalSftpHost,
-} from "../../connection-form";
+import { defaultSftpPortForHost, isLocalSftpHost } from "../../connection-form";
 import type { VendorWizardValues } from "../types/vendorWizardTypes";
 import {
 	createIntakeJob,
@@ -67,12 +64,12 @@ function hasIntegrationPatch(values: VendorWizardValues): boolean {
 	const profile = values.integration;
 	return Boolean(
 		profile.timezone.trim() ||
-			profile.transmission_method.trim() ||
-			profile.encryption.trim() ||
-			profile.file_formats.trim() ||
-			profile.trading_partner_id.trim() ||
-			profile.protocol.trim() ||
-			profile.notes.trim()
+		profile.transmission_method.trim() ||
+		profile.encryption.trim() ||
+		profile.file_formats.trim() ||
+		profile.trading_partner_id.trim() ||
+		profile.protocol.trim() ||
+		profile.notes.trim()
 	);
 }
 
@@ -156,7 +153,9 @@ function buildWizardConnectionConfig(
 	return config;
 }
 
-function wizardConnectionStatus(values: VendorWizardValues): "active" | "draft" {
+function wizardConnectionStatus(
+	values: VendorWizardValues
+): "active" | "draft" {
 	const c = values.connection;
 	if (c.method === "sftp_hosted") {
 		return c.landing_user.trim() ? "active" : "draft";
@@ -349,10 +348,7 @@ export async function syncVendorWizardExtras(
 				message:
 					"Pick a password credential or register name + secret_ref before creating the connection.",
 			});
-		} else if (
-			needsAuth &&
-			!values.connection.host_key_fingerprint.trim()
-		) {
+		} else if (needsAuth && !values.connection.host_key_fingerprint.trim()) {
 			failures.push({
 				section: "connection",
 				label: values.connection.name.trim(),

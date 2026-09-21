@@ -174,7 +174,12 @@ function InternalValidationSummaryPanel({
 	kpis,
 }: {
 	programType?: ProgramType;
-	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
+	kpis?: {
+		filesReceived: number;
+		accepted: number;
+		errors: number;
+		warnings: number;
+	};
 }) {
 	const files = kpis?.filesReceived ?? 0;
 	const passed = kpis?.accepted ?? 0;
@@ -241,7 +246,12 @@ function ExternalValidationSummaryPanel({
 	kpis,
 }: {
 	programType?: ProgramType;
-	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
+	kpis?: {
+		filesReceived: number;
+		accepted: number;
+		errors: number;
+		warnings: number;
+	};
 }) {
 	const files = kpis?.filesReceived ?? 0;
 	const passed = kpis?.accepted ?? 0;
@@ -856,7 +866,12 @@ function InternalValidationView({
 	programType?: ProgramType;
 	topErrorCodes?: typeof MEDICAID_VALIDATION_TOP_ERROR_CODES;
 	trend?: typeof MEDICAID_VALIDATION_TREND;
-	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
+	kpis?: {
+		filesReceived: number;
+		accepted: number;
+		errors: number;
+		warnings: number;
+	};
 }) {
 	return (
 		<div className={VALIDATION_PAGE_STACK}>
@@ -889,7 +904,12 @@ function ExternalValidationView({
 	programType?: ProgramType;
 	topErrorCodes?: typeof MEDICAID_EXTERNAL_TOP_REJECTION_CODES;
 	trend?: typeof MEDICAID_EXTERNAL_VALIDATION_TREND;
-	kpis?: { filesReceived: number; accepted: number; errors: number; warnings: number };
+	kpis?: {
+		filesReceived: number;
+		accepted: number;
+		errors: number;
+		warnings: number;
+	};
 }) {
 	const isMedicare = programType === "medicare";
 
@@ -934,7 +954,8 @@ export function MedicaidEncounterValidationTab({
 }: { programType?: ProgramType; reportingPeriod?: string } = {}) {
 	const [subTab, setSubTab] = useState<ValidationSubTab>("internal");
 	const isMedicare = programType === "medicare";
-	const validationQuery = useMedicaidEncounterValidationDerivedQuery(programType);
+	const validationQuery =
+		useMedicaidEncounterValidationDerivedQuery(programType);
 	const derivedTop = validationQuery.data?.topErrorCodes ?? [];
 	const derivedTrend = validationQuery.data?.trend ?? [];
 	const derivedExternalTop = derivedTop;

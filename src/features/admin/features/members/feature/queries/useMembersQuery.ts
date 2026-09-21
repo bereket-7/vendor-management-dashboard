@@ -32,6 +32,7 @@ import {
 	getMemberFamilyLink,
 	getMemberSourceRecord,
 	hardDeleteMember,
+	importMembersBulk,
 	listAccumulatorFiles,
 	listAccumulatorRows,
 	listMemberAccumulators,
@@ -363,6 +364,13 @@ export function useCreateMemberMutation() {
 	});
 }
 
+export function useImportMembersBulkMutation() {
+	return useVendorCoreFeatureMutation(domain, {
+		mutationFn: (input: Parameters<typeof importMembersBulk>[0]) =>
+			importMembersBulk(input),
+	});
+}
+
 export function useUpdateMemberMutation() {
 	const queryClient = useQueryClient();
 	return useVendorCoreFeatureMutation(domain, {
@@ -471,12 +479,8 @@ export function useMemberCoveragesQuery() {
 }
 
 export function useMemberVendorsQuery() {
-	return useVendorCoreFeatureQuery(
-		domain,
-		"vendors",
-		listMemberVendors,
-		apiOnly
-	);
+	// Always fetch when session allows — vendors are live even if member fixtures are on.
+	return useVendorCoreFeatureQuery(domain, "vendors", listMemberVendors, true);
 }
 
 export function useMemberSummariesList(filters?: MemberListQuery) {

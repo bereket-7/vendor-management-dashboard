@@ -1,15 +1,4 @@
 import type {
-	PdeReconciliationDto,
-	ProgramAuditDto,
-	ProgramDocumentDto,
-	ProgramExceptionDto,
-	ProgramOverviewDto,
-	ProgramResponseDto,
-	ProgramSubmissionDto,
-	ProgramTypeDto,
-} from "@/lib/vendor-reporting/program-reporting";
-
-import type {
 	MedicaidDocumentFileKind,
 	MedicaidDocumentRow,
 	MedicaidDocumentStatus,
@@ -24,6 +13,17 @@ import type {
 	MedicarePartDSubmissionStatus,
 	MedicarePartDSubmissionType,
 } from "@/features/admin/features/claim-encounter/medicare-reporting/mock-data";
+import type {
+	PdeReconciliationDto,
+	ProgramAuditDto,
+	ProgramDocumentDto,
+	ProgramExceptionDto,
+	ProgramOverviewDto,
+	ProgramResponseDto,
+	ProgramSubmissionDto,
+	ProgramTypeDto,
+} from "@/lib/vendor-reporting/program-reporting";
+
 import type {
 	AuditStatus,
 	ExceptionStatus,
@@ -248,9 +248,9 @@ function asSubmissionStatus(value: string): SubmissionStatus {
 	];
 	const normalized =
 		value === "In Progress" || value === "In Process" ? "In-Progress" : value;
-	return (allowed.includes(normalized as SubmissionStatus)
-		? normalized
-		: "Pending") as SubmissionStatus;
+	return (
+		allowed.includes(normalized as SubmissionStatus) ? normalized : "Pending"
+	) as SubmissionStatus;
 }
 
 function asMedicareSubmissionStatus(value: string): MedicareSubmissionStatus {
@@ -297,7 +297,11 @@ function asExceptionStatus(value: string): ExceptionStatus {
 }
 
 function asAuditStatus(value: string): AuditStatus {
-	if (value === "Completed" || value === "In Progress" || value === "Scheduled") {
+	if (
+		value === "Completed" ||
+		value === "In Progress" ||
+		value === "Scheduled"
+	) {
 		return value;
 	}
 	if (value === "Closed" || value === "Done") return "Completed";
@@ -367,10 +371,7 @@ export function mapOverviewDto(
 		const errors = num(recordField(row, "errors"));
 		return {
 			id: str(recordField(row, "id"), `r-${i}`),
-			file: str(
-				recordField(row, "responseFile", "response_file", "file"),
-				"—"
-			),
+			file: str(recordField(row, "responseFile", "response_file", "file"), "—"),
 			reportType: str(recordField(row, "reportType", "report_type"), "—"),
 			receivedDate: formatDisplayDate(
 				str(recordField(row, "receivedAt", "received_at"), "")
@@ -662,9 +663,10 @@ export function mapSubmissionsToProgramSubmissionsData(
 	programType: ProgramType
 ): ProgramSubmissionsData {
 	if (programType === "medicare") {
-		const kpis = overview.kpis.kind === "medicare"
-			? overview.kpis
-			: emptyOverview("medicare").kpis;
+		const kpis =
+			overview.kpis.kind === "medicare"
+				? overview.kpis
+				: emptyOverview("medicare").kpis;
 		const rows = submissions.map((s) => ({
 			id: s.id,
 			reportType: s.reportType || "—",
@@ -706,9 +708,10 @@ export function mapSubmissionsToProgramSubmissionsData(
 		};
 	}
 
-	const kpis = overview.kpis.kind === "medicaid"
-		? overview.kpis
-		: emptyOverview("medicaid").kpis;
+	const kpis =
+		overview.kpis.kind === "medicaid"
+			? overview.kpis
+			: emptyOverview("medicaid").kpis;
 	const rows = submissions.map((s) => ({
 		id: s.id,
 		batch: s.batch || "—",
@@ -769,7 +772,13 @@ export function emptyAudit(programType: ProgramType): ProgramAuditData {
 
 function asDocFileKind(value: string): MedicaidDocumentFileKind {
 	const v = value.toLowerCase().replace(/^\./, "");
-	if (v === "dat" || v === "rsp" || v === "pdf" || v === "xlsx" || v === "txt") {
+	if (
+		v === "dat" ||
+		v === "rsp" ||
+		v === "pdf" ||
+		v === "xlsx" ||
+		v === "txt"
+	) {
 		return v;
 	}
 	return "pdf";
@@ -1015,10 +1024,8 @@ export function getAcceptanceDerived(
 				"encounterFilesSubmitted" in k ? num(k.encounterFilesSubmitted) : 0,
 			reportsAccepted: "accepted" in k ? num(k.accepted) : 0,
 			reportsRejected: "rejected" in k ? num(k.rejected) : 0,
-			responsesPending:
-				"pendingResponses" in k ? num(k.pendingResponses) : 0,
-			openIssues: overview.exceptions.filter((e) => e.status === "Open")
-				.length,
+			responsesPending: "pendingResponses" in k ? num(k.pendingResponses) : 0,
+			openIssues: overview.exceptions.filter((e) => e.status === "Open").length,
 		},
 		acceptanceTrend: overview.acceptanceTrend.map((row) => ({
 			month: row.month,
@@ -1032,7 +1039,8 @@ export function getAcceptanceDerived(
 /* ——— Medicare Part D ——— */
 
 export function isPartDSubmission(dto: ProgramSubmissionDto): boolean {
-	const hay = `${dto.reportType} ${dto.submissionKind} ${dto.fileName}`.toLowerCase();
+	const hay =
+		`${dto.reportType} ${dto.submissionKind} ${dto.fileName}`.toLowerCase();
 	return hay.includes("pde") || hay.includes("part d") || hay.includes("partd");
 }
 

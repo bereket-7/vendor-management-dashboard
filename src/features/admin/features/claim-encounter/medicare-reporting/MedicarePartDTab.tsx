@@ -933,7 +933,10 @@ export function MedicarePartDTab({
 			>
 				<PdeSubmissionHistoryPanel submissions={partDSubmissions} />
 				<CmsResponseFilesPanel
-					rows={(responsesQuery.data?.items ?? []) as typeof MEDICARE_PART_D_RESPONSES}
+					rows={
+						(responsesQuery.data?.items ??
+							[]) as typeof MEDICARE_PART_D_RESPONSES
+					}
 				/>
 			</div>
 
@@ -944,9 +947,7 @@ export function MedicarePartDTab({
 				)}
 			>
 				<ValidationErrorDetailsPanel />
-				<ReconciliationStatusPanel
-					rows={reconQuery.data?.items ?? []}
-				/>
+				<ReconciliationStatusPanel rows={reconQuery.data?.items ?? []} />
 			</div>
 
 			<div

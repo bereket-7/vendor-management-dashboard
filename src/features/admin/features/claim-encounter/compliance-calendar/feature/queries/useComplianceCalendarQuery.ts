@@ -6,13 +6,13 @@ import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 import type { ComplianceObligationWrite } from "@/lib/vendor-reporting/compliance-calendar";
 
 import {
+	type ObligationListFilters,
 	createObligation,
 	getCalendarBundle,
 	getObligationDetail,
 	listObligations,
 	listUpcomingDeadlines,
 	updateObligation,
-	type ObligationListFilters,
 } from "../api/compliance-calendarApi";
 
 const domain = "compliance-calendar";

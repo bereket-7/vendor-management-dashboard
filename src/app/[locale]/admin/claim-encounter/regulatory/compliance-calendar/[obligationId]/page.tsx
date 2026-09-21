@@ -1,8 +1,7 @@
 "use client";
 
-import { use } from "react";
-
 import { notFound } from "next/navigation";
+import { use } from "react";
 
 import { ComplianceObligationDetailPage } from "@/features/admin/features/claim-encounter/compliance-calendar/ComplianceObligationDetailPage";
 import { useComplianceObligationDetailQuery } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";

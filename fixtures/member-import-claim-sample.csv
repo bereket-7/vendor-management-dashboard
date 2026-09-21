@@ -1,0 +1,5 @@
+CardholderID,PersonCode,PatientFirstName,PatientLastName,DateOfBirth,Gender,GroupID,ClaimNo,Phone,DateOfService,DrugName
+CLM-20011,01,Jordan,Patel,1991-02-18,M,CL-900,RX-778201,(703) 555-0199,2026-01-12,Atorvastatin 20mg
+CLM-20011,01,Jordan,Patel,1991-02-18,M,CL-900,RX-778202,(703) 555-0199,2026-02-10,Atorvastatin 20mg
+CLM-20012,01,Elena,Brooks,1984-09-30,F,CL-901,RX-778255,(240) 555-0177,2026-01-18,Metformin 500mg
+CLM-20013,01,Noah,Kim,1999-12-01,M,CL-902,RX-778301,(202) 555-0166,2026-03-02,Lisinopril 10mg

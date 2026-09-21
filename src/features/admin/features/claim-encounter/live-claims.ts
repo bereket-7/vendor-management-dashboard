@@ -152,12 +152,13 @@ export function claimVendorFileDtosToFiles(
 		const rejected = num(row.rejected_count);
 		const accepted = Math.max(claimCount - rejected, 0);
 		const statusRaw = str(row.status, "pending").toLowerCase();
-		const reviewStatus: ClaimVendorFile["reviewStatus"] =
-			statusRaw.includes("reject")
-				? "rejected"
-				: statusRaw.includes("accept") || statusRaw.includes("complete")
-					? "accepted"
-					: "pending";
+		const reviewStatus: ClaimVendorFile["reviewStatus"] = statusRaw.includes(
+			"reject"
+		)
+			? "rejected"
+			: statusRaw.includes("accept") || statusRaw.includes("complete")
+				? "accepted"
+				: "pending";
 		const fileStatus: ClaimVendorFile["status"] =
 			reviewStatus === "rejected"
 				? "rejected"
@@ -228,7 +229,10 @@ export function claimResponseDtosToResponses(
 			program,
 			claimType: "Professional Claim",
 			responseType,
-			receivedAt: str(row.received_at ?? row.created_at, new Date().toISOString()),
+			receivedAt: str(
+				row.received_at ?? row.created_at,
+				new Date().toISOString()
+			),
 			totalSubmitted: accepted + rejected,
 			paid: accepted,
 			rejected,
@@ -306,4 +310,3 @@ export function claimExceptionDtosToExceptions(
 		};
 	});
 }
-

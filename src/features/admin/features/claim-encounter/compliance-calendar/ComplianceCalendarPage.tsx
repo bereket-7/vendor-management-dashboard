@@ -150,7 +150,11 @@ function ProgramSummaryChart({
 	summary,
 	total,
 }: {
-	summary: Array<{ key: Exclude<ComplianceProgramKey, "overdue">; count: number; pct: string }>;
+	summary: Array<{
+		key: Exclude<ComplianceProgramKey, "overdue">;
+		count: number;
+		pct: string;
+	}>;
 	total: number;
 }) {
 	const chartData = summary.map((item) => ({
@@ -243,17 +247,17 @@ export function ComplianceCalendarPage() {
 	}, [data?.obligations, filterProgram, filterStatus]);
 
 	const grid = buildMonthGrid(cursor.year, cursor.monthIndex);
-	const monthLabel = new Date(cursor.year, cursor.monthIndex, 1).toLocaleDateString(
-		"en-US",
-		{ month: "long", year: "numeric" }
-	);
+	const monthLabel = new Date(
+		cursor.year,
+		cursor.monthIndex,
+		1
+	).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 	const anchor = new Date(
 		cursor.year,
 		cursor.monthIndex,
 		Math.min(now.getDate(), 28)
 	);
-	const periodLabel =
-		view === "week" ? weekLabel(anchor) : monthLabel;
+	const periodLabel = view === "week" ? weekLabel(anchor) : monthLabel;
 
 	async function handleAddObligation() {
 		try {
@@ -294,9 +298,7 @@ export function ComplianceCalendarPage() {
 						</span>
 						<Select
 							value={filterProgram === "All" ? "all" : filterProgram}
-							onValueChange={(v) =>
-								setFilterProgram(v === "all" ? "All" : v)
-							}
+							onValueChange={(v) => setFilterProgram(v === "all" ? "All" : v)}
 						>
 							<SelectTrigger className="h-9 w-[140px] bg-card text-xs shadow-sm">
 								<SelectValue />
@@ -524,9 +526,7 @@ export function ComplianceCalendarPage() {
 										day={cell.day}
 										inMonth={cell.inMonth}
 										isToday={cell.isToday}
-										events={
-											cell.inMonth ? (eventsByDay[cell.day] ?? []) : []
-										}
+										events={cell.inMonth ? (eventsByDay[cell.day] ?? []) : []}
 									/>
 								))}
 							</div>
