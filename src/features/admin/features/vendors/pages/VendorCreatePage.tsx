@@ -104,8 +104,7 @@ function VendorCreateForm() {
 
 			await invalidateVendorCore();
 
-			const sftpFailed =
-				syncResult.sftpAttempted && !syncResult.sftpConnected;
+			const sftpFailed = syncResult.sftpAttempted && !syncResult.sftpConnected;
 			const connectionFailures = syncResult.failures.filter(
 				(f) => f.section === "connection"
 			);
@@ -121,9 +120,7 @@ function VendorCreateForm() {
 					`Vendor created but SFTP is not connected: ${detail}. Fix on Configuration.`
 				);
 				if (otherFailures.length > 0) {
-					toast.warning(
-						`Also: ${formatWizardSyncFailures(otherFailures)}`
-					);
+					toast.warning(`Also: ${formatWizardSyncFailures(otherFailures)}`);
 				}
 			} else if (syncResult.failures.length > 0) {
 				const summary = formatWizardSyncFailures(syncResult.failures);

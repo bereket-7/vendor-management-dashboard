@@ -22,16 +22,9 @@ const PROGRAMS = new Set([
 	"other",
 ]);
 
-const STATUSES = new Set([
-	"Overdue",
-	"At Risk",
-	"Upcoming",
-	"Completed",
-]);
+const STATUSES = new Set(["Overdue", "At Risk", "Upcoming", "Completed"]);
 
-function asProgram(
-	value: string
-): Exclude<ComplianceProgramKey, "overdue"> {
+function asProgram(value: string): Exclude<ComplianceProgramKey, "overdue"> {
 	return PROGRAMS.has(value)
 		? (value as Exclude<ComplianceProgramKey, "overdue">)
 		: "other";
@@ -89,9 +82,7 @@ export function mapObligationDtoToDetail(
 	const docs = Array.isArray(dto.documents) ? dto.documents : [];
 	const activity = Array.isArray(dto.activity) ? dto.activity : [];
 	const priority =
-		dto.priority === "High" || dto.priority === "Low"
-			? dto.priority
-			: "Medium";
+		dto.priority === "High" || dto.priority === "Low" ? dto.priority : "Medium";
 
 	return {
 		...row,
@@ -100,9 +91,7 @@ export function mapObligationDtoToDetail(
 		internalDueDate: formatDueDateDisplay(dto.internalDueDate),
 		priority,
 		regulatoryReference: dto.regulatoryReference || "—",
-		lastUpdated: dto.updatedAt
-			? formatDueDateDisplay(dto.updatedAt)
-			: "—",
+		lastUpdated: dto.updatedAt ? formatDueDateDisplay(dto.updatedAt) : "—",
 		description: dto.description || "",
 		notes: dto.notes || "",
 		relatedSubmission: dto.relatedSubmission || "—",
@@ -117,9 +106,7 @@ export function mapObligationDtoToDetail(
 				id: String(d.id ?? `doc-${i}`),
 				title: String(d.title ?? d.name ?? "Document"),
 				meta: String(d.meta ?? d.fileSize ?? d.size ?? ""),
-				iconTone: String(
-					d.iconTone ?? "border-sky-200 bg-sky-50 text-sky-700"
-				),
+				iconTone: String(d.iconTone ?? "border-sky-200 bg-sky-50 text-sky-700"),
 			};
 		}),
 		activity: activity.map((item, i) => {
@@ -234,7 +221,11 @@ export function obligationRowsToSchedule(
 	});
 }
 
-export function buildMonthGrid(year: number, monthIndex: number, today = new Date()) {
+export function buildMonthGrid(
+	year: number,
+	monthIndex: number,
+	today = new Date()
+) {
 	const firstDay = new Date(year, monthIndex, 1).getDay();
 	const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 	const prevMonthDays = new Date(year, monthIndex, 0).getDate();
@@ -261,7 +252,13 @@ export function buildMonthGrid(year: number, monthIndex: number, today = new Dat
 }
 
 export function programSummaryFromRows(rows: ComplianceObligationRow[]) {
-	const keys = ["cms-edge", "medicaid", "medicare", "quality", "other"] as const;
+	const keys = [
+		"cms-edge",
+		"medicaid",
+		"medicare",
+		"quality",
+		"other",
+	] as const;
 	const total = Math.max(rows.length, 1);
 	return keys.map((key) => {
 		const count = rows.filter((r) => r.program === key).length;
@@ -285,13 +282,17 @@ export function labelToProgramFilter(label: string): string | undefined {
 	return map[label];
 }
 
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEKDAY_LABELS = [
+	"Sun",
+	"Mon",
+	"Tue",
+	"Wed",
+	"Thu",
+	"Fri",
+	"Sat",
+] as const;
 
-export function buildWeekDays(
-	anchor: Date,
-	monthIndex: number,
-	year: number
-) {
+export function buildWeekDays(anchor: Date, monthIndex: number, year: number) {
 	const start = new Date(anchor);
 	start.setDate(anchor.getDate() - anchor.getDay());
 	const today = new Date();
@@ -306,7 +307,8 @@ export function buildWeekDays(
 			day: date.getDate(),
 			month: date.getMonth(),
 			year: date.getFullYear(),
-			inCurrentMonth: date.getMonth() === monthIndex && date.getFullYear() === year,
+			inCurrentMonth:
+				date.getMonth() === monthIndex && date.getFullYear() === year,
 			isToday:
 				date.getFullYear() === today.getFullYear() &&
 				date.getMonth() === today.getMonth() &&

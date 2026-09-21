@@ -1,15 +1,18 @@
 import { apiClient } from "@/lib/api/client";
 import { buildAcceptPath, createVendorInvite } from "@/lib/auth/vendor-invites";
-import { isMockEnabled, isNestApiEnabled, withMockOrRemote } from "@/lib/mock-mode";
+import {
+	isMockEnabled,
+	isNestApiEnabled,
+	withMockOrRemote,
+} from "@/lib/mock-mode";
+import { vendorCoreApi } from "@/lib/vendor-core/api";
 import {
 	VendorCoreApiError,
 	getStoredAccessToken,
 	isVendorCoreLive,
 } from "@/lib/vendor-core/client";
-import { vendorCoreApi } from "@/lib/vendor-core/api";
 
 import { vendorDtoToModel } from "./map-vendor-core";
-import { CURRENT_VENDOR_ID, vmsStore } from "./mock-store";
 import {
 	mapDjangoApproval,
 	mapDjangoBid,
@@ -25,6 +28,7 @@ import {
 	mapDjangoScorecard,
 	mapDjangoTeamMember,
 } from "./mappers";
+import { CURRENT_VENDOR_ID, vmsStore } from "./mock-store";
 import type {
 	ActivityEventModel,
 	ApprovalRequestModel,
@@ -53,17 +57,15 @@ export type VendorInviteResult = {
 	};
 };
 
-function inviteDtoToVendorModel(
-	dto: {
-		id: string;
-		legal_name: string;
-		email: string;
-		categories: string[];
-		vendor_id: string | null;
-		created_at: string;
-		expires_at: string;
-	}
-): VendorModel {
+function inviteDtoToVendorModel(dto: {
+	id: string;
+	legal_name: string;
+	email: string;
+	categories: string[];
+	vendor_id: string | null;
+	created_at: string;
+	expires_at: string;
+}): VendorModel {
 	const now = dto.created_at || new Date().toISOString();
 	return {
 		id: dto.vendor_id ?? dto.id,
@@ -197,8 +199,7 @@ export const vmsApi = {
 		if (isMockEnabled()) return mockDelay(vmsStore.createVendor(input));
 		if (isVendorCoreLive()) {
 			const code =
-				input.tags?.[0]?.trim() ||
-				`VND-${Date.now().toString().slice(-8)}`;
+				input.tags?.[0]?.trim() || `VND-${Date.now().toString().slice(-8)}`;
 			const dto = await vendorCoreApi.createVendor({
 				vendor_code: code,
 				legal_name: input.legalName,
@@ -383,9 +384,9 @@ export const vmsApi = {
 			);
 		}
 		if (isNestApiEnabled()) {
-			return apiClient<VendorCategoryModel[] | { results?: VendorCategoryModel[] }>(
-				vmsPaths.categories
-			).then(unwrapList);
+			return apiClient<
+				VendorCategoryModel[] | { results?: VendorCategoryModel[] }
+			>(vmsPaths.categories).then(unwrapList);
 		}
 		return [];
 	},
@@ -396,9 +397,9 @@ export const vmsApi = {
 			return (page.results ?? []).map(mapDjangoOnboarding);
 		}
 		if (isNestApiEnabled()) {
-			return apiClient<OnboardingCaseModel[] | { results?: OnboardingCaseModel[] }>(
-				vmsPaths.onboarding
-			).then(unwrapList);
+			return apiClient<
+				OnboardingCaseModel[] | { results?: OnboardingCaseModel[] }
+			>(vmsPaths.onboarding).then(unwrapList);
 		}
 		return [];
 	},
@@ -597,9 +598,9 @@ export const vmsApi = {
 			return (page.results ?? []).map(mapDjangoRfx);
 		}
 		if (isNestApiEnabled()) {
-			return apiClient<RfxModel[] | { results?: RfxModel[] }>(vmsPaths.rfx).then(
-				unwrapList
-			);
+			return apiClient<RfxModel[] | { results?: RfxModel[] }>(
+				vmsPaths.rfx
+			).then(unwrapList);
 		}
 		return [];
 	},
@@ -696,7 +697,8 @@ export const vmsApi = {
 		throw new Error("Bid submit unavailable");
 	},
 	async listPurchaseOrders(vendorId?: string) {
-		if (isMockEnabled()) return mockDelay(vmsStore.listPurchaseOrders(vendorId));
+		if (isMockEnabled())
+			return mockDelay(vmsStore.listPurchaseOrders(vendorId));
 		if (isVendorCoreLive()) {
 			const page = await vendorCoreApi.listPurchaseOrders(
 				vendorId ? { vendor_id: vendorId } : undefined
@@ -704,10 +706,11 @@ export const vmsApi = {
 			return (page.results ?? []).map(mapDjangoPurchaseOrder);
 		}
 		if (isNestApiEnabled()) {
-			return apiClient<PurchaseOrderModel[] | { results?: PurchaseOrderModel[] }>(
-				vmsPaths.purchaseOrders,
-				{ params: vendorId ? { vendorId } : undefined }
-			).then(unwrapList);
+			return apiClient<
+				PurchaseOrderModel[] | { results?: PurchaseOrderModel[] }
+			>(vmsPaths.purchaseOrders, {
+				params: vendorId ? { vendorId } : undefined,
+			}).then(unwrapList);
 		}
 		return [];
 	},
@@ -936,7 +939,8 @@ export const vmsApi = {
 		return [];
 	},
 	async getCurrentVendor() {
-		if (isMockEnabled()) return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
+		if (isMockEnabled())
+			return mockDelay(vmsStore.getVendor(CURRENT_VENDOR_ID));
 		if (isVendorCoreLive()) {
 			const raw = await vendorCoreApi.getVendorMe();
 			const legalName = String(raw.legal_name ?? raw.name ?? "");
@@ -1229,5 +1233,4 @@ export const vmsApi = {
 		const row = await vendorCoreApi.updateCertificate(id, patch);
 		return mapDjangoCertificate(row as Record<string, unknown>);
 	},
-
 };

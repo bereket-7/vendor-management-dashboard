@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
+import { featureQueryKey } from "@/features/admin/shared/feature-contract";
 
 import {
 	getValidationDerivedFromLive,

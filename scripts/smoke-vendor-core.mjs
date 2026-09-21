@@ -216,7 +216,10 @@ if (USER && PASS) {
 			return `HTTP ${res.status}, count=${count}`;
 		});
 		await check("member-coverages with token", async () => {
-			const { res, body } = await get("/api/v1/member-coverages/?limit=5", auth);
+			const { res, body } = await get(
+				"/api/v1/member-coverages/?limit=5",
+				auth
+			);
 			if (!res.ok) {
 				throw new Error(`HTTP ${res.status}: ${body?.message ?? "failed"}`);
 			}

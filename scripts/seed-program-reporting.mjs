@@ -173,8 +173,16 @@ function buildObligations() {
 				{ name: "PBP_001_PDE.xml", kind: "xml" },
 			],
 			activity: [
-				{ at: "2027-06-10", actor: "Pharmacy Ops", note: "Draft file packaged" },
-				{ at: "2027-06-12", actor: "Compliance", note: "Pre-submission QA passed" },
+				{
+					at: "2027-06-10",
+					actor: "Pharmacy Ops",
+					note: "Draft file packaged",
+				},
+				{
+					at: "2027-06-12",
+					actor: "Compliance",
+					note: "Pre-submission QA passed",
+				},
 			],
 		},
 		{
@@ -190,7 +198,9 @@ function buildObligations() {
 			reportingPeriod: PERIOD_Q2,
 			description: "Quarterly Medicare Advantage encounter submission window.",
 			documents: [{ name: "EDS_Q2_2027_plan.pdf", kind: "pdf" }],
-			activity: [{ at: "2027-06-01", actor: "Claims Ops", note: "Batch build started" }],
+			activity: [
+				{ at: "2027-06-01", actor: "Claims Ops", note: "Batch build started" },
+			],
 		},
 		{
 			title: "Risk adjustment data submission (RAPS/EDS)",
@@ -358,7 +368,9 @@ function buildObligations() {
 			reportingPeriod: PERIOD_Q4,
 			description: "Confirm PDE artifacts retained per policy.",
 			status: "Completed",
-			activity: [{ at: "2027-01-10", actor: "Compliance", note: "Retention verified" }],
+			activity: [
+				{ at: "2027-01-10", actor: "Compliance", note: "Retention verified" },
+			],
 		},
 		{
 			title: "Medicaid provider roster quarterly",
@@ -460,22 +472,135 @@ async function main() {
 
 	// ——— Program submissions ———
 	console.log("\n== Program submissions ==");
-	const existingSubs = await listAll(token, "/api/v1/program-submissions/list/");
+	const existingSubs = await listAll(
+		token,
+		"/api/v1/program-submissions/list/"
+	);
 	const subByFile = new Map(existingSubs.map((s) => [s.fileName, s]));
 	const subByBatch = new Map(existingSubs.map((s) => [s.batch, s]));
 
 	const medicareSubs = [
-		["PDE_06202027.xml", "Part D (PDE)", "PDE-2027-0620", PERIOD_Q2, "Accepted", 842560, "Regular", "001", 12, "pde.ops"],
-		["PDE_06182027.xml", "Part D (PDE)", "PDE-2027-0618", PERIOD_Q2, "Accepted", 721440, "Regular", "002", 14, "pde.ops"],
-		["PDE_06152027.xml", "Part D (PDE)", "PDE-2027-0615", PERIOD_Q2, "Rejected", 12840, "Backfill", "001", 17, "pde.ops"],
-		["PDE_06122027.xml", "Part D (PDE)", "PDE-2027-0612", PERIOD_Q2, "Accepted", 598220, "Regular", "003", 20, "pde.ops"],
-		["PDE_06082027.xml", "Part D (PDE)", "PDE-2027-0608", PERIOD_Q2, "Pending", 4280, "Backfill", "002", 24, "pde.ops"],
-		["MA_Encounter_Q2_2027_001.xml", "Encounter Data", "EDS-2027-Q2-01", PERIOD_Q2, "Acknowledged", 312400, "Original", "001", 9, "encounter.ops"],
-		["MA_Encounter_Q2_2027_002.xml", "Encounter Data", "EDS-2027-Q2-02", PERIOD_Q2, "Submitted", 288120, "Original", "002", 5, "encounter.ops"],
-		["RAPS_Q2_2027.txt", "Risk Adjustment", "RAPS-2027-Q2", PERIOD_Q2, "Completed", 95600, "Replacement", "001", 18, "ra.ops"],
-		["PDE_Q1_2027_FINAL.xml", "Part D (PDE)", "PDE-2027-Q1-F", PERIOD_Q1, "Accepted", 910200, "Regular", "001", 70, "pde.ops"],
+		[
+			"PDE_06202027.xml",
+			"Part D (PDE)",
+			"PDE-2027-0620",
+			PERIOD_Q2,
+			"Accepted",
+			842560,
+			"Regular",
+			"001",
+			12,
+			"pde.ops",
+		],
+		[
+			"PDE_06182027.xml",
+			"Part D (PDE)",
+			"PDE-2027-0618",
+			PERIOD_Q2,
+			"Accepted",
+			721440,
+			"Regular",
+			"002",
+			14,
+			"pde.ops",
+		],
+		[
+			"PDE_06152027.xml",
+			"Part D (PDE)",
+			"PDE-2027-0615",
+			PERIOD_Q2,
+			"Rejected",
+			12840,
+			"Backfill",
+			"001",
+			17,
+			"pde.ops",
+		],
+		[
+			"PDE_06122027.xml",
+			"Part D (PDE)",
+			"PDE-2027-0612",
+			PERIOD_Q2,
+			"Accepted",
+			598220,
+			"Regular",
+			"003",
+			20,
+			"pde.ops",
+		],
+		[
+			"PDE_06082027.xml",
+			"Part D (PDE)",
+			"PDE-2027-0608",
+			PERIOD_Q2,
+			"Pending",
+			4280,
+			"Backfill",
+			"002",
+			24,
+			"pde.ops",
+		],
+		[
+			"MA_Encounter_Q2_2027_001.xml",
+			"Encounter Data",
+			"EDS-2027-Q2-01",
+			PERIOD_Q2,
+			"Acknowledged",
+			312400,
+			"Original",
+			"001",
+			9,
+			"encounter.ops",
+		],
+		[
+			"MA_Encounter_Q2_2027_002.xml",
+			"Encounter Data",
+			"EDS-2027-Q2-02",
+			PERIOD_Q2,
+			"Submitted",
+			288120,
+			"Original",
+			"002",
+			5,
+			"encounter.ops",
+		],
+		[
+			"RAPS_Q2_2027.txt",
+			"Risk Adjustment",
+			"RAPS-2027-Q2",
+			PERIOD_Q2,
+			"Completed",
+			95600,
+			"Replacement",
+			"001",
+			18,
+			"ra.ops",
+		],
+		[
+			"PDE_Q1_2027_FINAL.xml",
+			"Part D (PDE)",
+			"PDE-2027-Q1-F",
+			PERIOD_Q1,
+			"Accepted",
+			910200,
+			"Regular",
+			"001",
+			70,
+			"pde.ops",
+		],
 	];
-	for (const [fileName, reportType, batch, period, status, records, kind, pbp, days, by] of medicareSubs) {
+	for (const [
+		fileName,
+		reportType,
+		batch,
+		period,
+		status,
+		records,
+		kind,
+		pbp,
+		days,
+		by,
+	] of medicareSubs) {
 		const created = await createIfMissing({
 			token,
 			label: "medicare-sub",
@@ -500,13 +625,73 @@ async function main() {
 	}
 
 	const medicaidSubs = [
-		["DC_Encounter_Q2_2027_001.dat", "Encounter File", "ENC-DC-2027-06-01", PERIOD_Q2, "DC", "Accepted", 512840, 10, "encounter.ops"],
-		["MD_Encounter_Q2_2027_Final.dat", "Encounter File", "ENC-MD-2027-06-F", PERIOD_Q2, "MD", "Accepted", 421560, 16, "encounter.ops"],
-		["DC_Eligibility_Q2_2027.dat", "Member Eligibility", "ELIG-DC-2027-06", PERIOD_Q2, "DC", "Acknowledged", 389104, 8, "membership.ops"],
-		["DC_Provider_Q2_2027.dat", "Provider Data", "PROV-DC-2027-06", PERIOD_Q2, "DC", "Rejected", 84320, 11, "network.ops"],
-		["DC_Encounter_Q2_2027_003.dat", "Encounter File", "ENC-DC-2027-06-03", PERIOD_Q2, "DC", "Pending", 498220, 3, "encounter.ops"],
+		[
+			"DC_Encounter_Q2_2027_001.dat",
+			"Encounter File",
+			"ENC-DC-2027-06-01",
+			PERIOD_Q2,
+			"DC",
+			"Accepted",
+			512840,
+			10,
+			"encounter.ops",
+		],
+		[
+			"MD_Encounter_Q2_2027_Final.dat",
+			"Encounter File",
+			"ENC-MD-2027-06-F",
+			PERIOD_Q2,
+			"MD",
+			"Accepted",
+			421560,
+			16,
+			"encounter.ops",
+		],
+		[
+			"DC_Eligibility_Q2_2027.dat",
+			"Member Eligibility",
+			"ELIG-DC-2027-06",
+			PERIOD_Q2,
+			"DC",
+			"Acknowledged",
+			389104,
+			8,
+			"membership.ops",
+		],
+		[
+			"DC_Provider_Q2_2027.dat",
+			"Provider Data",
+			"PROV-DC-2027-06",
+			PERIOD_Q2,
+			"DC",
+			"Rejected",
+			84320,
+			11,
+			"network.ops",
+		],
+		[
+			"DC_Encounter_Q2_2027_003.dat",
+			"Encounter File",
+			"ENC-DC-2027-06-03",
+			PERIOD_Q2,
+			"DC",
+			"Pending",
+			498220,
+			3,
+			"encounter.ops",
+		],
 	];
-	for (const [fileName, reportType, batch, period, state, status, records, days, by] of medicaidSubs) {
+	for (const [
+		fileName,
+		reportType,
+		batch,
+		period,
+		state,
+		status,
+		records,
+		days,
+		by,
+	] of medicaidSubs) {
 		const created = await createIfMissing({
 			token,
 			label: "medicaid-sub",
@@ -538,19 +723,46 @@ async function main() {
 
 	// ——— Responses ———
 	console.log("\n== Program responses ==");
-	const existingResponses = await listAll(token, "/api/v1/program-responses/list/");
+	const existingResponses = await listAll(
+		token,
+		"/api/v1/program-responses/list/"
+	);
 	const respByFile = new Map(existingResponses.map((r) => [r.responseFile, r]));
 
 	const medicareResponses = [
-		["PDE_RESP_06212027.xml", "PDE-2027-0620", "Processed", 842560, 120, 40, 11],
+		[
+			"PDE_RESP_06212027.xml",
+			"PDE-2027-0620",
+			"Processed",
+			842560,
+			120,
+			40,
+			11,
+		],
 		["PDE_RESP_06192027.xml", "PDE-2027-0618", "Processed", 721440, 0, 12, 13],
 		["PDE_RESP_06162027.xml", "PDE-2027-0615", "Failed", 12840, 12840, 0, 16],
 		["PDE_RESP_06132027.xml", "PDE-2027-0612", "Processed", 598220, 85, 22, 19],
 		["PDE_RESP_06092027.xml", "PDE-2027-0608", "Pending", 4280, 0, 0, 23],
-		["EDS_RESP_Q2_001.xml", "EDS-2027-Q2-01", "Processed", 312400, 1240, 310, 8],
+		[
+			"EDS_RESP_Q2_001.xml",
+			"EDS-2027-Q2-01",
+			"Processed",
+			312400,
+			1240,
+			310,
+			8,
+		],
 		["RAPS_RESP_Q2.xml", "RAPS-2027-Q2", "Processed", 95600, 40, 15, 17],
 	];
-	for (const [responseFile, batch, status, records, errors, warnings, days] of medicareResponses) {
+	for (const [
+		responseFile,
+		batch,
+		status,
+		records,
+		errors,
+		warnings,
+		days,
+	] of medicareResponses) {
 		const sub = subByBatch.get(batch);
 		await createIfMissing({
 			token,
@@ -572,13 +784,61 @@ async function main() {
 	}
 
 	const medicaidResponses = [
-		["DC_MMIS_Response_Q2_2027_001.rsp", "ENC-DC-2027-06-01", "Processed", 512840, 12480, 2240, 9],
-		["MD_MMIS_Response_Q2_2027_Final.rsp", "ENC-MD-2027-06-F", "Processed", 421560, 8920, 1760, 15],
-		["DC_MMIS_Response_Q2_2027_ELIG.rsp", "ELIG-DC-2027-06", "Processed", 389104, 8284, 2400, 7],
-		["DC_MMIS_Response_Q2_2027_PROV.rsp", "PROV-DC-2027-06", "Failed", 84320, 84320, 0, 10],
-		["DC_MMIS_Response_Q2_2027_003.rsp", "ENC-DC-2027-06-03", "Pending", 498220, 0, 0, 2],
+		[
+			"DC_MMIS_Response_Q2_2027_001.rsp",
+			"ENC-DC-2027-06-01",
+			"Processed",
+			512840,
+			12480,
+			2240,
+			9,
+		],
+		[
+			"MD_MMIS_Response_Q2_2027_Final.rsp",
+			"ENC-MD-2027-06-F",
+			"Processed",
+			421560,
+			8920,
+			1760,
+			15,
+		],
+		[
+			"DC_MMIS_Response_Q2_2027_ELIG.rsp",
+			"ELIG-DC-2027-06",
+			"Processed",
+			389104,
+			8284,
+			2400,
+			7,
+		],
+		[
+			"DC_MMIS_Response_Q2_2027_PROV.rsp",
+			"PROV-DC-2027-06",
+			"Failed",
+			84320,
+			84320,
+			0,
+			10,
+		],
+		[
+			"DC_MMIS_Response_Q2_2027_003.rsp",
+			"ENC-DC-2027-06-03",
+			"Pending",
+			498220,
+			0,
+			0,
+			2,
+		],
 	];
-	for (const [responseFile, batch, status, records, errors, warnings, days] of medicaidResponses) {
+	for (const [
+		responseFile,
+		batch,
+		status,
+		records,
+		errors,
+		warnings,
+		days,
+	] of medicaidResponses) {
 		const sub = subByBatch.get(batch);
 		await createIfMissing({
 			token,
@@ -604,15 +864,127 @@ async function main() {
 	const existingAudits = await listAll(token, "/api/v1/program-audits/list/");
 	const auditByActivity = new Map(existingAudits.map((a) => [a.activity, a]));
 	const audits = [
-		["medicare", "PDE file integrity review", "High", "Completed", 10, { auditType: "File Integrity", reportType: "Part D (PDE)", plan: "PBP 001", auditPeriod: PERIOD_Q2, auditor: "Internal Audit", findings: 3, description: "NDC format and compound code checks" }],
-		["medicare", "Encounter data completeness", "Medium", "In Progress", 6, { auditType: "Completeness", reportType: "Encounter Data", plan: "PBP 002", auditPeriod: PERIOD_Q2, auditor: "Compliance", findings: 5, description: "Missing rendering NPI on professional claims" }],
-		["medicare", "Risk adjustment coding sample", "Critical", "Open", 4, { auditType: "Coding", reportType: "Risk Adjustment", plan: "PBP 001", auditPeriod: PERIOD_Q2, auditor: "External Vendor", findings: 8, description: "HCC capture gaps in diabetes cohort" }],
-		["medicare", "Part D reconciliation controls", "High", "Scheduled", 2, { auditType: "Controls", reportType: "Part D (PDE)", plan: "All PBPs", auditPeriod: PERIOD_Q2, auditor: "Internal Audit", findings: 0, description: "Quarterly PDE variance control walkthrough" }],
-		["medicare", "Medicare attestation evidence review", "Low", "Completed", 20, { auditType: "Attestation", reportType: "Compliance", plan: "Contract H1234", auditPeriod: PERIOD_Q1, auditor: "Compliance", findings: 1, description: "Evidence pack for Q1 attestation" }],
-		["medicaid", "State MMIS acceptance sampling", "Medium", "Completed", 12, { auditType: "Acceptance", reportType: "Encounter File", plan: "MFC-DC-100", auditPeriod: PERIOD_Q2, auditor: "QA", findings: 2, description: "Sampled rejected encounters for root cause" }],
-		["medicaid", "Provider roster data quality", "High", "In Progress", 5, { auditType: "Data Quality", reportType: "Provider Data", plan: "MFC-DC-100", auditPeriod: PERIOD_Q2, auditor: "Network Ops", findings: 4, description: "Invalid taxonomy codes on roster file" }],
+		[
+			"medicare",
+			"PDE file integrity review",
+			"High",
+			"Completed",
+			10,
+			{
+				auditType: "File Integrity",
+				reportType: "Part D (PDE)",
+				plan: "PBP 001",
+				auditPeriod: PERIOD_Q2,
+				auditor: "Internal Audit",
+				findings: 3,
+				description: "NDC format and compound code checks",
+			},
+		],
+		[
+			"medicare",
+			"Encounter data completeness",
+			"Medium",
+			"In Progress",
+			6,
+			{
+				auditType: "Completeness",
+				reportType: "Encounter Data",
+				plan: "PBP 002",
+				auditPeriod: PERIOD_Q2,
+				auditor: "Compliance",
+				findings: 5,
+				description: "Missing rendering NPI on professional claims",
+			},
+		],
+		[
+			"medicare",
+			"Risk adjustment coding sample",
+			"Critical",
+			"Open",
+			4,
+			{
+				auditType: "Coding",
+				reportType: "Risk Adjustment",
+				plan: "PBP 001",
+				auditPeriod: PERIOD_Q2,
+				auditor: "External Vendor",
+				findings: 8,
+				description: "HCC capture gaps in diabetes cohort",
+			},
+		],
+		[
+			"medicare",
+			"Part D reconciliation controls",
+			"High",
+			"Scheduled",
+			2,
+			{
+				auditType: "Controls",
+				reportType: "Part D (PDE)",
+				plan: "All PBPs",
+				auditPeriod: PERIOD_Q2,
+				auditor: "Internal Audit",
+				findings: 0,
+				description: "Quarterly PDE variance control walkthrough",
+			},
+		],
+		[
+			"medicare",
+			"Medicare attestation evidence review",
+			"Low",
+			"Completed",
+			20,
+			{
+				auditType: "Attestation",
+				reportType: "Compliance",
+				plan: "Contract H1234",
+				auditPeriod: PERIOD_Q1,
+				auditor: "Compliance",
+				findings: 1,
+				description: "Evidence pack for Q1 attestation",
+			},
+		],
+		[
+			"medicaid",
+			"State MMIS acceptance sampling",
+			"Medium",
+			"Completed",
+			12,
+			{
+				auditType: "Acceptance",
+				reportType: "Encounter File",
+				plan: "MFC-DC-100",
+				auditPeriod: PERIOD_Q2,
+				auditor: "QA",
+				findings: 2,
+				description: "Sampled rejected encounters for root cause",
+			},
+		],
+		[
+			"medicaid",
+			"Provider roster data quality",
+			"High",
+			"In Progress",
+			5,
+			{
+				auditType: "Data Quality",
+				reportType: "Provider Data",
+				plan: "MFC-DC-100",
+				auditPeriod: PERIOD_Q2,
+				auditor: "Network Ops",
+				findings: 4,
+				description: "Invalid taxonomy codes on roster file",
+			},
+		],
 	];
-	for (const [programType, activity, severity, status, days, details] of audits) {
+	for (const [
+		programType,
+		activity,
+		severity,
+		status,
+		days,
+		details,
+	] of audits) {
 		await createIfMissing({
 			token,
 			label: "audit",
@@ -636,19 +1008,127 @@ async function main() {
 	const excKey = (e) => `${e.programType}|${e.errorCode}|${e.submissionBatch}`;
 	const excByKey = new Map(existingExc.map((e) => [excKey(e), e]));
 	const exceptions = [
-		["medicare", "PDE-4012", "Invalid NDC code format on prescription drug event", "Critical", "", "PDE-2027-0615", 842, "Open"],
-		["medicare", "PDE-2201", "Compound code missing for multi-ingredient claim", "High", "", "PDE-2027-0615", 210, "In Review"],
-		["medicare", "EDS-110", "Member HICN/MBI not found on enrollment file", "High", "", "EDS-2027-Q2-01", 640, "Open"],
-		["medicare", "EDS-204", "Service date outside reporting period", "Medium", "", "EDS-2027-Q2-01", 180, "Open"],
-		["medicare", "RAPS-019", "Diagnosis code not billable for risk adjustment", "Medium", "", "RAPS-2027-Q2", 95, "Resolved"],
-		["medicare", "PDE-088", "Duplicate PDE record for same Rx fill", "Low", "", "PDE-2027-0620", 44, "Resolved"],
-		["medicaid", "ME-001", "Invalid member identifier", "Critical", "DC", "ENC-DC-2027-06-01", 1240, "Open"],
-		["medicaid", "ME-014", "Service date outside eligibility", "Warning", "DC", "ENC-DC-2027-06-01", 880, "In Review"],
-		["medicaid", "PR-008", "Provider NPI not on file", "Critical", "DC", "PROV-DC-2027-06", 4200, "Open"],
-		["medicaid", "EN-022", "Duplicate encounter record", "Warning", "MD", "ENC-MD-2027-06-F", 610, "Resolved"],
-		["medicaid", "EL-003", "Missing subscriber ID on eligibility row", "Info", "DC", "ELIG-DC-2027-06", 95, "Open"],
+		[
+			"medicare",
+			"PDE-4012",
+			"Invalid NDC code format on prescription drug event",
+			"Critical",
+			"",
+			"PDE-2027-0615",
+			842,
+			"Open",
+		],
+		[
+			"medicare",
+			"PDE-2201",
+			"Compound code missing for multi-ingredient claim",
+			"High",
+			"",
+			"PDE-2027-0615",
+			210,
+			"In Review",
+		],
+		[
+			"medicare",
+			"EDS-110",
+			"Member HICN/MBI not found on enrollment file",
+			"High",
+			"",
+			"EDS-2027-Q2-01",
+			640,
+			"Open",
+		],
+		[
+			"medicare",
+			"EDS-204",
+			"Service date outside reporting period",
+			"Medium",
+			"",
+			"EDS-2027-Q2-01",
+			180,
+			"Open",
+		],
+		[
+			"medicare",
+			"RAPS-019",
+			"Diagnosis code not billable for risk adjustment",
+			"Medium",
+			"",
+			"RAPS-2027-Q2",
+			95,
+			"Resolved",
+		],
+		[
+			"medicare",
+			"PDE-088",
+			"Duplicate PDE record for same Rx fill",
+			"Low",
+			"",
+			"PDE-2027-0620",
+			44,
+			"Resolved",
+		],
+		[
+			"medicaid",
+			"ME-001",
+			"Invalid member identifier",
+			"Critical",
+			"DC",
+			"ENC-DC-2027-06-01",
+			1240,
+			"Open",
+		],
+		[
+			"medicaid",
+			"ME-014",
+			"Service date outside eligibility",
+			"Warning",
+			"DC",
+			"ENC-DC-2027-06-01",
+			880,
+			"In Review",
+		],
+		[
+			"medicaid",
+			"PR-008",
+			"Provider NPI not on file",
+			"Critical",
+			"DC",
+			"PROV-DC-2027-06",
+			4200,
+			"Open",
+		],
+		[
+			"medicaid",
+			"EN-022",
+			"Duplicate encounter record",
+			"Warning",
+			"MD",
+			"ENC-MD-2027-06-F",
+			610,
+			"Resolved",
+		],
+		[
+			"medicaid",
+			"EL-003",
+			"Missing subscriber ID on eligibility row",
+			"Info",
+			"DC",
+			"ELIG-DC-2027-06",
+			95,
+			"Open",
+		],
 	];
-	for (const [programType, errorCode, description, severity, state, batch, count, status] of exceptions) {
+	for (const [
+		programType,
+		errorCode,
+		description,
+		severity,
+		state,
+		batch,
+		count,
+		status,
+	] of exceptions) {
 		const key = `${programType}|${errorCode}|${batch}`;
 		await createIfMissing({
 			token,
@@ -674,18 +1154,128 @@ async function main() {
 	const existingDocs = await listAll(token, "/api/v1/program-documents/list/");
 	const docByName = new Map(existingDocs.map((d) => [d.name, d]));
 	const docs = [
-		["medicare", "PDE_06202027.xml", "xml", "Submitted File", PERIOD_Q2, "", "Submitted", "48.2 MB", 12],
-		["medicare", "PDE_RESP_06212027.xml", "xml", "Response File", PERIOD_Q2, "", "Received", "6.1 MB", 11],
-		["medicare", "PDE_validation_Q2_2027.pdf", "pdf", "Validation Report", PERIOD_Q2, "", "Complete", "1.4 MB", 10],
-		["medicare", "MA_Encounter_Q2_2027_001.xml", "xml", "Submitted File", PERIOD_Q2, "", "Submitted", "112 MB", 9],
-		["medicare", "EDS_acceptance_Q2.pdf", "pdf", "Acceptance Report", PERIOD_Q2, "", "Complete", "820 KB", 8],
-		["medicare", "medicare_audit_workpapers_Q2.xlsx", "xlsx", "Audit Document", PERIOD_Q2, "", "Reference", "2.3 MB", 6],
-		["medicaid", "DC_Encounter_Q2_2027_001.dat", "dat", "Submitted File", PERIOD_Q2, "DC", "Submitted", "86 MB", 10],
-		["medicaid", "DC_MMIS_Response_Q2_2027_001.rsp", "rsp", "Response File", PERIOD_Q2, "DC", "Received", "12 MB", 9],
-		["medicaid", "DC_validation_summary_Q2.pdf", "pdf", "Validation Report", PERIOD_Q2, "DC", "Complete", "1.1 MB", 8],
-		["medicaid", "MD_Encounter_Q2_2027_Final.dat", "dat", "Submitted File", PERIOD_Q2, "MD", "Submitted", "71 MB", 16],
+		[
+			"medicare",
+			"PDE_06202027.xml",
+			"xml",
+			"Submitted File",
+			PERIOD_Q2,
+			"",
+			"Submitted",
+			"48.2 MB",
+			12,
+		],
+		[
+			"medicare",
+			"PDE_RESP_06212027.xml",
+			"xml",
+			"Response File",
+			PERIOD_Q2,
+			"",
+			"Received",
+			"6.1 MB",
+			11,
+		],
+		[
+			"medicare",
+			"PDE_validation_Q2_2027.pdf",
+			"pdf",
+			"Validation Report",
+			PERIOD_Q2,
+			"",
+			"Complete",
+			"1.4 MB",
+			10,
+		],
+		[
+			"medicare",
+			"MA_Encounter_Q2_2027_001.xml",
+			"xml",
+			"Submitted File",
+			PERIOD_Q2,
+			"",
+			"Submitted",
+			"112 MB",
+			9,
+		],
+		[
+			"medicare",
+			"EDS_acceptance_Q2.pdf",
+			"pdf",
+			"Acceptance Report",
+			PERIOD_Q2,
+			"",
+			"Complete",
+			"820 KB",
+			8,
+		],
+		[
+			"medicare",
+			"medicare_audit_workpapers_Q2.xlsx",
+			"xlsx",
+			"Audit Document",
+			PERIOD_Q2,
+			"",
+			"Reference",
+			"2.3 MB",
+			6,
+		],
+		[
+			"medicaid",
+			"DC_Encounter_Q2_2027_001.dat",
+			"dat",
+			"Submitted File",
+			PERIOD_Q2,
+			"DC",
+			"Submitted",
+			"86 MB",
+			10,
+		],
+		[
+			"medicaid",
+			"DC_MMIS_Response_Q2_2027_001.rsp",
+			"rsp",
+			"Response File",
+			PERIOD_Q2,
+			"DC",
+			"Received",
+			"12 MB",
+			9,
+		],
+		[
+			"medicaid",
+			"DC_validation_summary_Q2.pdf",
+			"pdf",
+			"Validation Report",
+			PERIOD_Q2,
+			"DC",
+			"Complete",
+			"1.1 MB",
+			8,
+		],
+		[
+			"medicaid",
+			"MD_Encounter_Q2_2027_Final.dat",
+			"dat",
+			"Submitted File",
+			PERIOD_Q2,
+			"MD",
+			"Submitted",
+			"71 MB",
+			16,
+		],
 	];
-	for (const [programType, name, fileKind, documentType, period, state, status, fileSize, days] of docs) {
+	for (const [
+		programType,
+		name,
+		fileKind,
+		documentType,
+		period,
+		state,
+		status,
+		fileSize,
+		days,
+	] of docs) {
 		await createIfMissing({
 			token,
 			label: "document",
@@ -718,7 +1308,15 @@ async function main() {
 		["003", "Monthly PDE", 598220, 598135, 85, "Pending", PERIOD_Q2],
 		["001", "Q1 Closeout", 910200, 910180, 20, "Reconciled", PERIOD_Q1],
 	];
-	for (const [pbp, reconciliationType, submitted, accepted, variance, status, period] of pdes) {
+	for (const [
+		pbp,
+		reconciliationType,
+		submitted,
+		accepted,
+		variance,
+		status,
+		period,
+	] of pdes) {
 		const key = `${pbp}|${reconciliationType}|${period}`;
 		await createIfMissing({
 			token,
@@ -738,7 +1336,9 @@ async function main() {
 		});
 	}
 
-	console.log("\nDone. Refresh Program Reporting (Medicare, period Q2 2027) + Compliance Calendar.");
+	console.log(
+		"\nDone. Refresh Program Reporting (Medicare, period Q2 2027) + Compliance Calendar."
+	);
 }
 
 main().catch((err) => {

@@ -140,9 +140,13 @@ export function useRevalidateClaimHeadersMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: (claimHeaderIds: string[]) => {
-			const ids = [...new Set(claimHeaderIds.map((id) => id.trim()).filter(Boolean))];
+			const ids = [
+				...new Set(claimHeaderIds.map((id) => id.trim()).filter(Boolean)),
+			];
 			if (ids.length === 0) {
-				return Promise.reject(new Error("Select at least one claim to re-validate."));
+				return Promise.reject(
+					new Error("Select at least one claim to re-validate.")
+				);
 			}
 			if (ids.length > 100) {
 				return Promise.reject(

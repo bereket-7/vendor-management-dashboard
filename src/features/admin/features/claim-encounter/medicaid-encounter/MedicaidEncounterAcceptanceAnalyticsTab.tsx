@@ -58,8 +58,8 @@ import {
 	MEDICAID_TOP_REJECTIONS,
 } from "@/features/admin/features/claim-encounter/medicaid-encounter/feature/queries/useMedicaidEncounterQuery";
 import { getAcceptanceDerived } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
-import { useProgramOverviewQuery } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
 import { emptyOverview } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
+import { useProgramOverviewQuery } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
 import { cn } from "@/lib/utils";
 
@@ -360,7 +360,11 @@ function ReportsByTypeDonut() {
 	);
 }
 
-function TopRejectionReasonsTable({ rows = MEDICAID_TOP_REJECTIONS }: { rows?: typeof MEDICAID_TOP_REJECTIONS }) {
+function TopRejectionReasonsTable({
+	rows = MEDICAID_TOP_REJECTIONS,
+}: {
+	rows?: typeof MEDICAID_TOP_REJECTIONS;
+}) {
 	return (
 		<CmsEdgeSectionPanel
 			className="flex h-full min-h-0 flex-col"
@@ -444,17 +448,18 @@ function TopRejectionReasonsTable({ rows = MEDICAID_TOP_REJECTIONS }: { rows?: t
 	);
 }
 
-function AcceptanceRateByMonthChart({ data = MEDICAID_RATE_BY_MONTH }: { data?: Array<{ month: string; rate: number; prior?: number }> }) {
+function AcceptanceRateByMonthChart({
+	data = MEDICAID_RATE_BY_MONTH,
+}: {
+	data?: Array<{ month: string; rate: number; prior?: number }>;
+}) {
 	return (
 		<ChartPanel
 			title="Acceptance Rate by Month"
 			footer={<PanelLink>View Details</PanelLink>}
 		>
 			<ResponsiveContainer width="100%" height="100%" minHeight={180}>
-				<BarChart
-					data={data}
-					margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-				>
+				<BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
 					<CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
 					<XAxis
 						dataKey="month"
@@ -695,9 +700,7 @@ export function MedicaidEncounterAcceptanceAnalyticsTab({
 						}))}
 					/>
 				}
-				center={
-					<AcceptanceRateByMonthChart data={derived.acceptanceTrend} />
-				}
+				center={<AcceptanceRateByMonthChart data={derived.acceptanceTrend} />}
 				right={
 					<CmsEdgeSectionPanel title="Summary by Report Type">
 						<p className="border-t border-border/50 px-4 py-8 text-center text-sm text-muted-foreground">

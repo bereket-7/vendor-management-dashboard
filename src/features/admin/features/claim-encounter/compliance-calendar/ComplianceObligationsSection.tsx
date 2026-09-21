@@ -191,7 +191,9 @@ export function ComplianceObligationsSection({
 										<TableCell className={TABLE_CELL}>
 											{row.obligationType}
 										</TableCell>
-										<TableCell className={TABLE_CELL}>{row.frequency}</TableCell>
+										<TableCell className={TABLE_CELL}>
+											{row.frequency}
+										</TableCell>
 										<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
 											{row.dueDate}
 										</TableCell>
@@ -219,7 +221,12 @@ export function ComplianceObligationsSection({
 											{row.sourceModule}
 										</TableCell>
 										<TableCell className={cn(TABLE_CELL, "text-right")}>
-											<Button asChild variant="ghost" size="sm" className="h-7 text-xs">
+											<Button
+												asChild
+												variant="ghost"
+												size="sm"
+												className="h-7 text-xs"
+											>
 												<Link
 													href={`/admin/claim-encounter/regulatory/compliance-calendar/${row.id}`}
 												>

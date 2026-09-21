@@ -19,6 +19,7 @@ import {
 	Users,
 	Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,22 +41,17 @@ import { CONTRACT_TYPE_OPTIONS } from "@/features/admin/features/contracts/featu
 import type { RiskLevel, VendorStatus } from "@/features/shared/vms/types";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import type {
-	CredentialDto,
-	VendorCategoryDto,
-} from "@/lib/vendor-core/types";
+import type { CredentialDto, VendorCategoryDto } from "@/lib/vendor-core/types";
 
-import { toast } from "sonner";
-
-import {
-	discoverVendorHostKey,
-	listVendorCredentials,
-} from "../feature/api/vendorsApi";
 import {
 	defaultSftpPortForHost,
 	isLocalSftpHost,
 	portAfterHostChange,
 } from "../connection-form";
+import {
+	discoverVendorHostKey,
+	listVendorCredentials,
+} from "../feature/api/vendorsApi";
 import {
 	EMPTY_VENDOR_WIZARD,
 	VENDOR_WIZARD_STEPS,
@@ -914,8 +910,7 @@ function IntegrationStep({
 			Number.isFinite(portNum) && portNum > 0
 				? portNum
 				: Number(defaultSftpPortForHost(host));
-		const effectivePort =
-			isLocalSftpHost(host) && port === 22 ? 2222 : port;
+		const effectivePort = isLocalSftpHost(host) && port === 22 ? 2222 : port;
 		setDiscoveringHostKey(true);
 		try {
 			const result = await discoverVendorHostKey({
@@ -1065,10 +1060,7 @@ function IntegrationStep({
 										const host = e.target.value;
 										patchConnection({
 											host,
-											port: portAfterHostChange(
-												host,
-												values.connection.port
-											),
+											port: portAfterHostChange(host, values.connection.port),
 										});
 									}}
 									placeholder="sftp.example.com"
@@ -1085,9 +1077,7 @@ function IntegrationStep({
 							>
 								<Input
 									value={values.connection.port}
-									onChange={(e) =>
-										patchConnection({ port: e.target.value })
-									}
+									onChange={(e) => patchConnection({ port: e.target.value })}
 									className="h-11 font-mono"
 								/>
 							</Field>
@@ -1110,9 +1100,7 @@ function IntegrationStep({
 								className="sm:col-span-2"
 							>
 								<Select
-									value={
-										values.connection.password_credential_id || "__none__"
-									}
+									value={values.connection.password_credential_id || "__none__"}
 									onValueChange={(v) =>
 										patchConnection({
 											password_credential_id: v === "__none__" ? "" : v,
@@ -1192,8 +1180,7 @@ function IntegrationStep({
 										variant="secondary"
 										className="h-11 shrink-0"
 										disabled={
-											discoveringHostKey ||
-											!values.connection.host.trim()
+											discoveringHostKey || !values.connection.host.trim()
 										}
 										onClick={() => void discoverHostKey()}
 									>
@@ -1254,14 +1241,10 @@ function IntegrationStep({
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="development">
-													Development
-												</SelectItem>
+												<SelectItem value="development">Development</SelectItem>
 												<SelectItem value="test">Test</SelectItem>
 												<SelectItem value="uat">UAT</SelectItem>
-												<SelectItem value="production">
-													Production
-												</SelectItem>
+												<SelectItem value="production">Production</SelectItem>
 											</SelectContent>
 										</Select>
 									</Field>
@@ -1296,8 +1279,7 @@ function IntegrationStep({
 											}
 											onValueChange={(v) =>
 												patchConnection({
-													private_key_credential_id:
-														v === "__none__" ? "" : v,
+													private_key_credential_id: v === "__none__" ? "" : v,
 												})
 											}
 										>
@@ -1328,14 +1310,10 @@ function IntegrationStep({
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="development">
-													Development
-												</SelectItem>
+												<SelectItem value="development">Development</SelectItem>
 												<SelectItem value="test">Test</SelectItem>
 												<SelectItem value="uat">UAT</SelectItem>
-												<SelectItem value="production">
-													Production
-												</SelectItem>
+												<SelectItem value="production">Production</SelectItem>
 											</SelectContent>
 										</Select>
 									</Field>

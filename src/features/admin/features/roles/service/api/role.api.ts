@@ -9,8 +9,8 @@ import { vendorCoreApi } from "@/lib/vendor-core/api";
 import type { ApiRoleDto, ApiRoleListResponseDto } from "../../dto/role.dto";
 import type { RoleModel } from "../../types/role.types";
 import { toRoleModelList } from "../mappers/role.mapper";
-import { MOCK_ROLES } from "./role.mock";
 import { roleEndpoints } from "./role.endpoints";
+import { MOCK_ROLES } from "./role.mock";
 
 export const roleApi = {
 	async list(): Promise<RoleModel[]> {

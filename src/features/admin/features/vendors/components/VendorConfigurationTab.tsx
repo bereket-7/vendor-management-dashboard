@@ -62,30 +62,30 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VendorCategoriesPanel } from "@/features/admin/features/vendors/components/VendorCategoriesPanel";
 import {
-	type VendorConfigJob,
-	type VendorIntegrationProfile,
-	type VendorSftpConnection,
-} from "@/features/admin/features/vendors/vendor-types";
-import {
+	type ConnectionFormDraft,
 	credentialOptionLabel,
 	draftFromSftpConnection,
 	emptyConnectionFormDraft,
 	isLocalSftpHost,
 	portAfterHostChange,
-	type ConnectionFormDraft,
 	validateConnectionDraft,
 } from "@/features/admin/features/vendors/connection-form";
 import {
 	discoverVendorHostKey,
 	discoverVendorHostKeyById,
 } from "@/features/admin/features/vendors/feature/api/vendorsApi";
-import { VendorCategoriesPanel } from "@/features/admin/features/vendors/components/VendorCategoriesPanel";
+import {
+	type VendorConfigJob,
+	type VendorIntegrationProfile,
+	type VendorSftpConnection,
+} from "@/features/admin/features/vendors/vendor-types";
+import { cn } from "@/lib/utils";
 import type {
 	CredentialDto,
 	VendorIntegrationProfileUpdateInput,
 } from "@/lib/vendor-core/types";
-import { cn } from "@/lib/utils";
 
 const JOB_SUBTABS = [
 	"Jobs",
@@ -602,8 +602,7 @@ export function VendorConfigurationTab({
 			return;
 		}
 		const portNum = Number(connectionDraft.port);
-		const port =
-			Number.isFinite(portNum) && portNum > 0 ? portNum : undefined;
+		const port = Number.isFinite(portNum) && portNum > 0 ? portNum : undefined;
 		setDiscoveringHostKey(true);
 		try {
 			const result =
@@ -631,9 +630,7 @@ export function VendorConfigurationTab({
 			);
 		} catch (err) {
 			toast.error(
-				err instanceof Error
-					? err.message
-					: "Could not discover host key."
+				err instanceof Error ? err.message : "Could not discover host key."
 			);
 		} finally {
 			setDiscoveringHostKey(false);
@@ -1987,9 +1984,7 @@ export function VendorConfigurationTab({
 										Only if key auth — leave None for password-only.
 									</p>
 									<Select
-										value={
-											connectionDraft.privateKeyCredentialId || "__none__"
-										}
+										value={connectionDraft.privateKeyCredentialId || "__none__"}
 										onValueChange={(v) =>
 											setConnectionDraft((p) => ({
 												...p,
@@ -2149,8 +2144,8 @@ export function VendorConfigurationTab({
 								</div>
 							) : (
 								<p className="text-[11px] text-muted-foreground">
-									Creates a CredentialReference row only — the secret value
-									must already exist under `.secrets.yml`.
+									Creates a CredentialReference row only — the secret value must
+									already exist under `.secrets.yml`.
 								</p>
 							)}
 						</div>

@@ -63,7 +63,6 @@ Deprecated Nest scaffold path `/api/admin/identity-groups/` — do not use.
 
 See monorepo [`docs/api/dashboard-endpoints.md`](../../../../../../docs/api/dashboard-endpoints.md).
 
-
 ## Offline (Dexie)
 
 - IndexedDB cache + sync queue under `offline/` and `src/lib/offline/`

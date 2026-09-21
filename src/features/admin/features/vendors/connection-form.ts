@@ -25,10 +25,7 @@ export function defaultSftpPortForHost(host: string): string {
  * When host changes, keep an explicit non-default port; otherwise apply host default.
  * Treats empty / "22" / "2222" as auto-managed defaults.
  */
-export function portAfterHostChange(
-	host: string,
-	currentPort: string
-): string {
+export function portAfterHostChange(host: string, currentPort: string): string {
 	const trimmed = currentPort.trim();
 	const autoManaged = !trimmed || trimmed === "22" || trimmed === "2222";
 	if (autoManaged) return defaultSftpPortForHost(host);
@@ -54,9 +51,7 @@ export type ConnectionFormDraft = {
 	privateKeyCredentialId: string;
 };
 
-export function emptyVendorSftpConnection(
-	name = ""
-): VendorSftpConnection {
+export function emptyVendorSftpConnection(name = ""): VendorSftpConnection {
 	return {
 		id: null,
 		connectionName: name,
@@ -143,10 +138,7 @@ export function validateConnectionDraft(
 	if (draft.method === "sftp_pull") {
 		if (!draft.host.trim()) return "Host is required for SFTP pull.";
 		if (!draft.username.trim()) return "Username is required for SFTP pull.";
-		if (
-			draft.status === "active" &&
-			!draft.hostKeyFingerprint.trim()
-		) {
+		if (draft.status === "active" && !draft.hostKeyFingerprint.trim()) {
 			return "An ACTIVE sftp_pull connection requires host_key_fingerprint.";
 		}
 	}

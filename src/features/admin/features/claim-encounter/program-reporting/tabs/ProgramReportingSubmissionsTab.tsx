@@ -59,13 +59,13 @@ import {
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import { formatCount } from "@/features/admin/features/claim-encounter/mock-data";
+import { emptySubmissions } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import {
 	MEDICAID_SUBMISSION_STATUS_STYLES,
 	MEDICARE_SUBMISSION_STATUS_STYLES,
 	type ProgramSubmissionsData,
 	useProgramSubmissionsQuery,
 } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
-import { emptySubmissions } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import type { ProgramType } from "@/features/admin/features/claim-encounter/program-reporting/types";
 import { cn } from "@/lib/utils";
 

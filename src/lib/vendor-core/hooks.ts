@@ -38,7 +38,8 @@ export const vendorCoreKeys = {
 	claimLines: () => [...vendorCoreKeys.all, "claim-lines"] as const,
 	credentials: () => [...vendorCoreKeys.all, "credentials"] as const,
 	eligibilityFiles: () => [...vendorCoreKeys.all, "eligibility-files"] as const,
-	claimVendorFiles: () => [...vendorCoreKeys.all, "claim-vendor-files"] as const,
+	claimVendorFiles: () =>
+		[...vendorCoreKeys.all, "claim-vendor-files"] as const,
 	claimResponses: () => [...vendorCoreKeys.all, "claim-responses"] as const,
 	claimExceptions: () => [...vendorCoreKeys.all, "claim-exceptions"] as const,
 	notifications: () => [...vendorCoreKeys.all, "notifications"] as const,

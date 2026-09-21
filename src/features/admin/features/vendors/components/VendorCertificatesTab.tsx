@@ -68,7 +68,9 @@ function labelForStatus(value: string) {
 	return CERT_STATUSES.find((t) => t.value === value)?.label ?? value;
 }
 
-export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) {
+export function VendorCertificatesTab({
+	vendorId,
+}: VendorCertificatesTabProps) {
 	const certsQ = useVendorCertificatesQuery(vendorId, true);
 	const createMutation = useCreateVendorCertificateMutation(vendorId);
 	const updateMutation = useUpdateVendorCertificateMutation();
@@ -132,7 +134,12 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 						</p>
 					</div>
 				</div>
-				<Button type="button" size="sm" className="h-8" onClick={() => setOpen(true)}>
+				<Button
+					type="button"
+					size="sm"
+					className="h-8"
+					onClick={() => setOpen(true)}
+				>
 					<Plus className="mr-1.5 size-3.5" />
 					Add certificate
 				</Button>
@@ -163,9 +170,7 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 										{labelForType(row.certification_type)}
 									</TableCell>
 									<TableCell>
-										<div className="text-sm">
-											{row.certifying_body || "—"}
-										</div>
+										<div className="text-sm">{row.certifying_body || "—"}</div>
 										<div className="font-mono text-[11px] text-muted-foreground">
 											{row.certificate_number || "—"}
 										</div>
@@ -180,9 +185,7 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 											}
 										>
 											<SelectTrigger className="h-8 w-[180px]">
-												<SelectValue>
-													{labelForStatus(row.status)}
-												</SelectValue>
+												<SelectValue>{labelForStatus(row.status)}</SelectValue>
 											</SelectTrigger>
 											<SelectContent>
 												{CERT_STATUSES.map((s) => (
@@ -207,9 +210,7 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 					</DialogHeader>
 					<div className="grid gap-3 sm:grid-cols-2">
 						<div className="sm:col-span-2 space-y-1.5">
-							<p className="text-xs font-medium text-muted-foreground">
-								Type
-							</p>
+							<p className="text-xs font-medium text-muted-foreground">Type</p>
 							<Select
 								value={form.certification_type}
 								onValueChange={(certification_type) =>
@@ -282,9 +283,7 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 							/>
 						</div>
 						<div className="sm:col-span-2 space-y-1.5">
-							<p className="text-xs font-medium text-muted-foreground">
-								Scope
-							</p>
+							<p className="text-xs font-medium text-muted-foreground">Scope</p>
 							<Input
 								value={form.scope_description}
 								onChange={(e) =>
@@ -302,9 +301,7 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 							</p>
 							<Select
 								value={form.status}
-								onValueChange={(status) =>
-									setForm((f) => ({ ...f, status }))
-								}
+								onValueChange={(status) => setForm((f) => ({ ...f, status }))}
 							>
 								<SelectTrigger className="h-9">
 									<SelectValue />
@@ -320,7 +317,11 @@ export function VendorCertificatesTab({ vendorId }: VendorCertificatesTabProps) 
 						</div>
 					</div>
 					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setOpen(false)}
+						>
 							Cancel
 						</Button>
 						<Button

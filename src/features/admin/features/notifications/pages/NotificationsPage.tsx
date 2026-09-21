@@ -38,8 +38,8 @@ import { useNotificationFileRunsList } from "@/features/admin/features/notificat
 import { VENDOR_ALERTS } from "@/features/admin/features/vendors/vendor-integration-mock";
 import { Link } from "@/i18n/navigation";
 import { isMockEnabled } from "@/lib/mock-mode";
-import { useVendorCoreNotifications } from "@/lib/vendor-core/hooks";
 import { cn } from "@/lib/utils";
+import { useVendorCoreNotifications } from "@/lib/vendor-core/hooks";
 import { useAdminModuleStore } from "@/stores/admin-module-store";
 
 type NotificationRow = {

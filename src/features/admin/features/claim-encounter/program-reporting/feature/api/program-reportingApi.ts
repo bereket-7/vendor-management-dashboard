@@ -1,9 +1,9 @@
 import {
+	type ProgramTypeDto,
 	fetchProgramAudits,
 	fetchProgramReportingOverview,
 	fetchProgramSubmissions,
 	updateProgramException,
-	type ProgramTypeDto,
 } from "@/lib/vendor-reporting/program-reporting";
 
 import type { ProgramType } from "../../types";
@@ -69,9 +69,7 @@ export async function getAcceptanceAnalytics(
 
 export async function getMedicareComplianceBundle() {
 	const [{ listObligations }, overview] = await Promise.all([
-		import(
-			"@/features/admin/features/claim-encounter/compliance-calendar/feature/api/compliance-calendarApi"
-		),
+		import("@/features/admin/features/claim-encounter/compliance-calendar/feature/api/compliance-calendarApi"),
 		getOverviewData("medicare"),
 	]);
 	const { items } = await listObligations({ program: "medicare" });

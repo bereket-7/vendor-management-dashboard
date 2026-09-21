@@ -1,0 +1,4 @@
+Member ID,Person Code,First Name,Last Name,Date of Birth,Gender,Relationship,Status,Eligibility Status,Plan Name,Plan Code,Group ID,Group Name,Email,Phone,Address Line 1,City,State,Postal Code,Program,LOB
+ELIG-10001,01,Ava,Nguyen,1988-04-12,F,18,active,eligible,PPO Gold,PPO-G,GRP-440,Acme Manufacturing,ava.nguyen@example.com,(410) 555-0101,120 Harbor Ave,Baltimore,MD,21201,Commercial,Medical
+ELIG-10002,01,Marcus,Reid,1975-11-03,M,18,active,eligible,HMO Silver,HMO-S,GRP-441,Harbor Logistics,marcus.reid@example.com,(301) 555-0144,88 Pratt St,Baltimore,MD,21202,Commercial,Medical
+ELIG-10003,02,Sofia,Reid,2008-06-21,F,19,active,eligible,HMO Silver,HMO-S,GRP-441,Harbor Logistics,,(301) 555-0144,88 Pratt St,Baltimore,MD,21202,Commercial,Medical

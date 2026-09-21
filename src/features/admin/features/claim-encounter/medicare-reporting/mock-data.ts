@@ -162,9 +162,11 @@ export const MEDICARE_PART_D_SUBMISSIONS: MedicarePartDSubmission[] = [];
 
 export const MEDICARE_PART_D_RESPONSES: MedicarePartDResponse[] = [];
 
-export const MEDICARE_PART_D_VALIDATION_ERRORS: MedicarePartDValidationError[] = [];
+export const MEDICARE_PART_D_VALIDATION_ERRORS: MedicarePartDValidationError[] =
+	[];
 
-export const MEDICARE_PART_D_RECONCILIATION: MedicarePartDReconciliationRow[] = [];
+export const MEDICARE_PART_D_RECONCILIATION: MedicarePartDReconciliationRow[] =
+	[];
 
 export const MEDICARE_PART_D_COMPLIANCE: MedicarePartDComplianceRow[] = [];
 

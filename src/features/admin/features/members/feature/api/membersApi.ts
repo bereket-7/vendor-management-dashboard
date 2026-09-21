@@ -26,6 +26,11 @@ import type {
 } from "@/lib/vendor-core/types";
 
 import {
+	type MemberImportFileKind,
+	type MemberImportRowDraft,
+	memberImportRowToCreateBody,
+} from "../../lib/member-import";
+import {
 	buildAccumulatorSummaryForMember,
 	mapAccumulatorFileRowToTransaction,
 	mapAccumulatorSummary,
@@ -689,8 +694,29 @@ export async function createMember(
 ) {
 	if (isMembersMockEnabled()) {
 		const existing = getMemberSummaries()[0];
-		if (!existing) throw new Error("No mock members");
-		return getMember(existing.id)!;
+		const id = `mock-import-${String(body.cardholder_id ?? "member")}-${Date.now()}`;
+		const first = String(body.first_name ?? "Imported");
+		const last = String(body.last_name ?? "Member");
+		if (!existing) {
+			return {
+				id,
+				memberId: String(body.cardholder_id ?? id),
+				firstName: first,
+				lastName: last,
+				status: "active",
+				eligibilityStatus: "eligible",
+			} as MemberDetail;
+		}
+		const template = getMember(existing.id);
+		if (!template) throw new Error("No mock members");
+		return {
+			...template,
+			id,
+			memberId: String(body.cardholder_id ?? template.memberId),
+			firstName: first,
+			lastName: last,
+			vendorId: String(body.vendor_id ?? template.vendorId ?? ""),
+		};
 	}
 	const dto = await vendorCoreApi.createMember(sanitizeMemberWriteBody(body));
 	const rawId =
@@ -750,6 +776,47 @@ export async function restoreMember(id: string) {
 export async function seedMembers(body?: Record<string, unknown>) {
 	if (isMembersMockEnabled()) return { created: 0, skipped: true };
 	return vendorCoreApi.seedMembers(body);
+}
+
+export type MemberBulkImportResult = {
+	createdCount: number;
+	updatedCount: number;
+	errorCount: number;
+	errors: { cardholderId: string; message: string }[];
+};
+
+export async function importMembersBulk(input: {
+	vendorId: string;
+	fileKind: MemberImportFileKind;
+	rows: MemberImportRowDraft[];
+	filename?: string;
+	onProgress?: (done: number, total: number) => void;
+}): Promise<MemberBulkImportResult> {
+	const { vendorId, fileKind, rows, onProgress } = input;
+	let createdCount = 0;
+	const errors: MemberBulkImportResult["errors"] = [];
+
+	// Live + mock: use existing member create endpoint (no dedicated import API).
+	for (let i = 0; i < rows.length; i += 1) {
+		const row = rows[i]!;
+		try {
+			await createMember(memberImportRowToCreateBody(row, vendorId, fileKind));
+			createdCount += 1;
+		} catch (err) {
+			errors.push({
+				cardholderId: row.cardholder_id,
+				message: err instanceof Error ? err.message : "Create failed",
+			});
+		}
+		onProgress?.(i + 1, rows.length);
+	}
+
+	return {
+		createdCount,
+		updatedCount: 0,
+		errorCount: errors.length,
+		errors,
+	};
 }
 
 export async function listMemberFamilyLinks(

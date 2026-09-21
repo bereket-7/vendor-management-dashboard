@@ -29,11 +29,11 @@ import {
 	CmsEdgeTableScroll,
 } from "@/features/admin/features/claim-encounter/cms-edge/CmsEdgeShared";
 import { useComplianceCalendarObligationsList } from "@/features/admin/features/claim-encounter/compliance-calendar/feature/queries/useComplianceCalendarQuery";
+import { emptyOverview } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import {
 	MEDICARE_COMPLIANCE_ATTESTATIONS,
 	useProgramOverviewQuery,
 } from "@/features/admin/features/claim-encounter/program-reporting/feature/queries/useProgramReportingQuery";
-import { emptyOverview } from "@/features/admin/features/claim-encounter/program-reporting/feature/mappers/program-reportingMappers";
 import { cn } from "@/lib/utils";
 
 const PAGE_STACK = "space-y-5";
@@ -302,12 +302,17 @@ function AttestationsTablePanel() {
 									<TableCell className={cn(TABLE_CELL, "font-medium")}>
 										{row.name}
 									</TableCell>
-									<TableCell className={TABLE_CELL}>{row.submittedBy}</TableCell>
+									<TableCell className={TABLE_CELL}>
+										{row.submittedBy}
+									</TableCell>
 									<TableCell className={cn(TABLE_CELL, "tabular-nums")}>
 										{row.submittedDate}
 									</TableCell>
 									<TableCell className={cn(TABLE_CELL, "pr-5")}>
-										<StatusPill label={row.status} className={row.statusStyle} />
+										<StatusPill
+											label={row.status}
+											className={row.statusStyle}
+										/>
 									</TableCell>
 								</TableRow>
 							))
@@ -325,9 +330,7 @@ export function MedicareComplianceTab({
 	const overviewQuery = useProgramOverviewQuery("medicare", reportingPeriod);
 	const overview = overviewQuery.data ?? emptyOverview("medicare");
 	const complianceStatus =
-		overview.kpis.kind === "medicare"
-			? overview.kpis.complianceStatus
-			: "—";
+		overview.kpis.kind === "medicare" ? overview.kpis.complianceStatus : "—";
 
 	const { obligations, isLoading } = useComplianceCalendarObligationsList({
 		program: "medicare",
